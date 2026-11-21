@@ -1,10 +1,61 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ChevronDown, Sparkles, CheckCircle2 } from 'lucide-react';
-import Container from '../ui/Container';
-import VillagePreview from './VillagePreview';
 
+/**
+ * Minimalist Editorial Homepage Hero Section (Frame Studio Inspired)
+ * Features:
+ * - Truly full-screen hero directly below navbar using normal document flow (min-h-[calc(100vh-80px)] / min-h-[calc(100dvh-80px)])
+ * - Background video absolutely positioned INSIDE hero container only (width 100%, height 100%, object-fit: cover)
+ * - Headline video targeting local /media/gaunpulse-hero.mp4 with 45% dark overlay for crisp legibility
+ * - Respects prefers-reduced-motion by pausing playback at the first frame without abstract placeholder graphics
+ * - Reduced headline size: "Every Village Deserves\nto Be Heard" (~42-48px desktop, 32-38px tablet, 28-32px mobile, weight 400-500, no period)
+ * - Small centered supporting paragraph (~16-17px desktop, 14-16px mobile, max-width ~650px)
+ * - Two compact rectangular buttons matching Frame Studio's refined aesthetic:
+ *     1. EXPLORE GAUNPULSE (black background, white text, scrolls to #how-it-works)
+ *     2. TRY THE LIVE DEMO (white background, black text, links to /demo)
+ * - Removed all eyebrow badges, sparkles, decorative dots, chevrons, and glassmorphic styling
+ */
 export function HeroSection() {
+  const videoRef = useRef(null);
+  const [hasVideoError, setHasVideoError] = useState(false);
+
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(() => {
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
+    return false;
+  });
+
+  // Dynamic listener for prefers-reduced-motion changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+      const handleMotionChange = (e) => setPrefersReducedMotion(e.matches);
+      motionQuery.addEventListener('change', handleMotionChange);
+
+      return () => {
+        motionQuery.removeEventListener('change', handleMotionChange);
+      };
+    }
+  }, []);
+
+  // Handle video playback respecting user preferences
+  useEffect(() => {
+    if (videoRef.current) {
+      if (prefersReducedMotion) {
+        videoRef.current.pause();
+        videoRef.current.currentTime = 0;
+      } else if (!hasVideoError) {
+        const playPromise = videoRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {
+            // Autoplay prevented by browser security policy
+          });
+        }
+      }
+    }
+  }, [prefersReducedMotion, hasVideoError]);
+
   const handleScrollToHowItWorks = (e) => {
     e.preventDefault();
     const target = document.getElementById('how-it-works');
@@ -17,84 +68,68 @@ export function HeroSection() {
   return (
     <section
       aria-label="GaunPulse Hero Introduction"
-      className="relative pt-6 pb-12 sm:pt-10 sm:pb-16 lg:pt-14 lg:pb-20 overflow-hidden"
+      className="relative w-full min-h-[calc(100vh-80px)] min-h-[calc(100dvh-80px)] flex items-center justify-center overflow-hidden bg-[#111111]"
     >
-      {/* Subtle organic background decoration */}
-      <div
-        className="absolute top-0 right-1/4 -z-10 w-96 h-96 bg-[#DDEBE2]/40 rounded-full blur-3xl pointer-events-none"
-        aria-hidden="true"
-      />
-      <div
-        className="absolute bottom-0 left-10 -z-10 w-72 h-72 bg-[#E3AD58]/10 rounded-full blur-2xl pointer-events-none"
-        aria-hidden="true"
-      />
-
-      <Container>
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
-          {/* Left Column: Value Proposition & Typography */}
-          <div className="lg:col-span-6 space-y-6 text-left">
-            {/* Eyebrow Badge */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#DDEBE2] border border-[#42866A]/20 text-xs sm:text-sm font-semibold text-[#173D32] shadow-2xs">
-              <Sparkles className="w-4 h-4 text-[#42866A]" />
-              <span>Smart Infrastructure. Stronger Communities.</span>
-            </div>
-
-            {/* Main Headline */}
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-[3.25rem] font-extrabold tracking-tight text-[#173D32] leading-[1.14]">
-              Every Village Has a Voice.{' '}
-              <span className="block text-[#42866A] mt-1 sm:mt-1.5">
-                Every Problem Deserves a Solution.
-              </span>
-            </h1>
-
-            {/* Supporting Description */}
-            <p className="text-base sm:text-lg text-[#1B2923]/80 leading-relaxed max-w-xl font-normal">
-              GaunPulse helps Nepal's communities and local governments understand infrastructure problems,
-              explore their impact, and make better-informed decisions through interactive maps, simulations,
-              and AI-assisted insights.
-            </p>
-
-            {/* Action Buttons */}
-            <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5 sm:gap-4">
-              <Link
-                to="/demo"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl text-base font-semibold bg-[#173D32] hover:bg-[#122F26] text-white shadow-sm hover:shadow-md transition-all duration-150 focus-visible:ring-2 focus-visible:ring-[#173D32] focus-visible:ring-offset-2 focus:outline-hidden group"
-              >
-                <span>Explore Interactive Demo</span>
-                <ArrowRight className="w-4 h-4 text-[#E3AD58] transition-transform group-hover:translate-x-1" />
-              </Link>
-
-              <a
-                href="#how-it-works"
-                onClick={handleScrollToHowItWorks}
-                className="inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl text-base font-semibold border border-[#42866A]/30 text-[#173D32] hover:bg-[#DDEBE2]/60 hover:border-[#42866A]/50 transition-all duration-150 focus-visible:ring-2 focus-visible:ring-[#42866A] focus-visible:ring-offset-2 focus:outline-hidden"
-              >
-                <span>Discover GaunPulse</span>
-                <ChevronDown className="w-4 h-4 text-[#42866A]" />
-              </a>
-            </div>
-
-            {/* Small Brand & Trust Label */}
-            <div className="pt-2 flex items-center gap-3 text-xs sm:text-sm text-[#42866A] font-medium border-t border-[#42866A]/15">
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-[#173D32]" />
-                <span className="font-semibold text-[#173D32]">
-                  GaunPulse — The Village That Speaks
-                </span>
-              </div>
-              <span className="text-[#42866A]/50 hidden sm:inline">•</span>
-              <span className="hidden sm:inline text-xs text-[#1B2923]/70">
-                CivicTech Prototype for Nepal
-              </span>
-            </div>
+      {/* 1. Background Video Layer (Confined INSIDE hero container, never overlaps navigation) */}
+      <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none select-none">
+        {!hasVideoError ? (
+          <video
+            ref={videoRef}
+            src="/media/gaunpulse-hero.mp4"
+            autoPlay={!prefersReducedMotion}
+            muted
+            loop
+            playsInline
+            controls={false}
+            preload="auto"
+            onError={() => setHasVideoError(true)}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          /* Solid neutral backdrop if video asset cannot be loaded */
+          <div className="w-full h-full bg-[#111111] flex items-center justify-center text-stone-500 text-xs">
+            <span>Video asset unavailable</span>
           </div>
+        )}
 
-          {/* Right Column: Visual Preview of Infrastructure Mapping Concept */}
-          <div className="lg:col-span-6 w-full">
-            <VillagePreview />
-          </div>
+        {/* 2. Moderate Dark Overlay for Crisp Legibility Without Excess Darkness */}
+        <div className="absolute inset-0 bg-black/45" aria-hidden="true" />
+      </div>
+
+      {/* 3. Centered Editorial Content Layer (Frame Studio Proportions) */}
+      <div className="relative z-10 w-full max-w-[760px] mx-auto px-4 sm:px-6 py-12 sm:py-16 flex flex-col items-center justify-center text-center space-y-5 sm:space-y-6">
+        {/* Main Headline (Frame Studio Proportions, No Period, Exact Line Break) */}
+        <h1 className="text-[28px] sm:text-[34px] md:text-[40px] lg:text-[48px] font-normal sm:font-medium tracking-tight text-white leading-[1.15] max-w-[700px] drop-shadow-sm">
+          Every Village Deserves
+          <br />
+          to Be Heard
+        </h1>
+
+        {/* Small Centered Supporting Paragraph */}
+        <p className="text-[14px] sm:text-[15px] md:text-[16px] lg:text-[17px] text-white/90 font-normal leading-relaxed max-w-[650px] drop-shadow-xs">
+          Understanding infrastructure challenges. Connecting communities. Building a smarter future for rural Nepal.
+        </p>
+
+        {/* Two Compact Rectangular Buttons */}
+        <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3.5 sm:gap-4 w-full sm:w-auto">
+          {/* Button 1: EXPLORE GAUNPULSE */}
+          <a
+            href="#how-it-works"
+            onClick={handleScrollToHowItWorks}
+            className="w-full sm:w-auto inline-flex items-center justify-center px-[24px] py-[13px] rounded-[6px] text-[12px] sm:text-[13px] font-semibold uppercase tracking-[0.06em] bg-[#111111] hover:bg-black text-white transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-2"
+          >
+            EXPLORE GAUNPULSE
+          </a>
+
+          {/* Button 2: TRY THE LIVE DEMO */}
+          <Link
+            to="/demo"
+            className="w-full sm:w-auto inline-flex items-center justify-center px-[24px] py-[13px] rounded-[6px] text-[12px] sm:text-[13px] font-semibold uppercase tracking-[0.06em] bg-white hover:bg-stone-100 text-[#111111] transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-2"
+          >
+            TRY THE LIVE DEMO
+          </Link>
         </div>
-      </Container>
+      </div>
     </section>
   );
 }

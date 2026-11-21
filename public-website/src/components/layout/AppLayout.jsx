@@ -5,7 +5,7 @@ import Footer from './Footer';
 
 export function AppLayout() {
   return (
-    <div className="min-h-screen flex flex-col bg-[#F8F7F2] text-[#1B2923] font-sans antialiased">
+    <div className="min-h-screen flex flex-col bg-white text-[#1B2923] font-sans antialiased">
       {/* Sticky Main Navigation */}
       <Navbar />
 

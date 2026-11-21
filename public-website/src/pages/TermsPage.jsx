@@ -108,7 +108,7 @@ export function TermsPage() {
         </Card>
 
         {/* Footer Note */}
-        <div className="p-4 rounded-xl bg-[#F8F7F2] border border-[#42866A]/20 text-xs text-[#1B2923]/70 leading-relaxed">
+        <div className="p-4 rounded-xl bg-stone-50 border border-[#42866A]/20 text-xs text-[#1B2923]/70 leading-relaxed">
           <p>
             <strong>Draft Notice:</strong> These terms are formulated for prototype demonstration purposes by PixelSquad. Prior to operational deployment with any municipal entity, formal legal counsel will establish binding operational agreements. For repository access, visit our <a href="https://github.com/sharmilashahi752/Gaunpluse-pixelsquad-" target="_blank" rel="noopener noreferrer" className="text-[#173D32] underline font-semibold">GitHub repository</a>.
           </p>

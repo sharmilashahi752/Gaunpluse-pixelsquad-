@@ -1,16 +1,32 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { NavLink, Link, useLocation } from 'react-router-dom';
-import { Menu, X, ArrowUpRight, Activity } from 'lucide-react';
+import { NavLink, useLocation } from 'react-router-dom';
+import { Menu, X } from 'lucide-react';
 import Container from '../ui/Container';
-import { NAV_LINKS } from '../../data/routes';
+import AuthModal from './AuthModal';
+import BrandLogo from './BrandLogo';
 
+/**
+ * Clean Minimalist Editorial Navigation Bar (Inspired by Frame Studio)
+ * Features:
+ * - Restored original GaunPulse pulse-style logo icon next to GAUNPULSE wordmark on one horizontal line
+ * - Left-aligned brand identity, right-aligned navigation groups
+ * - Two balanced navigation groups toward the right:
+ *     Group 1: HOME, ABOUT, INSIGHTS
+ *     Group 2: ISSUES, EXPLORE MAP, LIVE DEMO, SIGN IN
+ * - Small uppercase typography (~12-13px, weight 600, letter spacing 0.06em)
+ * - Minimal active underline indicator
+ * - Pure white background, thin bottom border, zero heavy shadows or pill shapes
+ * - Responsive mobile menu drawer with complete keyboard accessibility
+ * - Informational "Authentication Coming Soon" dialog integration
+ */
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const location = useLocation();
   const [prevPath, setPrevPath] = useState(location.pathname);
   const menuButtonRef = useRef(null);
 
-  // Close mobile drawer when location pathname changes (derived state during render)
+  // Close mobile drawer when location pathname changes
   if (prevPath !== location.pathname) {
     setPrevPath(location.pathname);
     setIsOpen(false);
@@ -43,152 +59,128 @@ export function Navbar() {
     };
   }, [isOpen]);
 
+  // Navigation links for desktop and mobile navigation
+  const allNavLinks = [
+    { label: 'HOME', path: '/' },
+    { label: 'ABOUT', path: '/about' },
+    { label: 'INSIGHTS', path: '/insights' },
+    { label: 'ISSUES', path: '/issues' },
+    { label: 'EXPLORE MAP', path: '/map' },
+    { label: 'LIVE DEMO', path: '/demo' },
+  ];
+
   return (
-    <header className="sticky top-0 z-50 w-full bg-[#F8F7F2]/90 backdrop-blur-md border-b border-[#42866A]/20 transition-all duration-200">
-      <Container>
-        <div className="flex items-center justify-between h-18">
-          {/* Brand Identity / Wordmark */}
-          <Link
-            to="/"
-            className="flex items-center gap-3 group rounded-lg focus-visible:ring-2 focus-visible:ring-[#173D32] focus-visible:ring-offset-2 focus:outline-hidden py-1"
-            aria-label="GaunPulse — Return to homepage"
-          >
-            {/* Logo Mark: Pulse & Mountain Peak hybrid */}
-            <div className="w-10 h-10 rounded-xl bg-[#173D32] flex items-center justify-center text-white shadow-xs group-hover:bg-[#122F26] transition-colors border border-[#42866A]/30">
-              <Activity className="w-5 h-5 text-[#E3AD58] transition-transform group-hover:scale-110" />
-            </div>
+    <>
+      <header className="sticky top-0 z-40 w-full bg-white border-b border-stone-200/80 transition-all">
+        <Container>
+          <div className="flex items-center justify-between h-20">
+            {/* 1. Left: GaunPulse Brand Identity (Logo + Two-line Text matching footer) */}
+            <BrandLogo variant="navbar" />
 
-            <div className="flex flex-col">
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-xl font-extrabold tracking-tight text-[#173D32]">
-                  Gaun<span className="text-[#42866A]">Pulse</span>
-                </span>
-                <span className="hidden sm:inline-block text-[11px] font-semibold text-[#42866A]/75 tracking-tight">
-                  गाउँ पल्स
-                </span>
-              </div>
-              <span className="text-[11px] font-medium tracking-wide text-[#42866A] -mt-0.5">
-                The Village That Speaks
-              </span>
-            </div>
-          </Link>
-
-          {/* Desktop Navigation Links */}
-          <nav
-            aria-label="Primary Navigation"
-            className="hidden md:flex items-center gap-1 lg:gap-2"
-          >
-            {NAV_LINKS.map((link) => (
-              <NavLink
-                key={link.path}
-                to={link.path}
-                end={link.path === '/'}
-                className={({ isActive }) =>
-                  `px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-150 focus-visible:ring-2 focus-visible:ring-[#173D32] focus-visible:ring-offset-1 focus:outline-hidden ${
-                    isActive
-                      ? 'text-[#173D32] bg-[#DDEBE2] shadow-2xs font-bold'
-                      : 'text-[#1B2923]/80 hover:text-[#173D32] hover:bg-[#DDEBE2]/50'
-                  }`
-                }
-              >
-                {link.label}
-              </NavLink>
-            ))}
-          </nav>
-
-          {/* Right Action: Primary CTA */}
-          <div className="hidden md:flex items-center gap-3">
-            <Link
-              to="/demo"
-              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-[#173D32] text-white hover:bg-[#122F26] shadow-xs hover:shadow-sm transition-all duration-150 focus-visible:ring-2 focus-visible:ring-[#173D32] focus-visible:ring-offset-2 focus:outline-hidden group"
+            {/* 2. Right: Desktop Navigation Links (All 7 links in one row with 24-28px gap) */}
+            <nav
+              aria-label="Primary Navigation"
+              className="hidden lg:flex items-center gap-5 xl:gap-[26px]"
             >
-              <span>Explore Demo</span>
-              <ArrowUpRight className="w-4 h-4 text-[#E3AD58] transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-            </Link>
-          </div>
-
-          {/* Mobile Hamburger Toggle Button */}
-          <div className="flex md:hidden items-center">
-            <button
-              ref={menuButtonRef}
-              type="button"
-              onClick={() => setIsOpen(!isOpen)}
-              className="p-2.5 rounded-lg text-[#173D32] hover:bg-[#DDEBE2] focus-visible:ring-2 focus-visible:ring-[#173D32] focus:outline-hidden transition-colors"
-              aria-expanded={isOpen}
-              aria-controls="mobile-navigation-menu"
-              aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}
-            >
-              {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
-          </div>
-        </div>
-      </Container>
-
-      {/* Mobile Navigation Drawer / Panel */}
-      {isOpen && (
-        <div
-          id="mobile-navigation-menu"
-          role="region"
-          aria-label="Mobile Navigation Drawer"
-          className="md:hidden fixed inset-x-0 top-18 bottom-0 bg-[#F8F7F2]/95 backdrop-blur-lg border-t border-[#42866A]/20 z-50 overflow-y-auto px-4 py-6 flex flex-col justify-between animate-in fade-in slide-in-from-top-2 duration-200"
-        >
-          <div className="space-y-4">
-            <div className="px-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-[#42866A]">
-                Navigation
-              </p>
-            </div>
-            <nav className="flex flex-col space-y-1">
-              {NAV_LINKS.map((link) => (
+              {allNavLinks.map((link) => (
                 <NavLink
                   key={link.path}
                   to={link.path}
                   end={link.path === '/'}
-                  onClick={() => setIsOpen(false)}
                   className={({ isActive }) =>
-                    `px-4 py-3 rounded-xl text-base font-semibold flex items-center justify-between transition-colors focus-visible:ring-2 focus-visible:ring-[#173D32] focus:outline-hidden ${
+                    `text-[12px] font-medium sm:font-semibold uppercase tracking-[0.05em] leading-[1.4] pt-2 pb-2 border-b transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-[#111111] focus-visible:outline-offset-2 ${
                       isActive
-                        ? 'bg-[#173D32] text-white shadow-xs'
-                        : 'text-[#1B2923] hover:bg-[#DDEBE2]'
+                        ? 'border-[#111111] text-[#111111]'
+                        : 'border-transparent text-[#111111]/75 hover:text-[#111111] hover:border-[#111111]/30'
                     }`
                   }
                 >
-                  <span>{link.label}</span>
-                  <ArrowUpRight className="w-4 h-4 opacity-70" />
+                  {link.label}
                 </NavLink>
               ))}
+
+              {/* SIGN IN Action */}
+              <button
+                type="button"
+                onClick={() => setIsAuthModalOpen(true)}
+                className="text-[12px] font-medium sm:font-semibold uppercase tracking-[0.05em] leading-[1.4] pt-2 pb-2 border-b border-transparent text-[#111111]/75 hover:text-[#111111] hover:border-[#111111]/30 transition-colors duration-150 cursor-pointer focus-visible:outline-2 focus-visible:outline-[#111111] focus-visible:outline-offset-2"
+              >
+                SIGN IN
+              </button>
             </nav>
 
-            {/* Preserved Route Link: Public Notices */}
-            <div className="pt-2 px-1 border-t border-[#42866A]/15">
-              <Link
-                to="/notices"
-                onClick={() => setIsOpen(false)}
-                className="px-3 py-2 text-sm font-medium text-[#42866A] hover:text-[#173D32] flex items-center justify-between rounded-lg"
+            {/* 3. Mobile Hamburger Toggle (< 1024px) */}
+            <div className="flex lg:hidden items-center gap-2">
+              <button
+                ref={menuButtonRef}
+                type="button"
+                onClick={() => setIsOpen(!isOpen)}
+                className="p-2 -mr-2 text-[#111111] hover:bg-stone-100 rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-[#111111]"
+                aria-expanded={isOpen}
+                aria-controls="mobile-navigation-menu"
+                aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}
               >
-                <span>Municipal Public Notices</span>
-                <span className="text-xs bg-[#DDEBE2] px-2 py-0.5 rounded text-[#173D32]">Updates</span>
-              </Link>
+                {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </button>
             </div>
           </div>
+        </Container>
 
-          {/* Mobile Bottom CTA */}
-          <div className="pt-6 border-t border-[#42866A]/15 space-y-3">
-            <Link
-              to="/demo"
-              onClick={() => setIsOpen(false)}
-              className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl text-base font-semibold bg-[#173D32] text-white hover:bg-[#122F26] shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-[#173D32] focus:outline-hidden"
-            >
-              <span>Explore Interactive Demo</span>
-              <ArrowUpRight className="w-5 h-5 text-[#E3AD58]" />
-            </Link>
-            <p className="text-center text-xs text-[#42866A] font-medium">
-              CivicTech Intelligence for Rural Nepal
-            </p>
+        {/* 4. Mobile Navigation Drawer */}
+        {isOpen && (
+          <div
+            id="mobile-navigation-menu"
+            role="region"
+            aria-label="Mobile Navigation Drawer"
+            className="lg:hidden fixed inset-x-0 top-20 bottom-0 bg-white z-50 overflow-y-auto px-6 py-8 flex flex-col justify-between border-t border-stone-200 animate-in fade-in slide-in-from-top-2 duration-150"
+          >
+            <div className="space-y-6">
+              <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-stone-400 block pb-2 border-b border-stone-100">
+                Menu
+              </span>
+
+              <nav className="flex flex-col space-y-2">
+                {allNavLinks.map((link) => (
+                  <NavLink
+                    key={link.path}
+                    to={link.path}
+                    end={link.path === '/'}
+                    onClick={() => setIsOpen(false)}
+                    className={({ isActive }) =>
+                      `min-h-[44px] flex items-center text-sm font-semibold uppercase tracking-[0.06em] px-2 transition-colors ${
+                        isActive ? 'text-[#111111] font-bold' : 'text-stone-600 hover:text-[#111111]'
+                      }`
+                    }
+                  >
+                    {link.label}
+                  </NavLink>
+                ))}
+              </nav>
+            </div>
+
+            {/* Mobile Drawer Footer Actions */}
+            <div className="pt-6 border-t border-stone-100 space-y-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsOpen(false);
+                  setIsAuthModalOpen(true);
+                }}
+                className="w-full min-h-[44px] py-3 px-4 text-xs font-semibold uppercase tracking-[0.06em] bg-[#111111] text-white rounded-lg hover:bg-black transition-colors cursor-pointer"
+              >
+                SIGN IN
+              </button>
+              <p className="text-center text-[11px] text-stone-400">
+                CivicTech Prototype for Rural Nepal
+              </p>
+            </div>
           </div>
-        </div>
-      )}
-    </header>
+        )}
+      </header>
+
+      {/* Informational Authentication Modal */}
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+    </>
   );
 }
 

@@ -7,7 +7,7 @@ export const THEME_COLORS = {
   // Core palette
   primaryForest: '#173D32',
   secondaryGreen: '#42866A',
-  warmBg: '#F8F7F2',
+  warmBg: '#FFFFFF',
   surfaceGreen: '#DDEBE2',
   accentAmber: '#E3AD58',
   alertRed: '#D45F53',
@@ -16,7 +16,7 @@ export const THEME_COLORS = {
   // Semantic mappings
   forest: '#173D32',
   forestSecondary: '#42866A',
-  warmBackground: '#F8F7F2',
+  warmBackground: '#FFFFFF',
   lightGreenSurface: '#DDEBE2',
   accent: '#E3AD58',
   danger: '#D45F53',

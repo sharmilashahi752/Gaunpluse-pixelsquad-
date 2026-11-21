@@ -98,7 +98,7 @@ export function PrivacyPage() {
         </Card>
 
         {/* Disclaimer Footer */}
-        <div className="p-4 rounded-xl bg-[#F8F7F2] border border-[#42866A]/20 text-xs text-[#1B2923]/70 leading-relaxed">
+        <div className="p-4 rounded-xl bg-stone-50 border border-[#42866A]/20 text-xs text-[#1B2923]/70 leading-relaxed">
           <p>
             <strong>Prototype Draft Notice:</strong> This policy is issued by the PixelSquad hackathon development team for prototype demonstration purposes. It does not constitute a formal legal contract or corporate warranty. For questions or technical review, visit our <a href="https://github.com/sharmilashahi752/Gaunpluse-pixelsquad-" target="_blank" rel="noopener noreferrer" className="text-[#173D32] underline font-semibold">GitHub repository</a>.
           </p>

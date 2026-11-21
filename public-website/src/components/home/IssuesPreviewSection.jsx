@@ -22,7 +22,7 @@ export function IssuesPreviewSection() {
   ];
 
   return (
-    <section aria-labelledby="issues-preview-heading" className="py-16 sm:py-24 bg-[#F8F7F2] border-t border-[#42866A]/20">
+    <section aria-labelledby="issues-preview-heading" className="py-16 sm:py-24 bg-white border-t border-stone-200/80">
       <Container>
         <div className="space-y-10">
           {/* Header */}
