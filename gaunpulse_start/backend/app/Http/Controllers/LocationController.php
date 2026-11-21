@@ -162,9 +162,42 @@ class LocationController extends Controller
                 foreach ($osmResults as $item) {
                     $name = $item['name'] ?? explode(',', $item['display_name'])[0];
                     $addr = $item['address'] ?? [];
-                    $state = $addr['state'] ?? $addr['province'] ?? 'Nepal';
-                    $county = $addr['county'] ?? $addr['district'] ?? '';
-                    $muniName = $addr['city'] ?? $addr['town'] ?? $addr['municipality'] ?? $addr['village'] ?? '';
+                    $rawDistrict = $addr['county'] ?? $addr['district'] ?? '';
+                    $rawMuni = $addr['city'] ?? $addr['town'] ?? $addr['municipality'] ?? $addr['village'] ?? '';
+
+                    // Match against official Nepal 77 districts
+                    $matchedDistrict = null;
+                    if ($rawDistrict) {
+                        $matchedDistrict = NepalLocationService::findDistrict($rawDistrict);
+                    }
+                    if (!$matchedDistrict && isset($item['display_name'])) {
+                        $tokens = explode(',', $item['display_name']);
+                        foreach ($tokens as $tok) {
+                            $d = NepalLocationService::findDistrict(trim($tok));
+                            if ($d) {
+                                $matchedDistrict = $d;
+                                break;
+                            }
+                        }
+                    }
+
+                    $finalDistrict = $matchedDistrict ? $matchedDistrict['name'] : ($rawDistrict ?: 'Sindhupalchok');
+                    $finalProvince = $matchedDistrict ? $matchedDistrict['province'] : (NepalLocationService::getProvinceByDistrict($finalDistrict) ?: 'Bagmati Province');
+
+                    $finalMuni = $rawMuni;
+                    if (!$finalMuni || !empty($matchedDistrict)) {
+                        $munis = NepalLocationService::getMunicipalities($finalDistrict);
+                        // Check if any municipality name appears in display_name
+                        $disp = $item['display_name'] ?? '';
+                        $foundSpecificMuni = null;
+                        foreach ($munis as $m) {
+                            if (stripos($disp, $m['name']) !== false || (isset($m['local_name']) && mb_stripos($disp, $m['local_name']) !== false)) {
+                                $foundSpecificMuni = $m['name'];
+                                break;
+                            }
+                        }
+                        $finalMuni = $foundSpecificMuni ?: (!empty($munis[0]['name']) ? $munis[0]['name'] : "{$finalDistrict} Rural Municipality");
+                    }
 
                     $key = "osm-" . ($item['place_id'] ?? md5($name . $item['lat']));
                     if (!isset($seen[$key])) {
@@ -176,9 +209,9 @@ class LocationController extends Controller
                             'lat' => (float) $item['lat'],
                             'lng' => (float) $item['lon'],
                             'zoom' => 13,
-                            'province' => $state,
-                            'district' => $county,
-                            'municipality' => $muniName,
+                            'province' => $finalProvince,
+                            'district' => $finalDistrict,
+                            'municipality' => $finalMuni,
                             'is_registered' => false,
                         ];
                     }
