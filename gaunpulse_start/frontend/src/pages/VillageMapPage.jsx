@@ -16,9 +16,11 @@ import {
   MapPin,
   Maximize2,
   Plus,
+  Radio,
   RefreshCw,
   Search,
   Sliders,
+  Sparkles,
   Trash2,
   TriangleAlert,
   Waypoints,
@@ -53,13 +55,22 @@ export default function VillageMapPage() {
   // Modals
   const [isAddVillageModalOpen, setIsAddVillageModalOpen] = useState(false);
   const [isAddAssetModalOpen, setIsAddAssetModalOpen] = useState(false);
-  const [isOsmModalOpen, setIsOsmModalOpen] = useState(false);
   const [isDiagnosticModalOpen, setIsDiagnosticModalOpen] = useState(false);
+
+  // Phase 2, 5 & 6: Automatic Infrastructure Discovery & Import Dashboard State
+  const [isDiscoveryModalOpen, setIsDiscoveryModalOpen] = useState(false);
+  const [discoveryLoading, setDiscoveryLoading] = useState(false);
+  const [discoveryRadius, setDiscoveryRadius] = useState(2000); // meters (Phase 3)
+  const [discoveryData, setDiscoveryData] = useState(null);
+  const [selectedFeatureMap, setSelectedFeatureMap] = useState({}); // featureId -> bool
+  const [activeCategoryTab, setActiveCategoryTab] = useState('all');
+  const [importingLoading, setImportingLoading] = useState(false);
 
   // Administrative Cascade Data
   const [provinces, setProvinces] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [municipalities, setMunicipalities] = useState([]);
+  const [hierarchyAudit, setHierarchyAudit] = useState(null);
 
   // Form States: New Village
   const [villageForm, setVillageForm] = useState({
@@ -100,12 +111,6 @@ export default function VillageMapPage() {
     notes: '',
   });
 
-  // OSM Ingestion State
-  const [osmRadius, setOsmRadius] = useState(2500);
-  const [osmLoading, setOsmLoading] = useState(false);
-  const [osmPreview, setOsmPreview] = useState(null);
-  const [osmSuccessMsg, setOsmSuccessMsg] = useState('');
-
   // Diagnostic State
   const [diagnostics, setDiagnostics] = useState(null);
   const [diagLoading, setDiagLoading] = useState(false);
@@ -118,7 +123,7 @@ export default function VillageMapPage() {
     setTimeout(() => setNotification(null), 6000);
   };
 
-  // 1. Initial Load: Villages & Provinces
+  // 1. Initial Load: Villages, Provinces, and Administrative Hierarchy Audit
   useEffect(() => {
     loadVillages();
     fetch('http://127.0.0.1:8000/api/locations/provinces')
@@ -127,6 +132,16 @@ export default function VillageMapPage() {
         if (Array.isArray(data)) setProvinces(data);
       })
       .catch((err) => console.error('Failed to load provinces:', err));
+
+    // Audit administrative hierarchy integrity
+    fetch('http://127.0.0.1:8000/api/villages/audit-hierarchy')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.inconsistent_count > 0) {
+          setHierarchyAudit(data);
+        }
+      })
+      .catch((err) => console.error('Hierarchy audit failed:', err));
   }, []);
 
   const loadVillages = () => {
@@ -159,7 +174,7 @@ export default function VillageMapPage() {
       .catch((err) => console.error('Failed to load districts:', err));
   }, [villageForm.province]);
 
-  // 3. Cascade Municipalities when District changes
+  // 3. Cascade Municipalities when District changes (Phase 1 Fix: auto-reset to avoid cross-district mismatch)
   useEffect(() => {
     if (!villageForm.district) return;
     fetch(`http://127.0.0.1:8000/api/locations/municipalities?district=${encodeURIComponent(villageForm.district)}`)
@@ -167,7 +182,8 @@ export default function VillageMapPage() {
       .then((data) => {
         if (Array.isArray(data)) {
           setMunicipalities(data);
-          if (data.length > 0) {
+          const currentMuniValid = data.some((m) => m.name === villageForm.municipality);
+          if (!currentMuniValid && data.length > 0) {
             setVillageForm((prev) => ({ ...prev, municipality: data[0].name }));
           }
         }
@@ -221,7 +237,6 @@ export default function VillageMapPage() {
   const handleMapClick = (latlng) => {
     setClickedCoords(latlng);
 
-    // If user is currently in picking mode
     if (isPickingLocation) {
       if (pickTargetField === 'village') {
         setVillageForm((prev) => ({
@@ -247,7 +262,6 @@ export default function VillageMapPage() {
       return;
     }
 
-    // Otherwise drop a click target marker
     setSelectedLocationMarker({
       lat: latlng.lat,
       lng: latlng.lng,
@@ -269,7 +283,6 @@ export default function VillageMapPage() {
       setSelectedLocationMarker(null);
       showNotification(`Switched to registered village: ${item.title}`);
     } else {
-      // Fly to location and drop marker
       setIsNationwideView(false);
       setSelectedLocationMarker({
         lat: item.lat,
@@ -286,15 +299,20 @@ export default function VillageMapPage() {
 
   // Quick Add Village from Marker
   const handleQuickAddVillage = (marker) => {
-    setVillageForm((prev) => ({
-      ...prev,
-      name: marker.title.replace(' District', '').replace(' Rural Municipality', '').replace(' Municipality', ''),
+    const rawTitle = (marker.title || '').replace(' District', '').replace(' Rural Municipality', '').replace(' Municipality', '');
+    setVillageForm({
+      name: rawTitle,
+      local_name: '',
       center_lat: marker.lat,
       center_lng: marker.lng,
-      province: marker.itemData?.province || prev.province,
-      district: marker.itemData?.district || prev.district,
-      municipality: marker.itemData?.municipality || prev.municipality,
-    }));
+      province: marker.itemData?.province || 'Gandaki Province',
+      district: marker.itemData?.district || 'Mustang',
+      municipality: marker.itemData?.municipality || 'Gharapjhong Rural Municipality',
+      ward_no: '1',
+      description: '',
+      data_source: 'Field Survey / OSM',
+      verification_status: 'verified',
+    });
     setIsAddVillageModalOpen(true);
   };
 
@@ -309,7 +327,7 @@ export default function VillageMapPage() {
     setIsAddAssetModalOpen(true);
   };
 
-  // Submit New Village
+  // Submit New Village -> Automatically triggers Discovery (Phase 5)
   const handleCreateVillage = async (e) => {
     e.preventDefault();
     try {
@@ -340,16 +358,119 @@ export default function VillageMapPage() {
 
       const newVillage = await res.json();
       setIsAddVillageModalOpen(false);
-      showNotification(`Village "${newVillage.name}" successfully registered in GaunPulse!`);
+      showNotification(`Village "${newVillage.name}" registered! Starting automatic infrastructure discovery...`);
 
       // Refresh village list and switch to new village
       loadVillages();
       setSelectedVillageId(newVillage.id);
       setIsNationwideView(false);
       setSelectedLocationMarker(null);
+
+      // Phase 5: Automatically launch discovery workflow for newly created village
+      triggerDiscovery(newVillage.id, 2000);
     } catch (err) {
       alert('Error creating village: ' + err.message);
     }
+  };
+
+  // Trigger Infrastructure Discovery (Phase 2, 3 & 4)
+  const triggerDiscovery = async (villageId, radius = 2000) => {
+    const vId = villageId || selectedVillageId;
+    if (!vId) return;
+
+    setDiscoveryLoading(true);
+    setIsDiscoveryModalOpen(true);
+    setDiscoveryRadius(radius);
+    setDiscoveryData(null);
+
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/villages/${vId}/discover-osm?radius=${radius}`);
+      if (!res.ok) {
+        throw new Error(`Server returned error code ${res.status}`);
+      }
+      const data = await res.json();
+      setDiscoveryData(data);
+
+      // Initialize selected checkboxes (select all valid non-duplicates)
+      const initialMap = {};
+      (data.features || []).forEach((feat) => {
+        initialMap[feat.id] = (feat.selected ?? true) && !feat.is_duplicate;
+      });
+      setSelectedFeatureMap(initialMap);
+    } catch (err) {
+      alert('Automatic discovery failed: ' + err.message);
+    } finally {
+      setDiscoveryLoading(false);
+    }
+  };
+
+  // Confirm and Save Selected Discovery Features (Phase 4, 7, 8)
+  const handleConfirmImport = async () => {
+    if (!selectedVillageId || !discoveryData) return;
+
+    const allFeatures = discoveryData.features || [];
+    const approvedFeatures = allFeatures.filter((f) => selectedFeatureMap[f.id]);
+
+    if (approvedFeatures.length === 0) {
+      alert('Please select at least one feature to import.');
+      return;
+    }
+
+    setImportingLoading(true);
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/confirm-osm-import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          features: approvedFeatures,
+          batch_id: `osm_batch_${Date.now()}`,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Import confirmation failed');
+      }
+
+      const result = await res.json();
+      setIsDiscoveryModalOpen(false);
+      showNotification(`Import complete! ${result.imported_nodes} nodes and ${result.imported_edges} lifeline edges saved to MySQL.`);
+
+      // Refresh village network immediately
+      const refreshRes = await fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/network`);
+      setVillageData(await refreshRes.json());
+      loadVillages();
+    } catch (err) {
+      alert('Error saving imported features: ' + err.message);
+    } finally {
+      setImportingLoading(false);
+    }
+  };
+
+  // Toggle selection for all or category
+  const toggleSelectAll = (selectVal) => {
+    const updated = { ...selectedFeatureMap };
+    const currentFeatures = getFilteredDiscoveryFeatures();
+    currentFeatures.forEach((f) => {
+      if (!f.is_duplicate) {
+        updated[f.id] = selectVal;
+      }
+    });
+    setSelectedFeatureMap(updated);
+  };
+
+  // Filter discovery features by active category
+  const getFilteredDiscoveryFeatures = () => {
+    if (!discoveryData?.features) return [];
+    if (activeCategoryTab === 'all') return discoveryData.features;
+    if (activeCategoryTab === 'roads') return discoveryData.categories?.roads || [];
+    if (activeCategoryTab === 'bridges') return discoveryData.categories?.bridges || [];
+    if (activeCategoryTab === 'schools') return discoveryData.categories?.schools || [];
+    if (activeCategoryTab === 'health') return discoveryData.categories?.health || [];
+    if (activeCategoryTab === 'water') return discoveryData.categories?.water || [];
+    if (activeCategoryTab === 'settlements') return discoveryData.categories?.settlements || [];
+    if (activeCategoryTab === 'warnings') return discoveryData.features.filter((f) => f.is_duplicate);
+    return discoveryData.features;
   };
 
   // Submit Point Asset (Node)
@@ -384,10 +505,8 @@ export default function VillageMapPage() {
       showNotification(`Infrastructure node "${pointForm.name}" added to village.`);
       setPointForm({ name: '', node_type: 'settlement', latitude: '', longitude: '', households: '', population: '', description: '' });
 
-      // Refresh village data
       const refreshRes = await fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/network`);
-      const updatedData = await refreshRes.json();
-      setVillageData(updatedData);
+      setVillageData(await refreshRes.json());
     } catch (err) {
       alert('Error saving asset: ' + err.message);
     }
@@ -443,10 +562,8 @@ export default function VillageMapPage() {
         notes: '',
       });
 
-      // Refresh village data
       const refreshRes = await fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/network`);
-      const updatedData = await refreshRes.json();
-      setVillageData(updatedData);
+      setVillageData(await refreshRes.json());
     } catch (err) {
       alert('Error saving road/bridge: ' + err.message);
     }
@@ -494,49 +611,6 @@ export default function VillageMapPage() {
     }
   };
 
-  // OSM Preview & Ingest
-  const handleOsmPreview = async () => {
-    if (!selectedVillageId) return;
-    setOsmLoading(true);
-    setOsmSuccessMsg('');
-    try {
-      const res = await fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/import-osm`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ radius: osmRadius, preview_only: true }),
-      });
-      const data = await res.json();
-      setOsmPreview(data);
-    } catch (err) {
-      alert('OSM Overpass preview failed: ' + err.message);
-    } finally {
-      setOsmLoading(false);
-    }
-  };
-
-  const handleOsmIngest = async () => {
-    if (!selectedVillageId) return;
-    setOsmLoading(true);
-    try {
-      const res = await fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/import-osm`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ radius: osmRadius, preview_only: false }),
-      });
-      const data = await res.json();
-      setOsmSuccessMsg(data.message || 'OSM data successfully ingested into MySQL!');
-      showNotification('OSM infrastructure imported successfully.');
-
-      // Refresh village network
-      const refreshRes = await fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/network`);
-      setVillageData(await refreshRes.json());
-    } catch (err) {
-      alert('OSM Ingestion error: ' + err.message);
-    } finally {
-      setOsmLoading(false);
-    }
-  };
-
   // Run NetworkX Diagnostic
   const handleRunDiagnostic = async () => {
     if (!selectedVillageId) return;
@@ -556,6 +630,15 @@ export default function VillageMapPage() {
   const village = villageData?.village || {};
   const nodes = villageData?.nodes || [];
   const edges = villageData?.edges || [];
+
+  const studyAreaCenter = [
+    parseFloat(village.center_lat || village.latitude || 27.8635),
+    parseFloat(village.center_lng || village.longitude || 85.5815),
+  ];
+
+  const candidateEdgesForMap = discoveryData?.categories?.roads
+    ? [...(discoveryData.categories.roads || []), ...(discoveryData.categories.bridges || [])]
+    : [];
 
   return (
     <div className="page-stack">
@@ -586,14 +669,66 @@ export default function VillageMapPage() {
         </div>
       )}
 
+      {/* Administrative Hierarchy Audit Warning (Phase 1) */}
+      {hierarchyAudit && hierarchyAudit.inconsistent_count > 0 && (
+        <div
+          style={{
+            background: '#fffbeb',
+            border: '1.5px solid #f59e0b',
+            borderRadius: '10px',
+            padding: '12px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: '12.5px',
+            color: '#78350f',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertTriangle size={18} color="#d97706" />
+            <div>
+              <strong>Administrative Hierarchy Notice:</strong> {hierarchyAudit.inconsistent_count} village record(s) have administrative mismatches that can be corrected reviewably.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const inc = hierarchyAudit.records.find((r) => !r.is_consistent);
+              if (inc && inc.proposed_corrections) {
+                fetch(`http://127.0.0.1:8000/api/villages/${inc.village_id}/correct-hierarchy`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(inc.proposed_corrections),
+                }).then(() => {
+                  showNotification(`Corrected hierarchy for ${inc.village_name}.`);
+                  setHierarchyAudit(null);
+                  loadVillages();
+                });
+              }
+            }}
+            style={{
+              background: '#b45309',
+              color: '#fff',
+              border: 'none',
+              padding: '5px 12px',
+              borderRadius: '6px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              fontSize: '11.5px',
+            }}
+          >
+            Apply Official Alignment
+          </button>
+        </div>
+      )}
+
       {/* Header Intro & Nepal Search Bar */}
       <PageIntro
-        eyebrow="Nepal-wide spatial lifelines"
+        eyebrow="Automatic spatial intelligence"
         title="Village Infrastructure Map"
-        description="Explore, georeference, and manage rural lifeline networks for any municipality, ward, or village in Nepal."
+        description="Discover, verify, and monitor roads, suspension bridges, water supplies, and public lifelines for any village across Nepal."
         actions={
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' }}>
-            {/* View All Nepal Button */}
             <button
               type="button"
               onClick={() => {
@@ -618,7 +753,6 @@ export default function VillageMapPage() {
               <Globe size={15} /> View All Nepal
             </button>
 
-            {/* Saved Villages Dropdown */}
             <select
               value={isNationwideView ? '' : selectedVillageId || ''}
               onChange={(e) => {
@@ -646,12 +780,9 @@ export default function VillageMapPage() {
               ))}
             </select>
 
-            {/* + Add New Village */}
             <button
               type="button"
-              onClick={() => {
-                setIsAddVillageModalOpen(true);
-              }}
+              onClick={() => setIsAddVillageModalOpen(true)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -687,16 +818,12 @@ export default function VillageMapPage() {
           boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
         }}
       >
-        {/* Search Bar Input */}
         <div style={{ position: 'relative', flex: '1 1 340px' }}>
           <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
-            <Search
-              size={17}
-              style={{ position: 'absolute', left: '12px', color: '#64748b' }}
-            />
+            <Search size={17} style={{ position: 'absolute', left: '12px', color: '#64748b' }} />
             <input
               type="text"
-              placeholder="Search any village, municipality or district in Nepal (e.g. Mustang, Pokhara, Helambu)..."
+              placeholder="Search any village, municipality or district in Nepal (e.g. Marpha, Mustang, Pokhara, Helambu)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => { if (searchResults.length > 0) setShowSearchResults(true); }}
@@ -711,15 +838,10 @@ export default function VillageMapPage() {
               }}
             />
             {isSearching && (
-              <RefreshCw
-                size={14}
-                className="animate-spin"
-                style={{ position: 'absolute', right: '12px', color: '#176342' }}
-              />
+              <RefreshCw size={14} className="animate-spin" style={{ position: 'absolute', right: '12px', color: '#176342' }} />
             )}
           </div>
 
-          {/* Autocomplete Dropdown */}
           {showSearchResults && searchResults.length > 0 && (
             <div
               style={{
@@ -784,7 +906,6 @@ export default function VillageMapPage() {
           )}
         </div>
 
-        {/* Clicked Coordinates & Quick Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', color: '#334155' }}>
           {clickedCoords ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f1f8f2', padding: '5px 10px', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
@@ -818,7 +939,7 @@ export default function VillageMapPage() {
             </div>
           ) : (
             <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>
-              💡 Click anywhere on map to inspect coordinates or drop assets
+              💡 Click anywhere on map to inspect coordinates or set asset positions
             </span>
           )}
         </div>
@@ -847,12 +968,32 @@ export default function VillageMapPage() {
 
         {!isNationwideView && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {/* Automatic Discovery Action Button (Phase 2 & 5) */}
+            <button
+              type="button"
+              onClick={() => triggerDiscovery(selectedVillageId, 2000)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '6px 14px',
+                borderRadius: '7px',
+                border: 'none',
+                background: '#047857',
+                color: '#fff',
+                fontSize: '12.5px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(4,120,87,0.25)',
+              }}
+            >
+              <Sparkles size={14} /> Auto-Discover Infrastructure
+            </button>
+
             {/* + Add Infrastructure Button */}
             <button
               type="button"
-              onClick={() => {
-                setIsAddAssetModalOpen(true);
-              }}
+              onClick={() => setIsAddAssetModalOpen(true)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -867,31 +1008,7 @@ export default function VillageMapPage() {
                 cursor: 'pointer',
               }}
             >
-              <Plus size={14} /> Add Infrastructure
-            </button>
-
-            {/* Import Available Map Data (OSM) */}
-            <button
-              type="button"
-              onClick={() => {
-                setIsOsmModalOpen(true);
-                handleOsmPreview();
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '6px 12px',
-                borderRadius: '7px',
-                border: '1px solid #dfe6df',
-                background: '#fff',
-                color: '#0f766e',
-                fontSize: '12.5px',
-                fontWeight: '700',
-                cursor: 'pointer',
-              }}
-            >
-              <Download size={14} /> Import Map Data (OSM)
+              <Plus size={14} /> Add Manual Asset
             </button>
 
             {/* Validate Network Button */}
@@ -912,7 +1029,7 @@ export default function VillageMapPage() {
                 cursor: 'pointer',
               }}
             >
-              <Zap size={14} /> Validate Network
+              <Zap size={14} /> Validate Topology
             </button>
           </div>
         )}
@@ -944,6 +1061,16 @@ export default function VillageMapPage() {
           isPickingLocation={isPickingLocation}
           onQuickAddVillage={handleQuickAddVillage}
           onQuickAddNode={handleQuickAddNode}
+          studyAreaCircle={
+            isDiscoveryModalOpen && studyAreaCenter[0]
+              ? { center: studyAreaCenter, radius: discoveryRadius }
+              : null
+          }
+          candidatePreviewFeatures={
+            isDiscoveryModalOpen && candidateEdgesForMap.length > 0
+              ? { edges: candidateEdgesForMap }
+              : null
+          }
         />
       </Card>
 
@@ -955,7 +1082,7 @@ export default function VillageMapPage() {
               <span className="eyebrow" style={{ color: '#176342' }}>Selected Lifeline Road / Bridge Asset</span>
               <h3 style={{ margin: '2px 0 6px', color: '#092d22' }}>{selectedEdge.name}</h3>
               <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#19392f' }}>
-                <strong>Type:</strong> {selectedEdge.infrastructure_type || selectedEdge.type} · <strong>Surface:</strong> {selectedEdge.surface_type || 'Gravel'} · <strong>Length:</strong> {selectedEdge.length_meters || 0}m · <strong>Condition:</strong> <span style={{ fontWeight: 'bold' }}>{selectedEdge.status || 'operational'}</span>
+                <strong>Type:</strong> {selectedEdge.infrastructure_type || selectedEdge.type} · <strong>Surface:</strong> {selectedEdge.surface_type || 'Gravel'} · <strong>Length:</strong> {selectedEdge.length_meters || 0}m · <strong>Condition:</strong> <span style={{ fontWeight: 'bold' }}>{selectedEdge.status || 'operational'}</span> · <strong>Verification:</strong> <span style={{ color: '#166534', fontWeight: 'bold' }}>{selectedEdge.verification_status || 'unverified'}</span>
               </p>
               {selectedEdge.notes && <p style={{ margin: '0 0 6px', fontStyle: 'italic', color: '#475569', fontSize: '12.5px' }}>{selectedEdge.notes}</p>}
             </div>
@@ -999,7 +1126,7 @@ export default function VillageMapPage() {
               <span className="eyebrow" style={{ color: '#1d4ed8' }}>Selected Node Facility / Settlement</span>
               <h3 style={{ margin: '2px 0 6px', color: '#1e3a8a' }}>{selectedNode.name}</h3>
               <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#1e293b' }}>
-                <strong>Type:</strong> {(selectedNode.node_type || selectedNode.type || 'junction').toUpperCase()} · <strong>Coordinates:</strong> {parseFloat(selectedNode.latitude).toFixed(5)}, {parseFloat(selectedNode.longitude).toFixed(5)}
+                <strong>Type:</strong> {(selectedNode.node_type || selectedNode.type || 'junction').toUpperCase()} · <strong>Coordinates:</strong> {parseFloat(selectedNode.latitude).toFixed(5)}, {parseFloat(selectedNode.longitude).toFixed(5)} · <strong>Verification:</strong> <span style={{ color: '#1e40af', fontWeight: 'bold' }}>{selectedNode.verification_status || 'unverified'}</span>
               </p>
               {selectedNode.description && <p style={{ margin: '0 0 6px', color: '#475569', fontSize: '12.5px' }}>{selectedNode.description}</p>}
             </div>
@@ -1067,7 +1194,7 @@ export default function VillageMapPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <GraduationCap size={22} color="#1d4ed8" />
               <div>
-                <span style={{ fontSize: '11px', color: '#687c73', textTransform: 'uppercase', fontWeight: 'bold' }}>Schools</span>
+                <span style={{ fontSize: '11px', color: '#687c73', textTransform: 'uppercase', fontWeight: 'bold' }}>Schools & Colleges</span>
                 <div style={{ fontSize: '20px', fontWeight: '800', color: '#092d22' }}>
                   {nodes.filter((n) => (n.node_type || n.type || '').includes('school')).length}
                 </div>
@@ -1079,7 +1206,7 @@ export default function VillageMapPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Waypoints size={22} color="#b45309" />
               <div>
-                <span style={{ fontSize: '11px', color: '#687c73', textTransform: 'uppercase', fontWeight: 'bold' }}>Bridges</span>
+                <span style={{ fontSize: '11px', color: '#687c73', textTransform: 'uppercase', fontWeight: 'bold' }}>Suspension Bridges</span>
                 <div style={{ fontSize: '20px', fontWeight: '800', color: '#092d22' }}>
                   {edges.filter((e) => (e.infrastructure_type || e.type) === 'bridge').length}
                 </div>
@@ -1091,7 +1218,7 @@ export default function VillageMapPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Layers size={22} color="#248157" />
               <div>
-                <span style={{ fontSize: '11px', color: '#687c73', textTransform: 'uppercase', fontWeight: 'bold' }}>Road Segments</span>
+                <span style={{ fontSize: '11px', color: '#687c73', textTransform: 'uppercase', fontWeight: 'bold' }}>Lifeline Road Segments</span>
                 <div style={{ fontSize: '20px', fontWeight: '800', color: '#092d22' }}>
                   {edges.filter((e) => (e.infrastructure_type || e.type) !== 'bridge').length}
                 </div>
@@ -1178,13 +1305,16 @@ export default function VillageMapPage() {
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>
                     Municipality / Gaunpalika *
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={villageForm.municipality}
                     onChange={(e) => setVillageForm({ ...villageForm, municipality: e.target.value })}
                     style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
                     required
-                  />
+                  >
+                    {municipalities.map((m, idx) => (
+                      <option key={`m-${idx}`} value={m.name}>{m.name}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -1210,7 +1340,7 @@ export default function VillageMapPage() {
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Bhotenamlang, Marpha"
+                    placeholder="e.g. Marpha, Bhotenamlang"
                     value={villageForm.name}
                     onChange={(e) => setVillageForm({ ...villageForm, name: e.target.value })}
                     style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
@@ -1224,7 +1354,7 @@ export default function VillageMapPage() {
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. भोटेनाम्लाङ"
+                    placeholder="e.g. मार्फा"
                     value={villageForm.local_name}
                     onChange={(e) => setVillageForm({ ...villageForm, local_name: e.target.value })}
                     style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
@@ -1240,7 +1370,7 @@ export default function VillageMapPage() {
                   <input
                     type="number"
                     step="0.000001"
-                    placeholder="27.8635"
+                    placeholder="28.7516"
                     value={villageForm.center_lat}
                     onChange={(e) => setVillageForm({ ...villageForm, center_lat: e.target.value })}
                     style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
@@ -1255,7 +1385,7 @@ export default function VillageMapPage() {
                   <input
                     type="number"
                     step="0.000001"
-                    placeholder="85.5815"
+                    placeholder="83.6844"
                     value={villageForm.center_lng}
                     onChange={(e) => setVillageForm({ ...villageForm, center_lng: e.target.value })}
                     style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
@@ -1289,20 +1419,20 @@ export default function VillageMapPage() {
                 </button>
               </div>
 
-              <div style={{ marginBottom: '12px' }}>
+              <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>
-                  Description / Terrain Notes
+                  Description / Terrain Characteristics
                 </label>
                 <textarea
                   rows="2"
-                  placeholder="Rural settlement with mountain terrain, suspension bridges, seasonal road access..."
+                  placeholder="Historic settlement on Kali Gandaki corridor, mountain trails, suspension bridges..."
                   value={villageForm.description}
                   onChange={(e) => setVillageForm({ ...villageForm, description: e.target.value })}
                   style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                 <button
                   type="button"
                   onClick={() => setIsAddVillageModalOpen(false)}
@@ -1312,9 +1442,17 @@ export default function VillageMapPage() {
                 </button>
                 <button
                   type="submit"
-                  style={{ padding: '8px 18px', borderRadius: '6px', border: 'none', background: '#176342', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}
+                  style={{
+                    padding: '8px 18px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: '#176342',
+                    color: '#fff',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                  }}
                 >
-                  Save Village to MySQL
+                  Save Village & Discover Lifelines →
                 </button>
               </div>
             </form>
@@ -1322,7 +1460,519 @@ export default function VillageMapPage() {
         </div>
       )}
 
-      {/* MODAL 2: ADD INFRASTRUCTURE ASSET */}
+      {/* MODAL 2: AUTOMATIC INFRASTRUCTURE DISCOVERY PREVIEW DASHBOARD (Phase 2, 3, 5, 6) */}
+      {isDiscoveryModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 3000,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: '16px',
+              maxWidth: '820px',
+              width: '100%',
+              padding: '24px',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Sparkles size={20} color="#047857" />
+                  <h3 style={{ margin: 0, color: '#092d22', fontSize: '19px' }}>
+                    Automatic Infrastructure Discovery & Import
+                  </h3>
+                </div>
+                <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: '#64748b' }}>
+                  Scanning OpenStreetMap geospatial entities for <strong>{village.name || 'Selected Village'}</strong>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDiscoveryModalOpen(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Study Area Boundary Selector (Phase 3) */}
+            <div
+              style={{
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '10px',
+                padding: '12px 16px',
+                marginBottom: '16px',
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
+              }}
+            >
+              <div>
+                <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#0f172a' }}>
+                  Study Area Radius (Meters):
+                </span>
+                <div style={{ fontSize: '11px', color: '#64748b' }}>
+                  Radius centered at {parseFloat(village.center_lat || village.latitude || 27.8635).toFixed(4)}°N, {parseFloat(village.center_lng || village.longitude || 85.5815).toFixed(4)}°E
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <select
+                  value={discoveryRadius}
+                  onChange={(e) => {
+                    const newRad = Number(e.target.value);
+                    setDiscoveryRadius(newRad);
+                    triggerDiscovery(selectedVillageId, newRad);
+                  }}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '12.5px',
+                    fontWeight: 'bold',
+                    background: '#fff',
+                  }}
+                >
+                  <option value={1000}>1,000 meters (1 km compact)</option>
+                  <option value={2000}>2,000 meters (2 km standard)</option>
+                  <option value={3500}>3,500 meters (3.5 km mountain valley)</option>
+                  <option value={5000}>5,000 meters (5 km maximum bounding)</option>
+                </select>
+
+                <button
+                  type="button"
+                  onClick={() => triggerDiscovery(selectedVillageId, discoveryRadius)}
+                  disabled={discoveryLoading}
+                  style={{
+                    background: '#047857',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '6px 14px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  {discoveryLoading ? <RefreshCw size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                  Re-Scan
+                </button>
+              </div>
+            </div>
+
+            {/* Discovery State: Loading / Empty / Loaded */}
+            {discoveryLoading ? (
+              <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                <RefreshCw size={32} className="animate-spin" color="#047857" style={{ margin: '0 auto 12px' }} />
+                <h4 style={{ margin: '0 0 6px', color: '#092d22' }}>Querying OpenStreetMap Overpass API...</h4>
+                <p style={{ margin: 0, fontSize: '12.5px', color: '#64748b' }}>
+                  Parsing roads, suspension bridges, health posts, schools, and water tanks within {discoveryRadius}m radius.
+                </p>
+              </div>
+            ) : discoveryData ? (
+              <div>
+                {/* Discovery Stat Cards (Phase 6) */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(105px, 1fr))', gap: '8px', marginBottom: '16px' }}>
+                  <div
+                    onClick={() => setActiveCategoryTab('roads')}
+                    style={{
+                      background: activeCategoryTab === 'roads' ? '#e4f4e9' : '#fff',
+                      border: `1.5px solid ${activeCategoryTab === 'roads' ? '#176342' : '#e2e8f0'}`,
+                      borderRadius: '8px',
+                      padding: '10px 8px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#176342' }}>
+                      {discoveryData.summary?.roads_count || 0}
+                    </div>
+                    <div style={{ fontSize: '10.5px', color: '#475569', fontWeight: '600' }}>Roads</div>
+                  </div>
+
+                  <div
+                    onClick={() => setActiveCategoryTab('bridges')}
+                    style={{
+                      background: activeCategoryTab === 'bridges' ? '#ffedd5' : '#fff',
+                      border: `1.5px solid ${activeCategoryTab === 'bridges' ? '#c2410c' : '#e2e8f0'}`,
+                      borderRadius: '8px',
+                      padding: '10px 8px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#c2410c' }}>
+                      {discoveryData.summary?.bridges_count || 0}
+                    </div>
+                    <div style={{ fontSize: '10.5px', color: '#475569', fontWeight: '600' }}>Bridges</div>
+                  </div>
+
+                  <div
+                    onClick={() => setActiveCategoryTab('schools')}
+                    style={{
+                      background: activeCategoryTab === 'schools' ? '#dbeafe' : '#fff',
+                      border: `1.5px solid ${activeCategoryTab === 'schools' ? '#1d4ed8' : '#e2e8f0'}`,
+                      borderRadius: '8px',
+                      padding: '10px 8px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#1d4ed8' }}>
+                      {discoveryData.summary?.schools_count || 0}
+                    </div>
+                    <div style={{ fontSize: '10.5px', color: '#475569', fontWeight: '600' }}>Schools</div>
+                  </div>
+
+                  <div
+                    onClick={() => setActiveCategoryTab('health')}
+                    style={{
+                      background: activeCategoryTab === 'health' ? '#ccfbf1' : '#fff',
+                      border: `1.5px solid ${activeCategoryTab === 'health' ? '#0f766e' : '#e2e8f0'}`,
+                      borderRadius: '8px',
+                      padding: '10px 8px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#0f766e' }}>
+                      {discoveryData.summary?.health_count || 0}
+                    </div>
+                    <div style={{ fontSize: '10.5px', color: '#475569', fontWeight: '600' }}>Health Posts</div>
+                  </div>
+
+                  <div
+                    onClick={() => setActiveCategoryTab('water')}
+                    style={{
+                      background: activeCategoryTab === 'water' ? '#e0f2fe' : '#fff',
+                      border: `1.5px solid ${activeCategoryTab === 'water' ? '#0284c7' : '#e2e8f0'}`,
+                      borderRadius: '8px',
+                      padding: '10px 8px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#0284c7' }}>
+                      {discoveryData.summary?.water_count || 0}
+                    </div>
+                    <div style={{ fontSize: '10.5px', color: '#475569', fontWeight: '600' }}>Water Tanks</div>
+                  </div>
+
+                  <div
+                    onClick={() => setActiveCategoryTab('settlements')}
+                    style={{
+                      background: activeCategoryTab === 'settlements' ? '#f0fdf4' : '#fff',
+                      border: `1.5px solid ${activeCategoryTab === 'settlements' ? '#15803d' : '#e2e8f0'}`,
+                      borderRadius: '8px',
+                      padding: '10px 8px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#15803d' }}>
+                      {discoveryData.summary?.settlements_count || 0}
+                    </div>
+                    <div style={{ fontSize: '10.5px', color: '#475569', fontWeight: '600' }}>Settlements</div>
+                  </div>
+
+                  {discoveryData.summary?.duplicates_count > 0 && (
+                    <div
+                      onClick={() => setActiveCategoryTab('warnings')}
+                      style={{
+                        background: activeCategoryTab === 'warnings' ? '#fef3c7' : '#fff',
+                        border: `1.5px solid ${activeCategoryTab === 'warnings' ? '#d97706' : '#fde68a'}`,
+                        borderRadius: '8px',
+                        padding: '10px 8px',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <div style={{ fontSize: '18px', fontWeight: '800', color: '#d97706' }}>
+                        {discoveryData.summary?.duplicates_count}
+                      </div>
+                      <div style={{ fontSize: '10.5px', color: '#78350f', fontWeight: '600' }}>Duplicates</div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Duplicate Notice Banner */}
+                {discoveryData.summary?.duplicates_count > 0 && (
+                  <div
+                    style={{
+                      background: '#fffbeb',
+                      border: '1px solid #fde68a',
+                      borderRadius: '8px',
+                      padding: '8px 12px',
+                      fontSize: '11.5px',
+                      color: '#92400e',
+                      marginBottom: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <AlertTriangle size={15} color="#d97706" />
+                    <span>
+                      {discoveryData.summary?.duplicates_count} candidate feature(s) overlap with existing village records in MySQL and have been automatically unchecked to prevent duplication.
+                    </span>
+                  </div>
+                )}
+
+                {/* Empty State when 0 features found (Phase 10: honest missing data messaging) */}
+                {discoveryData.features.length === 0 ? (
+                  <div
+                    style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      padding: '24px',
+                      textAlign: 'center',
+                      marginBottom: '16px',
+                    }}
+                  >
+                    <Info size={24} color="#64748b" style={{ margin: '0 auto 8px' }} />
+                    <h4 style={{ margin: '0 0 6px', color: '#1e293b', fontSize: '14px' }}>
+                      No mapped records found in the selected data source. Local verification is needed.
+                    </h4>
+                    <p style={{ margin: '0 0 14px', fontSize: '12px', color: '#64748b', maxWidth: '440px', marginLeft: 'auto', marginRight: 'auto' }}>
+                      OpenStreetMap does not currently have mapped infrastructure tags within this {discoveryRadius}m radius. You can expand the search radius, add assets manually, or import a municipal GeoJSON/CSV file.
+                    </p>
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsDiscoveryModalOpen(false);
+                          setIsAddAssetModalOpen(true);
+                        }}
+                        style={{
+                          background: '#176342',
+                          color: '#fff',
+                          border: 'none',
+                          padding: '6px 14px',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        + Add Manual Infrastructure
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    {/* Category Tabs & Bulk Selection */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                        {['all', 'roads', 'bridges', 'schools', 'health', 'water', 'settlements'].map((cat) => (
+                          <button
+                            key={`tab-${cat}`}
+                            type="button"
+                            onClick={() => setActiveCategoryTab(cat)}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              border: 'none',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              background: activeCategoryTab === cat ? '#176342' : '#f1f5f9',
+                              color: activeCategoryTab === cat ? '#fff' : '#475569',
+                              textTransform: 'capitalize',
+                            }}
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={() => toggleSelectAll(true)}
+                          style={{
+                            background: '#f1f5f9',
+                            border: '1px solid #cbd5e1',
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Select Valid
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => toggleSelectAll(false)}
+                          style={{
+                            background: '#f1f5f9',
+                            border: '1px solid #cbd5e1',
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Deselect All
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Discovered Features List */}
+                    <div
+                      style={{
+                        maxHeight: '260px',
+                        overflowY: 'auto',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        background: '#f8fafc',
+                        padding: '6px',
+                        marginBottom: '16px',
+                      }}
+                    >
+                      {getFilteredDiscoveryFeatures().map((item, idx) => {
+                        const isChecked = Boolean(selectedFeatureMap[item.id]);
+                        return (
+                          <div
+                            key={`feat-${item.id}-${idx}`}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '8px 10px',
+                              background: '#fff',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '6px',
+                              marginBottom: '4px',
+                              opacity: item.is_duplicate ? 0.65 : 1,
+                            }}
+                          >
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: item.is_duplicate ? 'default' : 'pointer', flex: 1 }}>
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                disabled={item.is_duplicate}
+                                onChange={(e) => {
+                                  setSelectedFeatureMap((prev) => ({
+                                    ...prev,
+                                    [item.id]: e.target.checked,
+                                  }));
+                                }}
+                              />
+                              <div>
+                                <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#0f172a' }}>
+                                  {item.name}
+                                </div>
+                                <div style={{ fontSize: '10.5px', color: '#64748b' }}>
+                                  Category: {item.category} · {item.infrastructure_type || item.node_type || 'asset'}
+                                  {item.length_meters && ` · ${item.length_meters}m`}
+                                  {item.surface_type && ` · ${item.surface_type}`}
+                                </div>
+                              </div>
+                            </label>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span
+                                style={{
+                                  fontSize: '10px',
+                                  fontWeight: '700',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  background: item.is_duplicate ? '#fee2e2' : '#dbeafe',
+                                  color: item.is_duplicate ? '#991b1b' : '#1e40af',
+                                }}
+                              >
+                                {item.is_duplicate ? 'Duplicate' : 'Needs Verification'}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : null}
+
+            {/* Modal Actions */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '14px' }}>
+              <div style={{ fontSize: '11.5px', color: '#64748b' }}>
+                Attribution: © OpenStreetMap contributors (ODbL 1.0)
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsDiscoveryModalOpen(false)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    background: '#fff',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  Close
+                </button>
+
+                {discoveryData && discoveryData.features.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleConfirmImport}
+                    disabled={importingLoading}
+                    style={{
+                      padding: '8px 18px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: '#176342',
+                      color: '#fff',
+                      fontWeight: 'bold',
+                      fontSize: '12.5px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    {importingLoading ? (
+                      <RefreshCw size={14} className="animate-spin" />
+                    ) : (
+                      <CheckCircle2 size={15} />
+                    )}
+                    Confirm & Save Selected Features (
+                    {Object.values(selectedFeatureMap).filter(Boolean).length})
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: MANUAL ADD INFRASTRUCTURE ASSET */}
       {isAddAssetModalOpen && (
         <div
           style={{
@@ -1361,7 +2011,6 @@ export default function VillageMapPage() {
               </button>
             </div>
 
-            {/* Asset Category Tabs */}
             <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
               <button
                 type="button"
@@ -1397,7 +2046,6 @@ export default function VillageMapPage() {
               </button>
             </div>
 
-            {/* POINT ASSET FORM */}
             {assetCategory === 'point' ? (
               <form onSubmit={handleCreatePointAsset}>
                 <div style={{ marginBottom: '12px' }}>
@@ -1406,7 +2054,7 @@ export default function VillageMapPage() {
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Upper Tole, Community Clinic, Primary School"
+                    placeholder="e.g. Upper Tole, Basic Health Post, Secondary School"
                     value={pointForm.name}
                     onChange={(e) => setPointForm({ ...pointForm, name: e.target.value })}
                     style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
@@ -1456,7 +2104,7 @@ export default function VillageMapPage() {
                     <input
                       type="number"
                       step="0.000001"
-                      placeholder="27.8635"
+                      placeholder="28.7516"
                       value={pointForm.latitude}
                       onChange={(e) => setPointForm({ ...pointForm, latitude: e.target.value })}
                       style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
@@ -1471,7 +2119,7 @@ export default function VillageMapPage() {
                     <input
                       type="number"
                       step="0.000001"
-                      placeholder="85.5815"
+                      placeholder="83.6844"
                       value={pointForm.longitude}
                       onChange={(e) => setPointForm({ ...pointForm, longitude: e.target.value })}
                       style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
@@ -1535,7 +2183,6 @@ export default function VillageMapPage() {
                 </div>
               </form>
             ) : (
-              /* LINEAR ASSET FORM */
               <form onSubmit={handleCreateLinearAsset}>
                 <div style={{ marginBottom: '12px' }}>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>
@@ -1543,7 +2190,7 @@ export default function VillageMapPage() {
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Ring Road Connector, Suspension Bridge 1"
+                    placeholder="e.g. Ring Road Connector, Suspension Bridge #1"
                     value={linearForm.name}
                     onChange={(e) => setLinearForm({ ...linearForm, name: e.target.value })}
                     style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
@@ -1649,7 +2296,7 @@ export default function VillageMapPage() {
                     >
                       <option value="operational">Operational (Passable)</option>
                       <option value="limited">Limited (Monsoon / Rough)</option>
-                      <option value="blocked">Blocked / Critical</option>
+                      <option value="blocked">Blocked / Hazard</option>
                       <option value="under_repair">Under Repair</option>
                     </select>
                   </div>
@@ -1662,7 +2309,7 @@ export default function VillageMapPage() {
                       checked={linearForm.is_critical}
                       onChange={(e) => setLinearForm({ ...linearForm, is_critical: e.target.checked })}
                     />
-                    Mark as Critical Village Lifeline (Single point of access)
+                    Mark as Critical Lifeline (Single point of failure)
                   </label>
                 </div>
 
@@ -1683,145 +2330,6 @@ export default function VillageMapPage() {
                 </div>
               </form>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 3: OPENSTREETMAP DATA INGESTION */}
-      {isOsmModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 3000,
-            padding: '16px',
-          }}
-        >
-          <div
-            style={{
-              background: '#fff',
-              borderRadius: '16px',
-              maxWidth: '600px',
-              width: '100%',
-              padding: '24px',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div>
-                <h3 style={{ margin: 0, color: '#092d22', fontSize: '18px' }}>Import Available OpenStreetMap Data</h3>
-                <span style={{ fontSize: '12px', color: '#64748b' }}>
-                  Overpass Ingestion for {village.name} (lat: {village.center_lat || village.latitude}, lng: {village.center_lng || village.longitude})
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsOsmModalOpen(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>
-                Search Radius from Village Center (Meters)
-              </label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  type="number"
-                  min="500"
-                  max="10000"
-                  step="500"
-                  value={osmRadius}
-                  onChange={(e) => setOsmRadius(Number(e.target.value))}
-                  style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                />
-                <button
-                  type="button"
-                  onClick={handleOsmPreview}
-                  disabled={osmLoading}
-                  style={{
-                    background: '#f1f5f9',
-                    border: '1px solid #cbd5e1',
-                    padding: '8px 14px',
-                    borderRadius: '6px',
-                    fontWeight: 'bold',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {osmLoading ? 'Querying...' : 'Scan OSM'}
-                </button>
-              </div>
-            </div>
-
-            {osmPreview && (
-              <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '16px' }}>
-                <h4 style={{ margin: '0 0 8px', color: '#0f172a', fontSize: '13px' }}>Scanned Map Features</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '12px', textAlign: 'center' }}>
-                  <div style={{ background: '#fff', padding: '8px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#176342' }}>
-                      {osmPreview.summary?.candidate_nodes || 0}
-                    </div>
-                    <div style={{ fontSize: '11px', color: '#64748b' }}>Nodes Found</div>
-                  </div>
-                  <div style={{ background: '#fff', padding: '8px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#0369a1' }}>
-                      {osmPreview.summary?.candidate_edges || 0}
-                    </div>
-                    <div style={{ fontSize: '11px', color: '#64748b' }}>Ways / Roads</div>
-                  </div>
-                  <div style={{ background: '#fff', padding: '8px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#b45309' }}>
-                      {osmPreview.summary?.candidate_facilities || 0}
-                    </div>
-                    <div style={{ fontSize: '11px', color: '#64748b' }}>Facilities</div>
-                  </div>
-                </div>
-
-                <p style={{ margin: 0, fontSize: '11.5px', color: '#475569' }}>
-                  {osmPreview.attribution || '© OpenStreetMap contributors'}
-                </p>
-              </div>
-            )}
-
-            {osmSuccessMsg && (
-              <div style={{ background: '#dcfce7', border: '1px solid #86efac', color: '#166534', padding: '10px', borderRadius: '8px', marginBottom: '16px', fontSize: '12.5px', fontWeight: 'bold' }}>
-                {osmSuccessMsg}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={() => setIsOsmModalOpen(false)}
-                style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={handleOsmIngest}
-                disabled={osmLoading || !osmPreview}
-                style={{
-                  padding: '8px 18px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  background: '#176342',
-                  color: '#fff',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                }}
-              >
-                {osmLoading ? 'Importing...' : 'Save Scanned Features to MySQL'}
-              </button>
-            </div>
           </div>
         </div>
       )}

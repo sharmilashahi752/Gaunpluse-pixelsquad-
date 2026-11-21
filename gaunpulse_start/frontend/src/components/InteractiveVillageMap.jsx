@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, Tooltip, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, Tooltip, Circle, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
@@ -127,6 +127,8 @@ export default function InteractiveVillageMap({
   isPickingLocation = false,
   onQuickAddVillage = null,
   onQuickAddNode = null,
+  studyAreaCircle = null,
+  candidatePreviewFeatures = null,
 }) {
   const [activeLayers, setActiveLayers] = useState({
     settlements: true,
@@ -320,6 +322,51 @@ export default function InteractiveVillageMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           maxZoom={19}
         />
+
+        {/* Study Area Bounding Circle (Phase 3) */}
+        {studyAreaCircle && studyAreaCircle.center && studyAreaCircle.center[0] && (
+          <Circle
+            center={studyAreaCircle.center}
+            radius={studyAreaCircle.radius || 2000}
+            pathOptions={{
+              color: '#176342',
+              fillColor: '#176342',
+              fillOpacity: 0.12,
+              weight: 2,
+              dashArray: '8, 8',
+            }}
+          >
+            <Tooltip permanent={false}>
+              <div style={{ fontSize: '11px', fontWeight: 'bold' }}>
+                Study Area Radius: {studyAreaCircle.radius || 2000}m
+              </div>
+            </Tooltip>
+          </Circle>
+        )}
+
+        {/* Candidate Discovered Features Preview (Phase 6) */}
+        {candidatePreviewFeatures?.edges?.map((candEdge, idx) => {
+          if (!candEdge.geometry || candEdge.geometry.length < 2) return null;
+          return (
+            <Polyline
+              key={`preview-edge-${idx}`}
+              positions={candEdge.geometry}
+              pathOptions={{
+                color: candEdge.infrastructure_type === 'bridge' ? '#d97706' : '#0284c7',
+                weight: 5,
+                dashArray: '6, 6',
+                opacity: 0.85,
+              }}
+            >
+              <Tooltip sticky>
+                <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#0369a1' }}>
+                  🔍 Discovered: {candEdge.name} ({candEdge.infrastructure_type})
+                  <div style={{ fontSize: '10px', color: '#64748b' }}>Length: {candEdge.length_meters}m</div>
+                </div>
+              </Tooltip>
+            </Polyline>
+          );
+        })}
 
         {/* 1. Nationwide Saved Villages Layer */}
         {activeLayers.savedVillages &&
