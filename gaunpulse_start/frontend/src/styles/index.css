@@ -1056,3 +1056,571 @@ h1, h2, h3, p { margin-top: 0; }
   gap: 6px;
 }
 
+
+/* ==========================================================================
+   GAUNPULSE VILLAGE DATA MANAGER (PREMIUM HUMAN-CENTERED REDESIGN)
+   ========================================================================== */
+
+.vm-home {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  max-width: 1360px;
+  margin: 0 auto;
+}
+
+.vm-hero {
+  background: linear-gradient(135deg, #092d22 0%, #124b35 60%, #176342 100%);
+  border-radius: 16px;
+  padding: 28px 36px;
+  color: #ffffff;
+  box-shadow: 0 8px 24px rgba(9, 45, 34, 0.16);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.vm-hero__content {
+  flex: 1;
+  min-width: 280px;
+}
+
+.vm-hero__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(134, 239, 172, 0.35);
+  color: #86efac;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 4px 10px;
+  border-radius: 20px;
+  margin-bottom: 10px;
+}
+
+.vm-hero__title {
+  font-size: 28px;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 8px 0;
+  letter-spacing: -0.02em;
+}
+
+.vm-hero__subtitle {
+  font-size: 15px;
+  color: #c4dcd0;
+  margin: 0;
+  line-height: 1.5;
+  max-width: 620px;
+}
+
+.vm-hero__btn {
+  background: #22c55e !important;
+  color: #092d22 !important;
+  font-weight: 700 !important;
+  font-size: 14.5px !important;
+  padding: 12px 24px !important;
+  border-radius: 10px !important;
+  box-shadow: 0 4px 14px rgba(34, 197, 94, 0.35) !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.vm-hero__btn:hover {
+  background: #16a34a !important;
+  color: #ffffff !important;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(34, 197, 94, 0.45) !important;
+}
+
+/* 4 Clear Action Cards */
+.vm-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 1024px) {
+  .vm-actions-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .vm-actions-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.vm-action-card {
+  background: #ffffff;
+  border: 1px solid #dfe6df;
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: left;
+}
+
+.vm-action-card:hover {
+  border-color: #176342;
+  box-shadow: 0 6px 18px rgba(23, 99, 66, 0.1);
+  transform: translateY(-2px);
+}
+
+.vm-action-card__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #eaf5ee;
+  color: #176342;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vm-action-card__icon--blue {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.vm-action-card__icon--amber {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.vm-action-card__icon--purple {
+  background: #faf5ff;
+  color: #7e22ce;
+}
+
+.vm-action-card__title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #092d22;
+  margin: 0;
+}
+
+.vm-action-card__desc {
+  font-size: 13px;
+  color: #526359;
+  line-height: 1.45;
+  margin: 0;
+  flex: 1;
+}
+
+.vm-action-card__link {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #176342;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Search and Filter Toolbar */
+.vm-toolbar {
+  background: #ffffff;
+  border: 1px solid #dfe6df;
+  border-radius: 12px;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.vm-search-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f8faf8;
+  border: 1px solid #c8d8cc;
+  border-radius: 8px;
+  padding: 8px 14px;
+  flex: 1;
+  min-width: 260px;
+}
+
+.vm-search-box input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 13.5px;
+  color: #092d22;
+  width: 100%;
+}
+
+.vm-search-box input::placeholder {
+  color: #7d8f85;
+}
+
+.vm-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.vm-filter-select {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #c8d8cc;
+  background: #ffffff;
+  font-size: 13px;
+  color: #092d22;
+  font-weight: 500;
+  outline: none;
+}
+
+/* Villages Cards Grid */
+.vm-villages-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 20px;
+}
+
+.vm-village-card {
+  background: #ffffff;
+  border: 1px solid #dfe6df;
+  border-radius: 14px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+.vm-village-card:hover {
+  border-color: #176342;
+  box-shadow: 0 8px 24px rgba(9, 45, 34, 0.08);
+}
+
+.vm-village-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.vm-village-card__title-wrap {
+  flex: 1;
+}
+
+.vm-village-card__name {
+  font-size: 18px;
+  font-weight: 750;
+  color: #092d22;
+  margin: 0 0 4px 0;
+}
+
+.vm-village-card__local-name {
+  font-size: 13px;
+  color: #687c73;
+  margin: 0;
+}
+
+.vm-village-card__location {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: #495a52;
+  margin-top: 4px;
+}
+
+.vm-village-card__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  background: #f8faf8;
+  border: 1px solid #e7ebe7;
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.vm-village-card__metric-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.vm-village-card__metric-label {
+  font-size: 11px;
+  color: #687c73;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.vm-village-card__metric-value {
+  font-size: 17px;
+  font-weight: 750;
+  color: #092d22;
+  margin-top: 2px;
+}
+
+.vm-village-card__quality-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.vm-quality-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.vm-quality-badge--verified {
+  background: #eaf8ef;
+  color: #176342;
+  border: 1px solid #b8dfc2;
+}
+
+.vm-quality-badge--ready {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.vm-quality-badge--review {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.vm-quality-badge--getting-started {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.vm-quality-badge--draft {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+}
+
+.vm-village-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid #f0f2f0;
+  padding-top: 14px;
+  margin-top: auto;
+}
+
+.vm-village-card__date {
+  font-size: 11.5px;
+  color: #7d8f85;
+}
+
+.vm-village-card__open-btn {
+  background: #176342;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
+}
+
+.vm-village-card__open-btn:hover {
+  background: #092d22;
+  transform: translateY(-1px);
+}
+
+/* Stepper Indicator */
+.vm-stepper {
+  display: flex;
+  background: #f8faf8;
+  border-bottom: 1px solid #dfe6df;
+  padding: 14px 24px;
+  gap: 12px;
+}
+
+.vm-step-pill {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #7d8f85;
+  background: #ffffff;
+  border: 1px solid #dfe6df;
+  transition: all 0.2s;
+}
+
+.vm-step-pill--active {
+  background: #176342;
+  color: #ffffff;
+  border-color: #176342;
+}
+
+.vm-step-pill--done {
+  background: #eaf8ef;
+  color: #176342;
+  border-color: #b8dfc2;
+}
+
+/* Infrastructure Category Preview Grid */
+.vm-infra-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .vm-infra-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.vm-infra-card {
+  background: #ffffff;
+  border: 1px solid #dfe6df;
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.vm-infra-card__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: #f0f7f3;
+  color: #176342;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.vm-infra-card__count {
+  font-size: 18px;
+  font-weight: 800;
+  color: #092d22;
+  line-height: 1;
+}
+
+.vm-infra-card__label {
+  font-size: 12px;
+  color: #526359;
+  font-weight: 500;
+  margin-top: 3px;
+}
+
+/* Dedicated Village View Breadcrumb & Topbar */
+.vm-detail-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 14px 20px;
+  background: #ffffff;
+  border: 1px solid #dfe6df;
+  border-radius: 12px;
+}
+
+.vm-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #687c73;
+}
+
+.vm-breadcrumb strong {
+  color: #092d22;
+  font-weight: 700;
+}
+
+.vm-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 2px solid #e7ebe7;
+  padding-bottom: 2px;
+  overflow-x: auto;
+}
+
+.vm-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 8px 8px 0 0;
+  border: none;
+  background: transparent;
+  color: #495a52;
+  font-weight: 500;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  white-space: nowrap;
+}
+
+.vm-tab-btn--active {
+  background: #176342;
+  color: #ffffff;
+  font-weight: 650;
+  border-bottom: 3px solid #092d22;
+}
+
+.vm-tab-btn:hover:not(.vm-tab-btn--active) {
+  background: #eaf5ee;
+  color: #176342;
+}
+
+/* Advanced details accordion */
+.vm-advanced-toggle {
+  background: #f9fbf9;
+  border: 1px solid #dce8dd;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: #4b6357;
+  margin-top: 10px;
+}
+
+.vm-advanced-toggle summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #176342;
+  outline: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
