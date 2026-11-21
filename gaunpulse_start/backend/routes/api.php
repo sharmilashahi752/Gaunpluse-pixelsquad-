@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ActionPlanController;
+use App\Http\Controllers\AIController;
 use App\Http\Controllers\Admin\AdminIssueController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\PriorityController;
@@ -48,6 +49,10 @@ Route::post('/simulations/compare', [SimulationController::class, 'compare']);
 
 // Public Priority Ranking Route
 Route::get('/priorities', PriorityController::class);
+
+// AI Agent Endpoints (proxied to Python Intelligence service)
+Route::post('/ai/chat', [AIController::class, 'chat']);
+Route::get('/ai/insights', [AIController::class, 'insights']);
 
 // Public Dashboard Real-Time Statistics
 Route::get('/dashboard/stats', function () {

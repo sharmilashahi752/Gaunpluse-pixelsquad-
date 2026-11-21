@@ -221,6 +221,61 @@ Request:
 
 ---
 
+## Part 5: GaunPulse AI Agent Integration
+
+GaunPulse AI provides evidence-grounded municipal decision support for rural infrastructure planning in Nepal.
+
+### Multi-Tier Architecture
+
+```
+[ React + Vite UI ]  (#/ai-agent, Dashboard AI Insights)
+        │
+        ▼ (Authenticated REST requests)
+[ Laravel 11 Gateway ]  (/api/ai/chat, /api/ai/insights)
+        │
+        ├─► [ MySQL Database ] (Authorized records, citizen redaction)
+        │
+        ▼ (Secure internal proxy)
+[ Python Intelligence Service ]  (Port 8001: FastAPI + NetworkX)
+        │
+        ├─► NetworkX MultiGraph Engine (Zero hallucinations for isolation numbers)
+        └─► Bilingual Synthesis Engine (English + Devanagari Nepali)
+```
+
+### Real AI Tools
+
+1. `get_village_issues(village_id)`: Retrieves authorized village issue reports from MySQL, strictly redacting private citizen identifying data.
+2. `get_infrastructure_details(infrastructure_id, village_id)`: Fetches mapped topology (surface type, length, connected nodes).
+3. `simulate_infrastructure_failure(edge_id, village_id)`: Invokes NetworkX to calculate exact newly disconnected households, cut-off facilities, and detour paths.
+4. `get_repair_priorities(village_id)`: Computes weighted priority scoring (Affected Population 30%, Lifeline Disruption 25%, Severity 30%, Verification 15%).
+5. `generate_action_plan_draft(issue_id, village_id)`: Produces structured engineering inspection steps, responsibility assignments, and timeline estimates.
+
+### AI Decision-Support & Security Safeguards
+
+- **Strictly Grounded in Real Data:** Disruption counts and isolated settlements originate exclusively from NetworkX calculations; the model never invents household counts.
+- **Human-in-the-Loop Approval:** Action plans are explicitly presented as drafts. The AI cannot authorize public expenditure, approve budgets, or certify infrastructure safety.
+- **One-Click Official Registration:** Municipal officers can review and click **"Import Draft into Action Plans"** to register approved interventions into the official MySQL records.
+- **Bilingual Natural Language:** Full native support for Devanagari Nepali (e.g. *"पुल बिग्रिएपछि कुन बस्ती प्रभावित हुन्छ?"*) and English.
+- **Prompt-Injection Resistance:** Refuses adversarial attempts to alter municipal protocols, clear databases, or bypass technical verification.
+
+### Environment Configuration
+
+In `intelligence/.env`:
+```ini
+LARAVEL_API_URL=http://127.0.0.1:8000/api
+REQUEST_TIMEOUT=15.0
+GEMINI_API_KEY=               # Optional: set for Gemini LLM synthesis
+OPENAI_API_KEY=               # Optional: set for OpenAI LLM synthesis
+AI_MODEL=gemini-2.5-flash
+```
+
+In `backend/.env`:
+```ini
+SIMULATOR_URL=http://127.0.0.1:8001
+```
+
+---
+
 ## Limitations and Data Quality
 
 - All current topological coordinates and numbers represent **demonstration data for Bhotenamlang Demo Village** in Helambu, Sindhupalchok.

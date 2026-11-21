@@ -4,18 +4,24 @@ from typing import Any, Union
 
 from graph_builder import GraphValidationError
 from schemas import (
+    AIChatRequest,
+    AIChatResponse,
+    AIInsightsResponse,
     SimulationRequest,
     SimulationResult,
     RepairComparisonRequest,
     RepairComparisonResult,
 )
 from simulator import run_simulation, compare_repairs
+from agent import GaunPulseAIAgent
 
 app = FastAPI(
     title="GaunPulse Intelligence Service",
-    description="Graph-theoretic rural lifeline simulation and repair prioritization engine for Nepal.",
+    description="Graph-theoretic rural lifeline simulation, repair prioritization, and AI decision-support engine for Nepal.",
     version="1.0.0",
 )
+
+ai_agent = GaunPulseAIAgent()
 
 # Enable CORS for local development & dashboard calls
 app.add_middleware(
@@ -108,3 +114,43 @@ def compare_repairs_endpoint(payload: RepairComparisonRequest):
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Repair comparison error: {str(exc)}") from exc
+
+
+@app.post(
+    "/ai/chat",
+    response_model=AIChatResponse,
+    summary="Chat with GaunPulse AI Agent",
+    description="Ask natural-language questions in Nepali or English about village lifelines, simulations, or draft action plans.",
+)
+async def ai_chat_endpoint(payload: AIChatRequest):
+    try:
+        return await ai_agent.chat(payload)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"AI Agent error: {str(exc)}") from exc
+
+
+@app.get(
+    "/ai/insights",
+    response_model=AIInsightsResponse,
+    summary="Get proactive AI insights for dashboard",
+)
+async def ai_insights_endpoint(village_id: int = 1):
+    try:
+        return await ai_agent.get_insights(village_id=village_id)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"AI Insights error: {str(exc)}") from exc
+
+
+@app.post(
+    "/ai/insights",
+    response_model=AIInsightsResponse,
+    summary="Get proactive AI insights with optional preloaded data",
+)
+async def ai_insights_post_endpoint(payload: dict[str, Any]):
+    try:
+        village_id = payload.get("village_id", 1)
+        issues_list = payload.get("issues_data")
+        return await ai_agent.get_insights(village_id=village_id, issues_list=issues_list)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"AI Insights error: {str(exc)}") from exc
+

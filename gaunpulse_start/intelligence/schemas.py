@@ -23,9 +23,9 @@ class EdgeSchema(BaseModel):
     id: Union[int, str]
     name: Optional[str] = None
     edge_code: Optional[str] = None
-    source: Optional[Union[int, str]] = Field(default=None, alias='from')
+    source: Optional[Union[int, str, dict[str, Any]]] = Field(default=None, alias='from')
     source_node_id: Optional[Union[int, str]] = None
-    target: Optional[Union[int, str]] = Field(default=None, alias='to')
+    target: Optional[Union[int, str, dict[str, Any]]] = Field(default=None, alias='to')
     target_node_id: Optional[Union[int, str]] = None
     type: Optional[str] = Field(default='road', alias='infrastructure_type')
     surface_type: Optional[str] = None
@@ -37,6 +37,10 @@ class EdgeSchema(BaseModel):
 
     @model_validator(mode='after')
     def resolve_nodes(self):
+        if isinstance(self.source, dict):
+            self.source = self.source.get('id')
+        if isinstance(self.target, dict):
+            self.target = self.target.get('id')
         if self.source is None and self.source_node_id is not None:
             self.source = self.source_node_id
         if self.target is None and self.target_node_id is not None:
@@ -157,3 +161,65 @@ class RepairComparisonResult(BaseModel):
         'seasonal accessibility, and geotechnical safety rather than automated cost scoring.'
     )
     calculation_timestamp: str
+
+
+# ==========================================
+# PART 5: AI AGENT SCHEMAS
+# ==========================================
+
+class AIChatMessage(BaseModel):
+    role: str  # 'user', 'assistant', 'system'
+    content: str
+
+
+class AIChatRequest(BaseModel):
+    village_id: int = 1
+    message: str
+    conversation_history: list[AIChatMessage] = Field(default_factory=list)
+    language: Optional[str] = None  # 'en', 'ne', or None (auto-detect)
+    network_data: Optional[dict[str, Any]] = None
+    issues_data: Optional[list[dict[str, Any]]] = None
+
+
+class AIToolCall(BaseModel):
+    tool: str
+    args: dict[str, Any]
+    result: Any
+
+
+class DraftActionPlan(BaseModel):
+    title: str
+    issue_id: Optional[int] = None
+    village_id: int = 1
+    ward: str = "Ward 4"
+    priority: str = "High"
+    responsible_team: str = "Municipal Infrastructure Unit"
+    problem_summary: str
+    evidence: str
+    suggested_inspection_steps: list[str] = Field(default_factory=list)
+    accessibility_considerations: str
+    proposed_responsibilities: str
+    follow_up_tasks: list[str] = Field(default_factory=list)
+    uncertainties: str
+    target_days: int = 7
+
+
+class AIChatResponse(BaseModel):
+    reply: str
+    language: str = "en"
+    tools_called: list[AIToolCall] = Field(default_factory=list)
+    draft_action_plan: Optional[DraftActionPlan] = None
+    suggested_questions: list[str] = Field(default_factory=list)
+    relevant_links: list[dict[str, str]] = Field(default_factory=list)
+
+
+class AIInsightsResponse(BaseModel):
+    village_id: int
+    village_name: str
+    frequent_category: str
+    critical_issues_summary: str
+    simulation_risk_alert: str
+    recommended_action: str
+    database_backed: bool = True
+    metrics: dict[str, Any] = Field(default_factory=dict)
+

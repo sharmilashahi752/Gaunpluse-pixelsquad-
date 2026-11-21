@@ -128,9 +128,14 @@ def build_network_graph(
 
         canonical_edge_id = str(raw_edge_id)
         source_raw = edge.get("source") if edge.get("source") is not None else edge.get("from")
+        if isinstance(source_raw, dict):
+            source_raw = source_raw.get("id")
         if source_raw is None:
             source_raw = edge.get("source_node_id")
+
         target_raw = edge.get("target") if edge.get("target") is not None else edge.get("to")
+        if isinstance(target_raw, dict):
+            target_raw = target_raw.get("id")
         if target_raw is None:
             target_raw = edge.get("target_node_id")
 

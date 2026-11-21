@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import AppLayout from './layouts/AppLayout';
 import ActionPlansPage from './pages/ActionPlansPage';
+import AIAgentPage from './pages/AIAgentPage';
 import CommunityVoicesPage from './pages/CommunityVoicesPage';
 import DashboardPage from './pages/DashboardPage';
 import IssuesPage from './pages/IssuesPage';
 import SimulationsPage from './pages/SimulationsPage';
 import VillageMapPage from './pages/VillageMapPage';
 import {
-  AIAgentPage,
   ReportsInsightsPage,
   VillageDataPage,
 } from './pages/ModulePages';

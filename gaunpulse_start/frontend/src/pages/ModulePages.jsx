@@ -227,33 +227,7 @@ export function ReportsInsightsPage() {
   );
 }
 
-const initialMessages = [{ role: 'assistant', text: 'Namaste. I am a scripted interface preview. Ask a sample question to see the planned conversation flow.' }];
-
-export function AIAgentPage() {
-  const [messages, setMessages] = useState(initialMessages);
-  const [question, setQuestion] = useState('');
-
-  const sendMessage = (event) => {
-    event.preventDefault();
-    const trimmed = question.trim();
-    if (!trimmed) return;
-    setMessages((current) => [...current, { role: 'user', text: trimmed }, { role: 'assistant', text: 'This is a fixed UI demonstration response. No AI model, village database or live tool was contacted.' }]);
-    setQuestion('');
-  };
-
-  return (
-    <div className="page-stack agent-page">
-      <PageIntro eyebrow="Decision-support preview" title="AI Agent" description="Explore the planned chat experience for evidence-based municipal questions." />
-      <FeatureNotice title="UI demonstration — not a working AI model" icon={Bot}>Messages stay in this browser session. Responses are scripted and no external model, database or simulator is connected.</FeatureNotice>
-      <Card className="agent-chat">
-        <div className="agent-chat__header"><span className="agent-chat__avatar"><Sparkles size={20} /></span><div><strong>GaunPulse Assistant</strong><span>Scripted demo · no live connection</span></div><StatusBadge tone="orange">Demo mode</StatusBadge></div>
-        <div className="agent-chat__messages" aria-live="polite">{messages.map((message, index) => <div className={`chat-message chat-message--${message.role}`} key={`${message.role}-${index}`}><span>{message.role === 'assistant' ? <Bot size={16} /> : 'AS'}</span><p>{message.text}</p></div>)}</div>
-        <form className="agent-chat__composer" onSubmit={sendMessage}><label className="sr-only" htmlFor="agent-question">Ask a demonstration question</label><input id="agent-question" value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Ask about a fictional infrastructure issue…" /><button className="button button--primary" type="submit" aria-label="Send demonstration message"><Send size={17} /></button></form>
-        <p className="agent-chat__privacy"><ShieldCheck size={13} /> Do not enter personal, sensitive or operational information.</p>
-      </Card>
-    </div>
-  );
-}
+export { default as AIAgentPage } from './AIAgentPage';
 
 export function VillageDataPage() {
   const [villages, setVillages] = useState([]);
