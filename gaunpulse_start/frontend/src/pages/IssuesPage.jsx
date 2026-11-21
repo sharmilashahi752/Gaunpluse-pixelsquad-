@@ -215,15 +215,20 @@ export default function IssuesPage({ onNavigate }) {
     }
   };
 
-  // Filter issues
+  // Filter issues with case and format normalization
+  const norm = (s) => (s || '').toLowerCase().replace(/[\s-]+/g, '_');
+
+  const getSeverityTone = (sev) => severityTones[(sev || '').toLowerCase()] || severityTones[sev] || 'default';
+  const getStatusTone = (st) => statusTones[(st || '').toLowerCase().replace(/[\s-]+/g, '_')] || statusTones[st] || 'default';
+
   const filteredIssues = issues.filter((item) => {
     const matchesSearch =
       (item.title || '').toLowerCase().includes(search.toLowerCase()) ||
       (item.tracking_code || '').toLowerCase().includes(search.toLowerCase()) ||
       (item.village?.name || '').toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = !filterCategory || item.category === filterCategory;
-    const matchesSeverity = !filterSeverity || (item.severity || '').toLowerCase() === filterSeverity.toLowerCase();
-    const matchesStatus = !filterStatus || (item.status || '').toLowerCase() === filterStatus.toLowerCase();
+    const matchesCategory = !filterCategory || norm(item.category) === norm(filterCategory);
+    const matchesSeverity = !filterSeverity || norm(item.severity) === norm(filterSeverity);
+    const matchesStatus = !filterStatus || norm(item.status) === norm(filterStatus);
     return matchesSearch && matchesCategory && matchesSeverity && matchesStatus;
   });
 
@@ -373,13 +378,13 @@ export default function IssuesPage({ onNavigate }) {
                       </span>
                     </td>
                     <td>
-                      <StatusBadge tone={severityTones[item.severity] || 'default'}>
+                      <StatusBadge tone={getSeverityTone(item.severity)}>
                         {item.severity}
                       </StatusBadge>
                     </td>
                     <td>
-                      <StatusBadge tone={statusTones[item.status] || 'default'}>
-                        {item.status}
+                      <StatusBadge tone={getStatusTone(item.status)}>
+                        {(item.status || '').replace(/_/g, ' ')}
                       </StatusBadge>
                     </td>
                     <td>

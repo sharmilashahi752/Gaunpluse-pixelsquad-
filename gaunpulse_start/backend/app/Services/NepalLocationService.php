@@ -413,8 +413,17 @@ class NepalLocationService
             return array_values(array_unique($all));
         }
 
+        $search = strtolower(trim(str_ireplace('province', '', $provinceName)));
         foreach (self::$provinces as $p) {
-            if (strcasecmp($p['name'], $provinceName) === 0 || strcasecmp($p['code'], $provinceName) === 0) {
+            $pName = strtolower(str_ireplace('province', '', $p['name']));
+            $pCode = strtolower($p['code']);
+            if (
+                strcasecmp($p['name'], $provinceName) === 0 ||
+                strcasecmp($p['code'], $provinceName) === 0 ||
+                trim($pName) === $search ||
+                str_contains($pName, $search) ||
+                str_contains($search, trim($pName))
+            ) {
                 return $p['districts'];
             }
         }
