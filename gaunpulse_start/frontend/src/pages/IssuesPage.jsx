@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { Card, CardHeader, EmptyState, FeatureNotice, LiveLabel, PageIntro, StatusBadge } from '../components/ui';
 import { deduplicateVillages, formatVillageLabel } from '../utils/villageUtils';
+import { useVillageSelection } from '../context/VillageSelectionContext';
+import { cachedFetchJson, invalidateApiCache } from '../utils/apiCache';
 
 const CATEGORIES = [
   { value: 'damaged_bridge', label: 'Damaged Bridge' },
@@ -57,14 +59,22 @@ const statusTones = {
 };
 
 export default function IssuesPage({ onNavigate }) {
+  const { villages: contextVillages } = useVillageSelection();
   const [issues, setIssues] = useState([]);
-  const [villages, setVillages] = useState([]);
+  const [villages, setVillages] = useState(contextVillages || []);
   const [villageEdges, setVillageEdges] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterSeverity, setFilterSeverity] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+
+  // Sync villages from context
+  useEffect(() => {
+    if (contextVillages && contextVillages.length > 0) {
+      setVillages(contextVillages);
+    }
+  }, [contextVillages]);
 
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -93,25 +103,34 @@ export default function IssuesPage({ onNavigate }) {
   const [photoFile, setPhotoFile] = useState(null);
 
   // Load issues and villages
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (force = false) => {
+    if (issues.length === 0) setLoading(true);
     try {
-      const [resIssues, resVillages] = await Promise.all([
-        fetch('http://127.0.0.1:8000/api/issues'),
-        fetch('http://127.0.0.1:8000/api/villages'),
+      const [dataIssues, dataVillages] = await Promise.all([
+        cachedFetchJson('http://127.0.0.1:8000/api/issues', {}, {
+          force,
+          ttlMs: 45000,
+          onBackgroundUpdate: (fresh) => {
+            if (fresh) setIssues(fresh.data || fresh || []);
+          },
+        }),
+        contextVillages && contextVillages.length > 0
+          ? Promise.resolve(contextVillages)
+          : cachedFetchJson('http://127.0.0.1:8000/api/villages', {}, { ttlMs: 120000 }),
       ]);
-      const dataIssues = await resIssues.json();
-      const dataVillages = await resVillages.json();
 
-      setIssues(dataIssues.data || dataIssues || []);
-      setVillages(dataVillages || []);
+      const issueList = dataIssues.data || dataIssues || [];
+      const villageList = Array.isArray(dataVillages) ? dataVillages : [];
 
-      if (dataVillages.length > 0 && !formData.village_id) {
+      setIssues(issueList);
+      setVillages(villageList);
+
+      if (villageList.length > 0 && !formData.village_id) {
         setFormData((prev) => ({
           ...prev,
-          village_id: dataVillages[0].id,
-          latitude: dataVillages[0].center_lat || 27.8635,
-          longitude: dataVillages[0].center_lng || 85.5815,
+          village_id: villageList[0].id,
+          latitude: villageList[0].center_lat || 27.8635,
+          longitude: villageList[0].center_lng || 85.5815,
         }));
       }
     } catch (err) {
@@ -175,8 +194,11 @@ export default function IssuesPage({ onNavigate }) {
         edge_id: '',
       }));
       setPhotoFile(null);
-      // Refresh list
-      loadData();
+      // Invalidate cache & refresh list
+      invalidateApiCache('api/issues');
+      invalidateApiCache('api/dashboard');
+      invalidateApiCache('api/reports');
+      loadData(true);
       setTimeout(() => setShowCreateModal(false), 1800);
     } catch (err) {
       setSubmitError(err.message);
@@ -208,7 +230,10 @@ export default function IssuesPage({ onNavigate }) {
 
       setStatusMessage('Status updated successfully and logged in database.');
       setSelectedIssue(updated.data || updated);
-      loadData();
+      invalidateApiCache('api/issues');
+      invalidateApiCache('api/dashboard');
+      invalidateApiCache('api/reports');
+      loadData(true);
     } catch (err) {
       setStatusMessage(`Error: ${err.message}`);
     } finally {

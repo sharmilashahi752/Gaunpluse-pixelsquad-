@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { cachedFetchJson, invalidateApiCache } from '../utils/apiCache';
 
 const STORAGE_KEY = 'gaunpulse.selectedVillageId';
 const VillageSelectionContext = createContext(null);
@@ -15,6 +16,32 @@ function readPersistedVillageId() {
 
 export function VillageSelectionProvider({ children }) {
   const [selectedVillageId, setSelectedVillageIdState] = useState(readPersistedVillageId);
+  const [villages, setVillages] = useState([]);
+  const [loadingVillages, setLoadingVillages] = useState(true);
+
+  const fetchVillages = useCallback(async (force = false) => {
+    try {
+      if (force) invalidateApiCache('api/villages');
+      const data = await cachedFetchJson('http://127.0.0.1:8000/api/villages', {}, {
+        force,
+        ttlMs: 120000,
+        onBackgroundUpdate: (fresh) => {
+          if (Array.isArray(fresh)) setVillages(fresh);
+        },
+      });
+      if (Array.isArray(data)) {
+        setVillages(data);
+      }
+    } catch (err) {
+      console.error('Failed to load global villages list:', err);
+    } finally {
+      setLoadingVillages(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchVillages();
+  }, [fetchVillages]);
 
   const setSelectedVillageId = useCallback((value) => {
     const villageId = Number(value);
@@ -31,7 +58,21 @@ export function VillageSelectionProvider({ children }) {
     }
   }, []);
 
-  const value = useMemo(() => ({ selectedVillageId, setSelectedVillageId }), [selectedVillageId, setSelectedVillageId]);
+  const refreshVillages = useCallback(async () => {
+    return fetchVillages(true);
+  }, [fetchVillages]);
+
+  const value = useMemo(
+    () => ({
+      selectedVillageId,
+      setSelectedVillageId,
+      villages,
+      setVillages,
+      loadingVillages,
+      refreshVillages,
+    }),
+    [selectedVillageId, setSelectedVillageId, villages, loadingVillages, refreshVillages]
+  );
 
   return <VillageSelectionContext.Provider value={value}>{children}</VillageSelectionContext.Provider>;
 }

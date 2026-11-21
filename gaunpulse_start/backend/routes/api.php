@@ -103,6 +103,7 @@ Route::get('/ai/insights', [AIController::class, 'insights']);
 
 // Real-Time Municipal Reports & Insights API (Phase 2 & 3)
 Route::prefix('reports')->group(function () {
+    Route::get('/bundle', [ReportController::class, 'bundle']);
     Route::get('/overview', [ReportController::class, 'overview']);
     Route::get('/categories', [ReportController::class, 'categories']);
     Route::get('/trends', [ReportController::class, 'trends']);

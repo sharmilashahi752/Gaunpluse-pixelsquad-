@@ -20,6 +20,7 @@ import InteractiveVillageMap from '../components/InteractiveVillageMap';
 import { Card, CardHeader, FeatureNotice, PageIntro, StatusBadge } from '../components/ui';
 import { useVillageSelection } from '../context/VillageSelectionContext';
 import { deduplicateVillages, formatVillageLabel } from '../utils/villageUtils';
+import { cachedFetchJson } from '../utils/apiCache';
 
 const API_BASE = 'http://127.0.0.1:8000/api';
 const BLOCKED_STATUSES = new Set(['blocked', 'closed', 'impassable', 'failed', 'out_of_service']);
@@ -53,8 +54,8 @@ function readinessTone(status) {
 }
 
 export default function SimulationsPage({ onNavigate }) {
-  const { selectedVillageId, setSelectedVillageId } = useVillageSelection();
-  const [villages, setVillages] = useState([]);
+  const { selectedVillageId, setSelectedVillageId, villages: contextVillages } = useVillageSelection();
+  const [villages, setVillages] = useState(contextVillages || []);
   const [villageData, setVillageData] = useState(null);
   const [loadingVillage, setLoadingVillage] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -74,33 +75,31 @@ export default function SimulationsPage({ onNavigate }) {
   const [validating, setValidating] = useState(false);
 
   useEffect(() => {
-    const controller = new AbortController();
-    fetch(`${API_BASE}/villages?status=active`, { signal: controller.signal })
-      .then(async (response) => {
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.message || 'Unable to load registered villages.');
-        return data;
-      })
+    if (contextVillages && contextVillages.length > 0) {
+      setVillages(contextVillages);
+      const selectedExists = contextVillages.some((village) => Number(village.id) === Number(selectedVillageId));
+      if (!selectedExists && contextVillages.length > 0) setSelectedVillageId(contextVillages[0].id);
+      return;
+    }
+    cachedFetchJson(`${API_BASE}/villages?status=active`, {}, { ttlMs: 120000 })
       .then((data) => {
         if (!Array.isArray(data)) return;
         setVillages(data);
         const selectedExists = data.some((village) => Number(village.id) === Number(selectedVillageId));
         if (!selectedExists && data.length > 0) setSelectedVillageId(data[0].id);
       })
-      .catch((error) => {
-        if (error.name !== 'AbortError') setLoadError(error.message);
-      });
-    return () => controller.abort();
-  }, [selectedVillageId, setSelectedVillageId]);
+      .catch((error) => setLoadError(error.message));
+  }, [contextVillages, selectedVillageId, setSelectedVillageId]);
 
   useEffect(() => {
     if (!selectedVillageId) return undefined;
     const requestedVillageId = Number(selectedVillageId);
-    const controller = new AbortController();
 
-    setLoadingVillage(true);
+    if (!villageData || villageData.village?.id !== requestedVillageId) {
+      setLoadingVillage(true);
+      setVillageData(null);
+    }
     setLoadError('');
-    setVillageData(null);
     setSelectedEdgeId('');
     setSimulationEnvelope(null);
     setSimulationError('');
@@ -111,19 +110,23 @@ export default function SimulationsPage({ onNavigate }) {
     setMapMode('before');
 
     Promise.all([
-      fetch(`${API_BASE}/villages/${requestedVillageId}/network`, { signal: controller.signal }),
-      fetch(`${API_BASE}/simulations?village_id=${requestedVillageId}`, { signal: controller.signal }),
+      cachedFetchJson(`${API_BASE}/villages/${requestedVillageId}/network`, {}, {
+        ttlMs: 60000,
+        onBackgroundUpdate: (fresh) => {
+          if (fresh?.village?.id === requestedVillageId) setVillageData(fresh);
+        },
+      }),
+      cachedFetchJson(`${API_BASE}/simulations?village_id=${requestedVillageId}`, {}, {
+        ttlMs: 45000,
+        onBackgroundUpdate: (fresh) => {
+          if (Array.isArray(fresh)) setHistory(fresh);
+        },
+      }),
     ])
-      .then(async ([networkResponse, historyResponse]) => {
-        const [networkData, historyData] = await Promise.all([networkResponse.json(), historyResponse.json()]);
-        if (!networkResponse.ok) throw new Error(networkData.message || 'Unable to load this village network.');
+      .then(([networkData, historyData]) => {
         if (Number(networkData?.village?.id) !== requestedVillageId) {
           throw new Error('The server returned a different village network. Please retry.');
         }
-        return { networkData, historyData: historyResponse.ok ? historyData : [] };
-      })
-      .then(({ networkData, historyData }) => {
-        if (controller.signal.aborted) return;
         setVillageData(networkData);
         setHistory(Array.isArray(historyData) ? historyData : []);
         const firstOperational = networkData.edges?.find(
@@ -136,13 +139,11 @@ export default function SimulationsPage({ onNavigate }) {
         if (damaged[1]) setRepairOptionB(String(damaged[1].id));
       })
       .catch((error) => {
-        if (error.name !== 'AbortError') setLoadError(error.message);
+        setLoadError(error.message);
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoadingVillage(false);
+        setLoadingVillage(false);
       });
-
-    return () => controller.abort();
   }, [selectedVillageId]);
 
   const readiness = villageData?.readiness;

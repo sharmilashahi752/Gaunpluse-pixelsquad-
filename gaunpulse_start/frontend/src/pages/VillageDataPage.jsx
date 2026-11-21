@@ -18,16 +18,25 @@ import VillageManagerHome from '../components/village-manager/VillageManagerHome
 import VillageDetailView from '../components/village-manager/VillageDetailView';
 import AddVillageWizardModal from '../components/village-manager/AddVillageWizardModal';
 import MapDataImportModal from '../components/village-manager/MapDataImportModal';
+import { cachedFetchJson } from '../utils/apiCache';
 
 const API_BASE = 'http://127.0.0.1:8000/api';
 
 export default function VillageDataPage() {
-  const { selectedVillageId, setSelectedVillageId } = useVillageSelection();
-  const [villages, setVillages] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { selectedVillageId, setSelectedVillageId, villages: contextVillages, refreshVillages } = useVillageSelection();
+  const [villages, setVillages] = useState(contextVillages || []);
+  const [loading, setLoading] = useState(!contextVillages || contextVillages.length === 0);
   const [view, setView] = useState('home'); // 'home' | 'detail'
   const [activeVillage, setActiveVillage] = useState(null);
   const [alert, setAlert] = useState(null);
+
+  // Sync context villages immediately if loaded
+  useEffect(() => {
+    if (contextVillages && contextVillages.length > 0) {
+      setVillages(contextVillages);
+      setLoading(false);
+    }
+  }, [contextVillages]);
 
   // Modals
   const [showWizardModal, setShowWizardModal] = useState(false);
@@ -35,13 +44,23 @@ export default function VillageDataPage() {
   const [draftToResume, setDraftToResume] = useState(null);
   const [targetImportVillage, setTargetImportVillage] = useState(null);
 
-  // Load list of villages
-  const loadVillages = async () => {
-    setLoading(true);
+  // Load list of villages with caching
+  const loadVillages = async (force = false) => {
+    if (villages.length === 0) setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/villages`);
-      if (!res.ok) throw new Error('Failed to load villages list');
-      const data = await res.json();
+      const data = await cachedFetchJson(`${API_BASE}/villages`, {}, {
+        force,
+        ttlMs: 60000,
+        onBackgroundUpdate: (fresh) => {
+          if (Array.isArray(fresh)) {
+            setVillages(fresh);
+            if (activeVillage) {
+              const freshActive = fresh.find((v) => v.id === activeVillage.id);
+              if (freshActive) setActiveVillage(freshActive);
+            }
+          }
+        },
+      });
       const list = Array.isArray(data) ? data : [];
       setVillages(list);
 

@@ -31,14 +31,25 @@ import InteractiveVillageMap from '../components/InteractiveVillageMap';
 import { Card, CardHeader, DemoLabel, FeatureNotice, PageIntro, StatusBadge } from '../components/ui';
 import { useVillageSelection } from '../context/VillageSelectionContext';
 import { deduplicateVillages, formatVillageLabel } from '../utils/villageUtils';
+import { cachedFetchJson, invalidateApiCache } from '../utils/apiCache';
 
 export default function VillageMapPage() {
   // Saved Villages & Active Selection
-  const [villages, setVillages] = useState([]);
-  const { selectedVillageId, setSelectedVillageId } = useVillageSelection();
+  const { selectedVillageId, setSelectedVillageId, villages: contextVillages, refreshVillages } = useVillageSelection();
+  const [villages, setVillages] = useState(contextVillages || []);
   const [villageData, setVillageData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [isNationwideView, setIsNationwideView] = useState(false);
+
+  // Sync villages from context
+  useEffect(() => {
+    if (contextVillages && contextVillages.length > 0) {
+      setVillages(contextVillages);
+      if (!selectedVillageId) {
+        setSelectedVillageId(contextVillages[0].id);
+      }
+    }
+  }, [contextVillages, selectedVillageId, setSelectedVillageId]);
 
   // Search State across Nepal
   const [searchQuery, setSearchQuery] = useState('');
@@ -131,43 +142,54 @@ export default function VillageMapPage() {
   // 1. Initial Load: Villages, Provinces, and Administrative Hierarchy Audit
   useEffect(() => {
     loadVillages();
-    fetch('http://127.0.0.1:8000/api/locations/provinces')
-      .then((res) => res.json())
+    cachedFetchJson('http://127.0.0.1:8000/api/locations/provinces', {}, { ttlMs: 600000 })
       .then((data) => {
         if (Array.isArray(data)) setProvinces(data);
       })
       .catch((err) => console.error('Failed to load provinces:', err));
 
     // Audit administrative hierarchy integrity
-    fetch('http://127.0.0.1:8000/api/villages/audit-hierarchy')
-      .then((res) => res.json())
+    cachedFetchJson('http://127.0.0.1:8000/api/villages/audit-hierarchy', {}, { ttlMs: 120000 })
       .then((data) => {
-        if (data.inconsistent_count > 0) {
+        if (data?.inconsistent_count > 0) {
           setHierarchyAudit(data);
         }
       })
       .catch((err) => console.error('Hierarchy audit failed:', err));
   }, []);
 
-  const loadVillages = () => {
-    fetch('http://127.0.0.1:8000/api/villages')
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          setVillages(data);
-          if (!selectedVillageId) {
-            setSelectedVillageId(data[0].id);
-          }
+  const loadVillages = async (force = false) => {
+    if (contextVillages && contextVillages.length > 0 && !force) {
+      setVillages(contextVillages);
+      if (!selectedVillageId) {
+        setSelectedVillageId(contextVillages[0].id);
+      }
+      return;
+    }
+
+    try {
+      const data = await cachedFetchJson('http://127.0.0.1:8000/api/villages', {}, {
+        force,
+        ttlMs: 120000,
+        onBackgroundUpdate: (fresh) => {
+          if (Array.isArray(fresh)) setVillages(fresh);
+        },
+      });
+      if (Array.isArray(data) && data.length > 0) {
+        setVillages(data);
+        if (!selectedVillageId) {
+          setSelectedVillageId(data[0].id);
         }
-      })
-      .catch((err) => console.error('Failed to load villages:', err));
+      }
+    } catch (err) {
+      console.error('Failed to load villages:', err);
+    }
   };
 
   // 2. Cascade Districts when Province changes
   useEffect(() => {
     if (!villageForm.province) return;
-    fetch(`http://127.0.0.1:8000/api/locations/districts?province=${encodeURIComponent(villageForm.province)}`)
-      .then((res) => res.json())
+    cachedFetchJson(`http://127.0.0.1:8000/api/locations/districts?province=${encodeURIComponent(villageForm.province)}`, {}, { ttlMs: 600000 })
       .then((data) => {
         if (Array.isArray(data)) {
           setDistricts(data);
@@ -182,8 +204,7 @@ export default function VillageMapPage() {
   // 3. Cascade Municipalities when District changes (Phase 1 Fix: auto-reset to avoid cross-district mismatch)
   useEffect(() => {
     if (!villageForm.district) return;
-    fetch(`http://127.0.0.1:8000/api/locations/municipalities?district=${encodeURIComponent(villageForm.district)}`)
-      .then((res) => res.json())
+    cachedFetchJson(`http://127.0.0.1:8000/api/locations/municipalities?district=${encodeURIComponent(villageForm.district)}`, {}, { ttlMs: 600000 })
       .then((data) => {
         if (Array.isArray(data)) {
           setMunicipalities(data);
@@ -201,12 +222,25 @@ export default function VillageMapPage() {
       .catch((err) => console.error('Failed to load municipalities:', err));
   }, [villageForm.district]);
 
-  // 4. Load Active Village Network
+  // 4. Load Active Village Network with SWR
   useEffect(() => {
     if (!selectedVillageId) return;
-    setLoading(true);
-    fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/network`)
-      .then((res) => res.json())
+    if (!villageData || villageData.village?.id !== Number(selectedVillageId)) {
+      setLoading(true);
+    }
+
+    cachedFetchJson(
+      `http://127.0.0.1:8000/api/villages/${selectedVillageId}/network`,
+      {},
+      {
+        ttlMs: 60000,
+        onBackgroundUpdate: (fresh) => {
+          if (fresh && fresh.village?.id === Number(selectedVillageId)) {
+            setVillageData(fresh);
+          }
+        },
+      }
+    )
       .then((data) => {
         setVillageData(data);
         setLoading(false);

@@ -38,6 +38,8 @@ import {
 import { Chart, registerables } from 'chart.js';
 import { Card, CardHeader, PageIntro, StatusBadge } from '../components/ui';
 import { deduplicateVillages, formatVillageLabel } from '../utils/villageUtils';
+import { cachedFetchJson } from '../utils/apiCache';
+import { useVillageSelection } from '../context/VillageSelectionContext';
 
 // Register Chart.js components
 Chart.register(...registerables);
@@ -45,6 +47,7 @@ Chart.register(...registerables);
 const API_BASE = 'http://127.0.0.1:8000/api';
 
 export default function ReportsInsightsPage({ onNavigate }) {
+  const { villages: globalVillages } = useVillageSelection();
   // -------------------------------------------------------------
   // Filter States
   // -------------------------------------------------------------
@@ -132,18 +135,23 @@ export default function ReportsInsightsPage({ onNavigate }) {
       if (params.get('date_to')) setDateTo(params.get('date_to'));
     }
 
-    // Load directory of villages and municipalities
-    fetch(`${API_BASE}/villages`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setVillagesList(data);
-          const distinctMunis = Array.from(new Set(data.map((v) => v.municipality).filter(Boolean)));
-          setMunicipalitiesList(distinctMunis);
-        }
-      })
-      .catch((e) => console.error('Failed to load directory:', e));
-  }, []);
+    // Load directory of villages and municipalities from global context or cached fetch
+    if (globalVillages && globalVillages.length > 0) {
+      setVillagesList(globalVillages);
+      const distinctMunis = Array.from(new Set(globalVillages.map((v) => v.municipality).filter(Boolean)));
+      setMunicipalitiesList(distinctMunis);
+    } else {
+      cachedFetchJson(`${API_BASE}/villages`)
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setVillagesList(data);
+            const distinctMunis = Array.from(new Set(data.map((v) => v.municipality).filter(Boolean)));
+            setMunicipalitiesList(distinctMunis);
+          }
+        })
+        .catch((e) => console.error('Failed to load directory:', e));
+    }
+  }, [globalVillages]);
 
   // -------------------------------------------------------------
   // Construct Query String for API requests
@@ -200,44 +208,41 @@ export default function ReportsInsightsPage({ onNavigate }) {
   };
 
   // -------------------------------------------------------------
-  // Fetch All Reports Data from Laravel MySQL
+  // Fetch All Reports Data from Laravel MySQL (Bundled & Cached)
   // -------------------------------------------------------------
+  const applyBundleData = (bundle) => {
+    if (!bundle) return;
+    if (bundle.overview) setOverview(bundle.overview);
+    if (bundle.categories) setCategoryData(bundle.categories);
+    if (bundle.trends) setTrendData(bundle.trends);
+    if (bundle.status_distribution) setStatusDistData(bundle.status_distribution);
+    if (bundle.priorities) setPriorityData(bundle.priorities);
+    if (bundle.ward_comparison) setWardCompData(bundle.ward_comparison);
+    if (bundle.infrastructure_condition) setInfraConditionData(bundle.infrastructure_condition);
+    if (bundle.simulations) setSimulationData(bundle.simulations);
+    setLastUpdated(new Date());
+  };
+
   const fetchAllReportData = async (isManual = false) => {
     if (isManual) setRefreshing(true);
-    else setLoading(true);
+    else if (!overview) setLoading(true);
 
     const qs = buildQueryString ? `?${buildQueryString}` : '';
 
     try {
-      const [
-        resOverview,
-        resCategories,
-        resTrends,
-        resStatusDist,
-        resPriorities,
-        resWardComp,
-        resInfraCondition,
-        resSimulations,
-      ] = await Promise.all([
-        fetch(`${API_BASE}/reports/overview${qs}`).then((r) => r.json()),
-        fetch(`${API_BASE}/reports/categories${qs}`).then((r) => r.json()),
-        fetch(`${API_BASE}/reports/trends${qs}`).then((r) => r.json()),
-        fetch(`${API_BASE}/reports/status-distribution${qs}`).then((r) => r.json()),
-        fetch(`${API_BASE}/reports/priorities${qs}`).then((r) => r.json()),
-        fetch(`${API_BASE}/reports/ward-comparison${qs}`).then((r) => r.json()),
-        fetch(`${API_BASE}/reports/infrastructure-condition${qs}`).then((r) => r.json()),
-        fetch(`${API_BASE}/reports/simulations${qs}`).then((r) => r.json()),
-      ]);
+      const bundle = await cachedFetchJson(
+        `${API_BASE}/reports/bundle${qs}`,
+        {},
+        {
+          force: isManual,
+          ttlMs: 45000,
+          onBackgroundUpdate: (fresh) => {
+            applyBundleData(fresh);
+          },
+        }
+      );
 
-      setOverview(resOverview);
-      setCategoryData(resCategories);
-      setTrendData(resTrends);
-      setStatusDistData(resStatusDist);
-      setPriorityData(resPriorities);
-      setWardCompData(resWardComp);
-      setInfraConditionData(resInfraCondition);
-      setSimulationData(resSimulations);
-      setLastUpdated(new Date());
+      applyBundleData(bundle);
     } catch (err) {
       console.error('Failed to load reports data:', err);
     } finally {
@@ -272,8 +277,12 @@ export default function ReportsInsightsPage({ onNavigate }) {
       tableSearch
     )}${qs ? `&${qs}` : ''}`;
     try {
-      const res = await fetch(url);
-      const data = await res.json();
+      const data = await cachedFetchJson(url, {}, {
+        ttlMs: 30000,
+        onBackgroundUpdate: (fresh) => {
+          if (fresh) setTableData(fresh);
+        },
+      });
       setTableData(data);
     } catch (e) {
       console.error('Failed to fetch table records:', e);
@@ -767,6 +776,21 @@ export default function ReportsInsightsPage({ onNavigate }) {
         }
       />
 
+      {/* Top fast loader bar */}
+      {(loading || refreshing) && (
+        <div
+          style={{
+            height: '3px',
+            width: '100%',
+            background: 'linear-gradient(90deg, #176342 0%, #34d399 50%, #176342 100%)',
+            backgroundSize: '200% 100%',
+            animation: 'fastLoadingShimmer 1s infinite linear',
+            borderRadius: '2px',
+            marginBottom: '4px',
+          }}
+        />
+      )}
+
       {/* 2. Global Filter Toolbar (Phase 4) */}
       <Card className="filter-toolbar-card" style={{ padding: '16px 20px', background: '#ffffff' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
@@ -1044,7 +1068,11 @@ export default function ReportsInsightsPage({ onNavigate }) {
           <div className="report-kpi-card__body">
             <span className="report-kpi-card__label">Issues Resolved</span>
             <strong className="report-kpi-card__value">
-              {kpis.resolution_rate?.formatted || (kpis.resolution_rate?.eligible_count === 0 ? 'No data' : '0%')}
+              {loading && !overview ? (
+                <span className="shimmer-placeholder" style={{ display: 'inline-block', width: '70px', height: '24px', background: '#e2e8f0', borderRadius: '4px' }} />
+              ) : (
+                kpis.resolution_rate?.formatted || (kpis.resolution_rate?.eligible_count === 0 ? 'No data' : '0%')
+              )}
             </strong>
             <small className="report-kpi-card__desc">
               {kpis.resolution_rate?.resolved_count ?? 0} of {kpis.resolution_rate?.eligible_count ?? 0} eligible issues
@@ -1063,7 +1091,11 @@ export default function ReportsInsightsPage({ onNavigate }) {
           <div className="report-kpi-card__body">
             <span className="report-kpi-card__label">Median Verification</span>
             <strong className="report-kpi-card__value">
-              {kpis.median_verification?.formatted || 'Not available'}
+              {loading && !overview ? (
+                <span className="shimmer-placeholder" style={{ display: 'inline-block', width: '70px', height: '24px', background: '#e2e8f0', borderRadius: '4px' }} />
+              ) : (
+                kpis.median_verification?.formatted || 'Not available'
+              )}
             </strong>
             <small className="report-kpi-card__desc">
               {kpis.median_verification?.verified_issues_count ?? 0} verified · {kpis.median_verification?.unverified_issues_count ?? 0} pending
@@ -1082,7 +1114,11 @@ export default function ReportsInsightsPage({ onNavigate }) {
           <div className="report-kpi-card__body">
             <span className="report-kpi-card__label">Community Reports</span>
             <strong className="report-kpi-card__value">
-              {kpis.community_reports?.total ?? 0}
+              {loading && !overview ? (
+                <span className="shimmer-placeholder" style={{ display: 'inline-block', width: '50px', height: '24px', background: '#e2e8f0', borderRadius: '4px' }} />
+              ) : (
+                kpis.community_reports?.total ?? 0
+              )}
             </strong>
             <small className="report-kpi-card__desc">
               {kpis.community_reports?.citizen_issue_reports ?? 0} citizen issues · {kpis.community_reports?.community_feedback_count ?? 0} voices
@@ -1101,7 +1137,11 @@ export default function ReportsInsightsPage({ onNavigate }) {
           <div className="report-kpi-card__body">
             <span className="report-kpi-card__label">Active Issues</span>
             <strong className="report-kpi-card__value">
-              {kpis.active_issues?.count ?? 0}
+              {loading && !overview ? (
+                <span className="shimmer-placeholder" style={{ display: 'inline-block', width: '50px', height: '24px', background: '#e2e8f0', borderRadius: '4px' }} />
+              ) : (
+                kpis.active_issues?.count ?? 0
+              )}
             </strong>
             <small className="report-kpi-card__desc" style={{ color: '#dc2626', fontWeight: 600 }}>
               {kpis.active_issues?.critical_count ?? 0} critical severity

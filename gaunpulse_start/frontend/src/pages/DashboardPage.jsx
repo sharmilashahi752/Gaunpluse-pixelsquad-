@@ -8,14 +8,23 @@ import PriorityActionQueue from '../components/PriorityActionQueue';
 import StatCard from '../components/StatCard';
 import VillageMapPreview from '../components/VillageMapPreview';
 import WelcomeBanner from '../components/WelcomeBanner';
+import { cachedFetchJson } from '../utils/apiCache';
 
 export default function DashboardPage({ onNavigate }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/api/dashboard/stats')
-      .then((res) => res.json())
+    cachedFetchJson(
+      'http://127.0.0.1:8000/api/dashboard/stats',
+      {},
+      {
+        ttlMs: 45000,
+        onBackgroundUpdate: (fresh) => {
+          if (fresh) setStats(fresh);
+        },
+      }
+    )
       .then((data) => {
         setStats(data);
         setLoading(false);

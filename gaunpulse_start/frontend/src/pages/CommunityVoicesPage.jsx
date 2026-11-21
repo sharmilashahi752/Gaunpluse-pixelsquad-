@@ -13,16 +13,26 @@ import {
   X,
 } from 'lucide-react';
 import { Card, CardHeader, FeatureNotice, LiveLabel, PageIntro, StatusBadge } from '../components/ui';
+import { useVillageSelection } from '../context/VillageSelectionContext';
+import { cachedFetchJson, invalidateApiCache } from '../utils/apiCache';
 
 const TAGS = ['Safety', 'Water access', 'Roads', 'School access', 'Health', 'General'];
 
 export default function CommunityVoicesPage() {
+  const { villages: contextVillages } = useVillageSelection();
   const [voices, setVoices] = useState([]);
-  const [villages, setVillages] = useState([]);
+  const [villages, setVillages] = useState(contextVillages || []);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [filterTag, setFilterTag] = useState('');
+
+  // Sync villages from context
+  useEffect(() => {
+    if (contextVillages && contextVillages.length > 0) {
+      setVillages(contextVillages);
+    }
+  }, [contextVillages]);
 
   const [formData, setFormData] = useState({
     resident_name: '',
@@ -32,20 +42,29 @@ export default function CommunityVoicesPage() {
     village_id: '',
   });
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (force = false) => {
+    if (voices.length === 0) setLoading(true);
     try {
-      const [resVoices, resVillages] = await Promise.all([
-        fetch('http://127.0.0.1:8000/api/feedback'),
-        fetch('http://127.0.0.1:8000/api/villages'),
+      const [dataVoices, dataVillages] = await Promise.all([
+        cachedFetchJson('http://127.0.0.1:8000/api/feedback', {}, {
+          force,
+          ttlMs: 45000,
+          onBackgroundUpdate: (fresh) => {
+            if (Array.isArray(fresh)) setVoices(fresh);
+          },
+        }),
+        contextVillages && contextVillages.length > 0
+          ? Promise.resolve(contextVillages)
+          : cachedFetchJson('http://127.0.0.1:8000/api/villages', {}, { ttlMs: 120000 }),
       ]);
-      const dataVoices = await resVoices.json();
-      const dataVillages = await resVillages.json();
 
-      setVoices(Array.isArray(dataVoices) ? dataVoices : []);
-      setVillages(dataVillages || []);
-      if (dataVillages.length > 0 && !formData.village_id) {
-        setFormData((prev) => ({ ...prev, village_id: dataVillages[0].id }));
+      const voicesList = Array.isArray(dataVoices) ? dataVoices : [];
+      const villagesList = Array.isArray(dataVillages) ? dataVillages : [];
+
+      setVoices(voicesList);
+      setVillages(villagesList);
+      if (villagesList.length > 0 && !formData.village_id) {
+        setFormData((prev) => ({ ...prev, village_id: villagesList[0].id }));
       }
     } catch (err) {
       console.error('Failed to load community feedback:', err);
@@ -76,7 +95,10 @@ export default function CommunityVoicesPage() {
           tag: 'Safety',
           village_id: villages[0]?.id || '',
         });
-        loadData();
+        invalidateApiCache('api/feedback');
+        invalidateApiCache('api/reports');
+        invalidateApiCache('api/dashboard');
+        loadData(true);
       }
     } catch (err) {
       console.error('Error submitting voice:', err);
@@ -92,7 +114,10 @@ export default function CommunityVoicesPage() {
         headers: { Accept: 'application/json' },
       });
       if (res.ok) {
-        loadData();
+        invalidateApiCache('api/feedback');
+        invalidateApiCache('api/reports');
+        invalidateApiCache('api/dashboard');
+        loadData(true);
       }
     } catch (err) {
       console.error('Error acknowledging voice:', err);

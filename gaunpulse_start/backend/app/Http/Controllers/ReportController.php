@@ -279,6 +279,24 @@ class ReportController extends Controller
     }
 
     /**
+     * High-speed bundled report payload to eliminate sequential request queues.
+     * Bundles all 8 analytical sections into a single atomic database aggregation.
+     */
+    public function bundle(Request $request): JsonResponse
+    {
+        return response()->json([
+            'overview' => $this->overview($request)->getData(true),
+            'categories' => $this->categories($request)->getData(true),
+            'trends' => $this->trends($request)->getData(true),
+            'status_distribution' => $this->statusDistribution($request)->getData(true),
+            'priorities' => $this->priorities($request)->getData(true),
+            'ward_comparison' => $this->wardComparison($request)->getData(true),
+            'infrastructure_condition' => $this->infrastructureCondition($request)->getData(true),
+            'simulations' => $this->simulations($request)->getData(true),
+        ]);
+    }
+
+    /**
      * Phase 2 & 3: Main Executive Overview KPIs and Summary Statistics.
      */
     public function overview(Request $request): JsonResponse
@@ -297,12 +315,16 @@ class ReportController extends Controller
 
         $resolutionRate = $eligibleCount > 0 ? round(($resolvedCount / $eligibleCount) * 100, 1) : null;
 
-        // 2. Median Verification Time Calculation
+        // 2. Median Verification Time Calculation (optimized with select and limit)
         $verifiedIssues = (clone $issuesQuery)
+            ->select(['id', 'created_at'])
+            ->whereIn('status', ['verified', 'in_progress', 'resolved'])
             ->with(['updates' => function ($q) {
-                $q->whereIn('status', ['verified', 'in_progress', 'resolved'])
+                $q->select(['id', 'issue_id', 'status', 'created_at'])
+                  ->whereIn('status', ['verified', 'in_progress', 'resolved'])
                   ->orderBy('created_at', 'asc');
             }])
+            ->take(150)
             ->get();
 
         $latenciesSeconds = [];
@@ -358,33 +380,38 @@ class ReportController extends Controller
         $communityFeedbackCount = $feedbackQuery->count();
         $totalCommunityReports = $citizenIssueCount + $communityFeedbackCount;
 
-        // 4. Infrastructure Coverage (Unique mapped elements in MySQL)
-        $roadsCount = $this->applyEdgeFilters(Edge::query(), $request)->where('infrastructure_type', 'road')->count();
-        $bridgesCount = $this->applyEdgeFilters(Edge::query(), $request)->whereIn('infrastructure_type', ['bridge', 'suspension_bridge'])->count();
-        
-        $schoolsCount = $this->applyFacilityFilters(Facility::query(), $request)->where('facility_type', 'school')->count();
-        if ($schoolsCount === 0) {
-            $schoolsCount = $this->applyNodeFilters(Node::query(), $request)->where('node_type', 'school')->count();
-        }
+        // 4. Infrastructure Coverage (Optimized via single-pass GROUP BY queries)
+        $edgeQuery = $this->applyEdgeFilters(Edge::query(), $request);
+        $edgeCounts = (clone $edgeQuery)
+            ->select('infrastructure_type', DB::raw('COUNT(*) as count'))
+            ->groupBy('infrastructure_type')
+            ->pluck('count', 'infrastructure_type')
+            ->toArray();
 
-        $healthCount = $this->applyFacilityFilters(Facility::query(), $request)->where('facility_type', 'health_post')->count();
-        if ($healthCount === 0) {
-            $healthCount = $this->applyNodeFilters(Node::query(), $request)->where('node_type', 'health_post')->count();
-        }
+        $roadsCount = (int) ($edgeCounts['road'] ?? 0);
+        $bridgesCount = (int) (($edgeCounts['bridge'] ?? 0) + ($edgeCounts['suspension_bridge'] ?? 0));
+        $totalEdges = array_sum($edgeCounts);
 
-        $waterCount = $this->applyFacilityFilters(Facility::query(), $request)->where('facility_type', 'water_point')->count();
-        if ($waterCount === 0) {
-            $waterCount = $this->applyNodeFilters(Node::query(), $request)->where('node_type', 'water_point')->count();
-        }
+        $nodeQuery = $this->applyNodeFilters(Node::query(), $request);
+        $nodeCounts = (clone $nodeQuery)
+            ->select('node_type', DB::raw('COUNT(*) as count'))
+            ->groupBy('node_type')
+            ->pluck('count', 'node_type')
+            ->toArray();
 
-        $settlementsCount = $this->applyNodeFilters(Node::query(), $request)->where('node_type', 'settlement')->count();
-        if ($settlementsCount === 0) {
-            $settlementsCount = SettlementGroup::count();
-        }
+        $facilityQuery = $this->applyFacilityFilters(Facility::query(), $request);
+        $facilityCounts = (clone $facilityQuery)
+            ->select('facility_type', DB::raw('COUNT(*) as count'))
+            ->groupBy('facility_type')
+            ->pluck('count', 'facility_type')
+            ->toArray();
 
-        $totalNodes = $this->applyNodeFilters(Node::query(), $request)->count();
-        $totalEdges = $this->applyEdgeFilters(Edge::query(), $request)->count();
-        $totalFacilities = $this->applyFacilityFilters(Facility::query(), $request)->count();
+        $schoolsCount = (int) ($facilityCounts['school'] ?? ($nodeCounts['school'] ?? 0));
+        $healthCount = (int) ($facilityCounts['health_post'] ?? ($nodeCounts['health_post'] ?? 0));
+        $waterCount = (int) ($facilityCounts['water_point'] ?? ($nodeCounts['water_point'] ?? 0));
+        $settlementsCount = (int) ($nodeCounts['settlement'] ?? SettlementGroup::count());
+        $totalNodes = array_sum($nodeCounts);
+        $totalFacilities = array_sum($facilityCounts);
 
         // 5. Action Plans Progress
         $planQuery = $this->applyActionPlanFilters(ActionPlan::query(), $request);
@@ -473,8 +500,11 @@ class ReportController extends Controller
     public function categories(Request $request): JsonResponse
     {
         $issuesQuery = $this->applyIssueFilters(Issue::query(), $request);
-        $results = (clone $issuesQuery)->get(['category']);
-        $total = $results->count();
+        $rawCounts = (clone $issuesQuery)
+            ->select('category', DB::raw('COUNT(*) as total'))
+            ->groupBy('category')
+            ->pluck('total', 'category')
+            ->toArray();
 
         $canonicalLabels = [
             'damaged_bridge' => 'Damaged Bridge',
@@ -486,8 +516,9 @@ class ReportController extends Controller
         ];
 
         $counts = [];
-        foreach ($results as $row) {
-            $raw = trim($row->category ?? '');
+        $total = 0;
+        foreach ($rawCounts as $rawCategory => $count) {
+            $raw = trim($rawCategory ?? '');
             $normalizedKey = strtolower(str_replace(' ', '_', $raw));
             if (!$normalizedKey) {
                 $normalizedKey = 'general';
@@ -495,7 +526,8 @@ class ReportController extends Controller
             if (!isset($counts[$normalizedKey])) {
                 $counts[$normalizedKey] = 0;
             }
-            $counts[$normalizedKey]++;
+            $counts[$normalizedKey] += (int) $count;
+            $total += (int) $count;
         }
 
         arsort($counts);
@@ -592,7 +624,11 @@ class ReportController extends Controller
     public function statusDistribution(Request $request): JsonResponse
     {
         $issuesQuery = $this->applyIssueFilters(Issue::query(), $request);
-        $results = (clone $issuesQuery)->get(['status']);
+        $rawCounts = (clone $issuesQuery)
+            ->select('status', DB::raw('COUNT(*) as total'))
+            ->groupBy('status')
+            ->pluck('total', 'status')
+            ->toArray();
 
         $canonicalStatuses = [
             'submitted' => 'Reported / New',
@@ -612,16 +648,16 @@ class ReportController extends Controller
             'rejected' => 0,
         ];
 
-        foreach ($results as $row) {
-            $raw = strtolower(str_replace(' ', '_', trim($row->status ?? '')));
+        $total = 0;
+        foreach ($rawCounts as $rawStatus => $count) {
+            $raw = strtolower(str_replace(' ', '_', trim($rawStatus ?? '')));
             if (isset($counts[$raw])) {
-                $counts[$raw]++;
+                $counts[$raw] += (int) $count;
             } else {
-                $counts['submitted']++;
+                $counts['submitted'] += (int) $count;
             }
+            $total += (int) $count;
         }
-
-        $total = $results->count();
 
         $distribution = [];
         foreach ($canonicalStatuses as $k => $label) {
@@ -646,7 +682,11 @@ class ReportController extends Controller
     public function priorities(Request $request): JsonResponse
     {
         $issuesQuery = $this->applyIssueFilters(Issue::query(), $request);
-        $results = (clone $issuesQuery)->get(['severity']);
+        $rawCounts = (clone $issuesQuery)
+            ->select('severity', DB::raw('COUNT(*) as total'))
+            ->groupBy('severity')
+            ->pluck('total', 'severity')
+            ->toArray();
 
         $counts = [
             'critical' => 0,
@@ -655,12 +695,12 @@ class ReportController extends Controller
             'low' => 0,
         ];
 
-        foreach ($results as $row) {
-            $sev = strtolower(trim($row->severity ?? ''));
+        foreach ($rawCounts as $rawSev => $count) {
+            $sev = strtolower(trim($rawSev ?? ''));
             if (isset($counts[$sev])) {
-                $counts[$sev]++;
+                $counts[$sev] += (int) $count;
             } else {
-                $counts['medium']++;
+                $counts['medium'] += (int) $count;
             }
         }
 

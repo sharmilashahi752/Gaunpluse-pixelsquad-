@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { Card, CardHeader, DemoLabel, EmptyState, FeatureNotice, PageIntro, StatusBadge } from '../components/ui';
 import { deduplicateVillages, formatVillageLabel } from '../utils/villageUtils';
+import { useVillageSelection } from '../context/VillageSelectionContext';
+import { cachedFetchJson, invalidateApiCache } from '../utils/apiCache';
 
 const PRIORITIES = ['Critical', 'High', 'Medium', 'Low'];
 const STATUSES = [
@@ -44,10 +46,18 @@ const statusTones = {
 };
 
 export default function ActionPlansPage() {
+  const { villages: contextVillages } = useVillageSelection();
   const [plans, setPlans] = useState([]);
-  const [villages, setVillages] = useState([]);
+  const [villages, setVillages] = useState(contextVillages || []);
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Sync villages from context
+  useEffect(() => {
+    if (contextVillages && contextVillages.length > 0) {
+      setVillages(contextVillages);
+    }
+  }, [contextVillages]);
 
   // Filters
   const [filterPriority, setFilterPriority] = useState('');
@@ -79,26 +89,40 @@ export default function ActionPlansPage() {
     notes: '',
   });
 
-  // Load plans, villages, and issues
-  const loadData = async () => {
-    setLoading(true);
+  // Load plans, villages, and issues with caching
+  const loadData = async (force = false) => {
+    if (plans.length === 0) setLoading(true);
     try {
-      const [resPlans, resVillages, resIssues] = await Promise.all([
-        fetch('http://127.0.0.1:8000/api/action-plans'),
-        fetch('http://127.0.0.1:8000/api/villages'),
-        fetch('http://127.0.0.1:8000/api/issues'),
+      const [dataPlans, dataVillages, dataIssues] = await Promise.all([
+        cachedFetchJson('http://127.0.0.1:8000/api/action-plans', {}, {
+          force,
+          ttlMs: 45000,
+          onBackgroundUpdate: (fresh) => {
+            if (Array.isArray(fresh)) setPlans(fresh);
+          },
+        }),
+        contextVillages && contextVillages.length > 0
+          ? Promise.resolve(contextVillages)
+          : cachedFetchJson('http://127.0.0.1:8000/api/villages', {}, { ttlMs: 120000 }),
+        cachedFetchJson('http://127.0.0.1:8000/api/issues', {}, {
+          force,
+          ttlMs: 45000,
+          onBackgroundUpdate: (fresh) => {
+            if (fresh) setIssues(fresh.data || fresh || []);
+          },
+        }),
       ]);
 
-      const dataPlans = await resPlans.json();
-      const dataVillages = await resVillages.json();
-      const dataIssues = await resIssues.json();
+      const planList = Array.isArray(dataPlans) ? dataPlans : [];
+      const villageList = Array.isArray(dataVillages) ? dataVillages : [];
+      const issueList = dataIssues.data || dataIssues || [];
 
-      setPlans(Array.isArray(dataPlans) ? dataPlans : []);
-      setVillages(dataVillages || []);
-      setIssues(dataIssues.data || dataIssues || []);
+      setPlans(planList);
+      setVillages(villageList);
+      setIssues(issueList);
 
-      if (dataVillages.length > 0 && !formData.village_id) {
-        setFormData((prev) => ({ ...prev, village_id: dataVillages[0].id }));
+      if (villageList.length > 0 && !formData.village_id) {
+        setFormData((prev) => ({ ...prev, village_id: villageList[0].id }));
       }
     } catch (err) {
       console.error('Failed to load action plans:', err);
@@ -143,7 +167,10 @@ export default function ActionPlansPage() {
 
       setShowCreateModal(false);
       setEditingPlan(null);
-      loadData();
+      invalidateApiCache('api/action-plans');
+      invalidateApiCache('api/dashboard');
+      invalidateApiCache('api/reports');
+      loadData(true);
     } catch (err) {
       setModalError(err.message);
     } finally {
@@ -162,7 +189,10 @@ export default function ActionPlansPage() {
       });
       if (res.ok) {
         setUpdatingProgressPlan(null);
-        loadData();
+        invalidateApiCache('api/action-plans');
+        invalidateApiCache('api/dashboard');
+        invalidateApiCache('api/reports');
+        loadData(true);
       }
     } catch (err) {
       console.error('Error saving progress:', err);
@@ -174,7 +204,10 @@ export default function ActionPlansPage() {
     if (!window.confirm('Are you sure you want to remove this municipal action plan?')) return;
     try {
       await fetch(`http://127.0.0.1:8000/api/action-plans/${id}`, { method: 'DELETE' });
-      loadData();
+      invalidateApiCache('api/action-plans');
+      invalidateApiCache('api/dashboard');
+      invalidateApiCache('api/reports');
+      loadData(true);
     } catch (err) {
       console.error('Error deleting action plan:', err);
     }
