@@ -11,6 +11,21 @@ return new class extends Migration
         // 1. Enhance villages table
         if (Schema::hasTable('villages')) {
             Schema::table('villages', function (Blueprint $table) {
+                if (!Schema::hasColumn('villages', 'local_name')) {
+                    $table->string('local_name', 255)->nullable();
+                }
+                if (!Schema::hasColumn('villages', 'ward_no')) {
+                    $table->string('ward_no', 50)->default('1');
+                }
+                if (!Schema::hasColumn('villages', 'center_lat')) {
+                    $table->decimal('center_lat', 10, 7)->nullable();
+                }
+                if (!Schema::hasColumn('villages', 'center_lng')) {
+                    $table->decimal('center_lng', 10, 7)->nullable();
+                }
+                if (!Schema::hasColumn('villages', 'description')) {
+                    $table->text('description')->nullable();
+                }
                 if (!Schema::hasColumn('villages', 'status')) {
                     $table->string('status', 30)->default('active')->index();
                 }
@@ -41,6 +56,12 @@ return new class extends Migration
         // 2. Enhance nodes table with verification & GIS provenance
         if (Schema::hasTable('nodes')) {
             Schema::table('nodes', function (Blueprint $table) {
+                if (!Schema::hasColumn('nodes', 'node_type')) {
+                    $table->string('node_type', 50)->nullable()->index();
+                }
+                if (!Schema::hasColumn('nodes', 'description')) {
+                    $table->text('description')->nullable();
+                }
                 if (!Schema::hasColumn('nodes', 'node_code')) {
                     $table->string('node_code', 100)->nullable()->index();
                 }

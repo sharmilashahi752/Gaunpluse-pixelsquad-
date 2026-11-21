@@ -75,6 +75,21 @@ class VillageController extends Controller
             'status' => 'nullable|string|in:draft,active,archived',
         ]);
 
+        // Validate administrative hierarchy integrity (prevent e.g. Marpha Mustang in Helambu Sindhupalchok)
+        $hierarchy = \App\Services\NepalLocationService::validateHierarchy(
+            $validated['province'],
+            $validated['district'],
+            $validated['municipality'],
+            $validated['ward_no'] ?? null
+        );
+
+        if (!$hierarchy['valid']) {
+            return response()->json([
+                'message' => 'Invalid administrative hierarchy: ' . $hierarchy['error'],
+                'suggestion' => $hierarchy['suggestion'] ?? null,
+            ], 422);
+        }
+
         $lat = $validated['center_lat'] ?? $validated['latitude'] ?? 27.8635;
         $lng = $validated['center_lng'] ?? $validated['longitude'] ?? 85.5815;
 
@@ -962,222 +977,140 @@ class VillageController extends Controller
     }
 
     /**
-     * Import mapped infrastructure from OpenStreetMap via Overpass (Phase 5).
+     * Audit all villages in MySQL for administrative hierarchy consistency (Phase 1).
+     */
+    public function auditHierarchy()
+    {
+        $villages = Village::all();
+        $report = [];
+        foreach ($villages as $v) {
+            $report[] = \App\Services\NepalLocationService::auditVillageHierarchy($v);
+        }
+
+        return response()->json([
+            'total_audited' => count($report),
+            'inconsistent_count' => count(array_filter($report, fn($r) => !$r['is_consistent'])),
+            'records' => $report,
+        ]);
+    }
+
+    /**
+     * Reviewable correction of inconsistent administrative hierarchy (Phase 1).
+     */
+    public function correctHierarchy(Request $request, Village $village)
+    {
+        $validated = $request->validate([
+            'province' => 'sometimes|required|string',
+            'district' => 'sometimes|required|string',
+            'municipality' => 'sometimes|required|string',
+            'ward_no' => 'nullable|string',
+            'reason' => 'nullable|string',
+        ]);
+
+        $updated = \App\Services\NepalLocationService::correctVillageHierarchy($village, $validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Administrative hierarchy corrected for village '{$village->name}'.",
+            'village' => $updated,
+        ]);
+    }
+
+    /**
+     * Discover available OpenStreetMap infrastructure for a Village within bounded area (Phase 2 & 3).
+     */
+    public function discoverOsm(Request $request, Village $village)
+    {
+        $radius = $request->integer('radius', 2000);
+        $customBounds = $request->input('bounds', null);
+
+        $discovery = \App\Services\OsmInfrastructureService::discover($village, $radius, $customBounds);
+        return response()->json($discovery);
+    }
+
+    /**
+     * Confirm and persist approved discovery features into MySQL (Phase 4, 5, 7, 8).
+     */
+    public function confirmOsmImport(Request $request, Village $village)
+    {
+        $validated = $request->validate([
+            'features' => 'required|array',
+            'batch_id' => 'nullable|string',
+        ]);
+
+        $result = \App\Services\OsmInfrastructureService::persistDiscovered(
+            $village,
+            $validated['features'],
+            $validated['batch_id'] ?? null
+        );
+
+        // Build/update travel-time estimates and graph topology
+        $this->buildNetwork($request, $village);
+
+        return response()->json($result);
+    }
+
+    /**
+     * Fetch village import history and audit logs (Phase 4).
+     */
+    public function importHistory(Village $village)
+    {
+        $logs = $village->auditLogs()
+            ->whereIn('action', ['osm_infrastructure_import', 'hierarchy_correction', 'import_geojson', 'import_csv'])
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'village_id' => $village->id,
+            'last_imported_at' => $village->last_imported_at,
+            'import_batch_id' => $village->import_batch_id,
+            'logs' => $logs,
+        ]);
+    }
+
+    /**
+     * Import mapped infrastructure from OpenStreetMap via Overpass (Phase 4 & 5).
      */
     public function importOsm(Request $request, Village $village)
     {
         $previewOnly = $request->boolean('preview_only', false);
-        $lat = (float) ($village->center_lat ?? 27.8635);
-        $lng = (float) ($village->center_lng ?? 85.5815);
+        $radius = $request->integer('radius', 2000);
+        $customBounds = $request->input('bounds', null);
 
-        // Compute 0.025 deg bounding box (~2.7km radius)
-        $south = $lat - 0.025;
-        $west = $lng - 0.025;
-        $north = $lat + 0.025;
-        $east = $lng + 0.025;
-
-        // Overpass QL query
-        $overpassQuery = "[out:json][timeout:10];(way[\"highway\"]({$south},{$west},{$north},{$east});node[\"amenity\"~\"hospital|clinic|school|water_point\"]({$south},{$west},{$north},{$east}););out body;>;out skel qt;";
-
-        $elements = [];
-        $sourceType = 'OpenStreetMap Overpass Live API';
-
-        try {
-            $response = Http::timeout(8)
-                ->asForm()
-                ->post('https://overpass-api.de/api/interpreter', ['data' => $overpassQuery]);
-
-            if ($response->successful()) {
-                $elements = $response->json('elements') ?? [];
-            }
-        } catch (\Throwable $e) {
-            // Overpass offline or timed out; fall back to high-fidelity Nepal rural lifeline dataset
-            $sourceType = 'OpenStreetMap Nepal Lifeline Archive (Local Fallback)';
-        }
-
-        // If elements are empty, provide standard OSM-modeled mountain waypoints & ways
-        if (empty($elements)) {
-            $elements = [
-                ['type' => 'node', 'id' => 9001, 'lat' => $lat + 0.003, 'lon' => $lng - 0.004, 'tags' => ['amenity' => 'clinic', 'name' => "{$village->name} Health Outpost"]],
-                ['type' => 'node', 'id' => 9002, 'lat' => $lat + 0.006, 'lon' => $lng + 0.002, 'tags' => ['amenity' => 'school', 'name' => "{$village->name} Basic School"]],
-                ['type' => 'node', 'id' => 9003, 'lat' => $lat - 0.004, 'lon' => $lng + 0.005, 'tags' => ['highway' => 'crossing', 'name' => 'Riverside Ford Junction']],
-                ['type' => 'node', 'id' => 9004, 'lat' => $lat, 'lon' => $lng, 'tags' => ['highway' => 'turning_loop', 'name' => 'Chautara Center Waypoint']],
-                [
-                    'type' => 'way',
-                    'id' => 80001,
-                    'nodes' => [9004, 9001],
-                    'tags' => ['highway' => 'unclassified', 'surface' => 'gravel', 'name' => 'Clinic Feeder Road'],
-                ],
-                [
-                    'type' => 'way',
-                    'id' => 80002,
-                    'nodes' => [9004, 9002],
-                    'tags' => ['highway' => 'track', 'surface' => 'ground', 'name' => 'Janahit School Access Track'],
-                ],
-                [
-                    'type' => 'way',
-                    'id' => 80003,
-                    'nodes' => [9004, 9003],
-                    'tags' => ['highway' => 'footway', 'bridge' => 'suspension', 'surface' => 'wood', 'name' => 'Gorge Suspension Footway'],
-                ],
-            ];
-        }
-
-        // Parse OSM nodes and ways
-        $osmNodes = [];
-        $candidates = ['nodes' => [], 'edges' => [], 'facilities' => []];
-
-        foreach ($elements as $elem) {
-            if ($elem['type'] === 'node' && isset($elem['lat'], $elem['lon'])) {
-                $nodeName = $elem['tags']['name'] ?? ('OSM Node #' . $elem['id']);
-                $amenity = $elem['tags']['amenity'] ?? null;
-                $nodeType = match ($amenity) {
-                    'hospital', 'clinic' => 'facility',
-                    'school' => 'facility',
-                    'water_point' => 'water_source',
-                    default => 'junction',
-                };
-
-                $osmNodes[$elem['id']] = [
-                    'osm_id' => $elem['id'],
-                    'name' => $nodeName,
-                    'node_type' => $nodeType,
-                    'latitude' => $elem['lat'],
-                    'longitude' => $elem['lon'],
-                    'amenity' => $amenity,
-                ];
-                $candidates['nodes'][] = $osmNodes[$elem['id']];
-
-                if ($amenity) {
-                    $candidates['facilities'][] = [
-                        'name' => $nodeName,
-                        'facility_type' => $amenity === 'school' ? 'school' : 'health_post',
-                        'osm_id' => $elem['id'],
-                    ];
-                }
-            }
-        }
-
-        foreach ($elements as $elem) {
-            if ($elem['type'] === 'way' && isset($elem['nodes']) && count($elem['nodes']) >= 2) {
-                $tags = $elem['tags'] ?? [];
-                $edgeName = $tags['name'] ?? ('OSM ' . ucfirst($tags['highway'] ?? 'Road') . ' #' . $elem['id']);
-                $isBridge = isset($tags['bridge']) && $tags['bridge'] !== 'no';
-                $infraType = $isBridge ? 'bridge' : match ($tags['highway'] ?? 'road') {
-                    'path', 'footway' => 'trail',
-                    'track' => 'trail',
-                    default => 'road',
-                };
-
-                $candidates['edges'][] = [
-                    'osm_id' => $elem['id'],
-                    'name' => $edgeName,
-                    'source_osm_id' => $elem['nodes'][0],
-                    'target_osm_id' => $elem['nodes'][count($elem['nodes']) - 1],
-                    'infrastructure_type' => $infraType,
-                    'surface_type' => $tags['surface'] ?? ($isBridge ? 'suspension' : 'gravel'),
-                    'is_critical' => $isBridge,
-                ];
-            }
-        }
+        $discovery = \App\Services\OsmInfrastructureService::discover($village, $radius, $customBounds);
 
         if ($previewOnly) {
             return response()->json([
                 'preview_only' => true,
-                'source' => $sourceType,
-                'attribution' => '© OpenStreetMap contributors (ODbL 1.0)',
+                'source' => $discovery['summary']['source'],
+                'attribution' => $discovery['summary']['attribution'],
                 'summary' => [
-                    'candidate_nodes' => count($candidates['nodes']),
-                    'candidate_edges' => count($candidates['edges']),
-                    'candidate_facilities' => count($candidates['facilities']),
+                    'candidate_nodes' => count($discovery['categories']['schools']) + count($discovery['categories']['health']) + count($discovery['categories']['water']) + count($discovery['categories']['settlements']),
+                    'candidate_edges' => count($discovery['categories']['roads']) + count($discovery['categories']['bridges']),
+                    'candidate_facilities' => count($discovery['categories']['schools']) + count($discovery['categories']['health']),
                 ],
-                'candidates' => $candidates,
+                'categories' => $discovery['categories'],
+                'duplicate_warnings' => $discovery['duplicate_warnings'],
+                'features' => $discovery['features'],
             ]);
         }
 
-        // Persist to MySQL
-        DB::beginTransaction();
-        try {
-            $createdNodes = 0;
-            $createdEdges = 0;
-            $dbNodeMap = [];
+        // Persist all selected features
+        $selectedFeatures = array_filter($discovery['features'], fn($f) => ($f['selected'] ?? true) && !($f['is_duplicate'] ?? false));
+        $result = \App\Services\OsmInfrastructureService::persistDiscovered($village, array_values($selectedFeatures));
 
-            foreach ($candidates['nodes'] as $cn) {
-                $attrs = [
-                    'village_id' => $village->id,
-                    'name' => $cn['name'],
-                    'latitude' => $cn['latitude'],
-                    'longitude' => $cn['longitude'],
-                ];
-                if (Schema::hasColumn('nodes', 'node_code')) $attrs['node_code'] = 'osm_' . $cn['osm_id'];
-                if (Schema::hasColumn('nodes', 'node_type')) $attrs['node_type'] = $cn['node_type'];
-                if (Schema::hasColumn('nodes', 'type')) $attrs['type'] = $cn['node_type'];
-                if (Schema::hasColumn('nodes', 'source')) $attrs['source'] = 'osm';
-                if (Schema::hasColumn('nodes', 'verification_status')) $attrs['verification_status'] = 'imported';
-                if (Schema::hasColumn('nodes', 'confidence_score')) $attrs['confidence_score'] = 80;
+        // Build travel-times
+        $this->buildNetwork($request, $village);
 
-                $node = Node::updateOrCreate(
-                    ['village_id' => $village->id, 'name' => $cn['name']],
-                    $attrs
-                );
-                $dbNodeMap[$cn['osm_id']] = $node;
-                $createdNodes++;
-            }
-
-            foreach ($candidates['edges'] as $ce) {
-                $src = $dbNodeMap[$ce['source_osm_id']] ?? null;
-                $tgt = $dbNodeMap[$ce['target_osm_id']] ?? null;
-
-                if ($src && $tgt && $src->id !== $tgt->id) {
-                    $edgeAttrs = [
-                        'village_id' => $village->id,
-                        'source_node_id' => $src->id,
-                        'target_node_id' => $tgt->id,
-                        'name' => $ce['name'],
-                        'status' => 'passable',
-                    ];
-                    if (Schema::hasColumn('edges', 'edge_code')) $edgeAttrs['edge_code'] = 'osm_' . $ce['osm_id'];
-                    if (Schema::hasColumn('edges', 'infrastructure_type')) $edgeAttrs['infrastructure_type'] = $ce['infrastructure_type'];
-                    if (Schema::hasColumn('edges', 'type')) $edgeAttrs['type'] = $ce['infrastructure_type'];
-                    if (Schema::hasColumn('edges', 'surface_type')) $edgeAttrs['surface_type'] = $ce['surface_type'];
-                    if (Schema::hasColumn('edges', 'is_critical')) $edgeAttrs['is_critical'] = $ce['is_critical'];
-                    if (Schema::hasColumn('edges', 'length_meters')) $edgeAttrs['length_meters'] = 450;
-                    if (Schema::hasColumn('edges', 'distance')) $edgeAttrs['distance'] = 0.45;
-                    if (Schema::hasColumn('edges', 'source')) $edgeAttrs['source'] = 'osm';
-                    if (Schema::hasColumn('edges', 'verification_status')) $edgeAttrs['verification_status'] = 'imported';
-                    if (Schema::hasColumn('edges', 'confidence_score')) $edgeAttrs['confidence_score'] = 80;
-
-                    Edge::updateOrCreate(
-                        ['village_id' => $village->id, 'name' => $ce['name']],
-                        $edgeAttrs
-                    );
-                    $createdEdges++;
-                }
-            }
-
-            AuditLog::create([
-                'village_id' => $village->id,
-                'action_type' => 'imported',
-                'entity_type' => 'osm',
-                'performed_by' => 'OpenStreetMap Syncer',
-                'summary' => "Imported {$createdNodes} nodes and {$createdEdges} edges from OpenStreetMap.",
-                'details' => ['source' => $sourceType, 'attribution' => 'ODbL 1.0'],
-            ]);
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => "OpenStreetMap Ingestion: {$createdNodes} nodes and {$createdEdges} lifeline edges imported into MySQL.",
-                'source' => $sourceType,
-                'attribution' => '© OpenStreetMap contributors (ODbL 1.0)',
-                'imported_nodes' => $createdNodes,
-                'imported_edges' => $createdEdges,
-            ]);
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            return response()->json(['error' => 'OSM import failed: ' . $e->getMessage()], 500);
-        }
+        return response()->json([
+            'success' => true,
+            'message' => $result['message'],
+            'source' => $discovery['summary']['source'],
+            'attribution' => $discovery['summary']['attribution'],
+            'imported_nodes' => $result['imported_nodes'],
+            'imported_edges' => $result['imported_edges'],
+            'imported_facilities' => $result['imported_facilities'],
+        ]);
     }
 
     /**

@@ -28,10 +28,12 @@ Route::get('/locations/wards', [LocationController::class, 'wards']);
 Route::get('/locations/search', [LocationController::class, 'search']);
 
 // Public / Demo Village & Network Routes
+Route::get('/villages/audit-hierarchy', [VillageController::class, 'auditHierarchy']);
 Route::get('/villages', [VillageController::class, 'index']);
 Route::post('/villages', [VillageController::class, 'store']);
 Route::post('/villages/wizard-draft', [VillageController::class, 'storeWizardDraft']);
 Route::post('/villages/{village}/activate', [VillageController::class, 'activate']);
+Route::post('/villages/{village}/correct-hierarchy', [VillageController::class, 'correctHierarchy']);
 Route::get('/villages/{village}', [VillageController::class, 'show']);
 Route::put('/villages/{village}', [VillageController::class, 'update']);
 Route::delete('/villages/{village}', [VillageController::class, 'destroy']);
@@ -40,6 +42,9 @@ Route::get('/villages/{village}/export-geojson', [VillageController::class, 'exp
 Route::post('/villages/{village}/import-geojson', [VillageController::class, 'importGeoJson']);
 Route::post('/villages/{village}/import-csv', [VillageController::class, 'importCsv']);
 Route::post('/villages/{village}/import-osm', [VillageController::class, 'importOsm']);
+Route::get('/villages/{village}/discover-osm', [VillageController::class, 'discoverOsm']);
+Route::post('/villages/{village}/confirm-osm-import', [VillageController::class, 'confirmOsmImport']);
+Route::get('/villages/{village}/import-history', [VillageController::class, 'importHistory']);
 Route::post('/villages/{village}/build-network', [VillageController::class, 'buildNetwork']);
 Route::get('/villages/{village}/integrity', [VillageController::class, 'integrity']);
 Route::get('/villages/{village}/audit-logs', [VillageController::class, 'auditLogs']);
