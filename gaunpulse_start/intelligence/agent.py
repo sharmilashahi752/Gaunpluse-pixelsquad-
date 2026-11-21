@@ -97,15 +97,49 @@ class GaunPulseAIAgent:
             "प्राथमिकता", "पहिले कुन", "प्राथमिकीकरण"
         ])
 
-        # Intent 4: General Issues list
+        # Intent 4: Citizen Assistance & Tracking Code Lookup
+        tracking_code_match = re.search(r'\b(gp-[a-z0-9-]+)\b', lower_msg)
+        is_citizen_intent = bool(tracking_code_match) or any(w in lower_msg for w in [
+            "my issue", "track", "tracking code", "report a damaged", "how can i report",
+            "गुनासो", "उजुरी", "कहाँ पुगेको", "स्थिति", "कसरी दर्ता"
+        ])
+
+        # Intent 5: General Issues list
         is_issues_intent = any(w in lower_msg for w in [
             "issues", "problems", "alerts", "reports", "disruptions",
-            "समस्या", "उजुरी", "विवरण", "के के छन्"
+            "समस्या", "विवरण", "के के छन्"
         ])
 
         # Execute appropriate tools
         network_data = request.network_data
         issues_data = request.issues_data
+
+        if is_citizen_intent:
+            matched_code = tracking_code_match.group(1).upper() if tracking_code_match else None
+            issues_res = await tools.get_village_issues(village_id=village_id, issues_list=issues_data)
+            matching_issue = None
+            if matched_code and "issues" in issues_res:
+                matching_issue = next((i for i in issues_res["issues"] if (i.get("tracking_code") or "").upper() == matched_code), None)
+            elif "issues" in issues_res and issues_res["issues"]:
+                # Default to first road/bridge issue for general inquiry
+                matching_issue = issues_res["issues"][0]
+
+            tools_called.append(AIToolCall(
+                tool="lookup_citizen_issue",
+                agent="Citizen Assistance Agent",
+                args={"tracking_code": matched_code or (matching_issue.get("tracking_code") if matching_issue else "GP-BRG-01")},
+                result={"found": bool(matching_issue), "issue": matching_issue},
+            ))
+            relevant_links.append({"label": "Report New Issue", "url": "#/issues-alerts"})
+
+        if is_priority_intent or (is_plan_intent and not is_sim_intent):
+            prio_res = await tools.get_repair_priorities(village_id=village_id, issues_list=issues_data)
+            tools_called.append(AIToolCall(
+                tool="get_repair_priorities",
+                agent="Problem Prioritization Agent",
+                args={"village_id": village_id},
+                result=prio_res,
+            ))
 
         if is_sim_intent:
             # Determine edge (default to Bridge B, id=2)
@@ -117,6 +151,7 @@ class GaunPulseAIAgent:
             )
             tools_called.append(AIToolCall(
                 tool="simulate_infrastructure_failure",
+                agent="Infrastructure Impact Agent",
                 args={"edge_id": edge_id, "village_id": village_id},
                 result=sim_res,
             ))
@@ -136,6 +171,7 @@ class GaunPulseAIAgent:
             )
             tools_called.append(AIToolCall(
                 tool="generate_action_plan_draft",
+                agent="Repair Planning Agent",
                 args={"issue_id": issue_id, "village_id": village_id},
                 result=plan_res,
             ))
@@ -143,18 +179,11 @@ class GaunPulseAIAgent:
                 draft_plan = DraftActionPlan(**plan_res)
             relevant_links.append({"label": "Action Plans Management", "url": "#/action-plans"})
 
-        if is_priority_intent and not is_sim_intent:
-            prio_res = await tools.get_repair_priorities(village_id=village_id, issues_list=issues_data)
-            tools_called.append(AIToolCall(
-                tool="get_repair_priorities",
-                args={"village_id": village_id},
-                result=prio_res,
-            ))
-
-        if is_issues_intent and not is_sim_intent and not is_plan_intent:
+        if is_issues_intent and not is_sim_intent and not is_plan_intent and not is_priority_intent and not is_citizen_intent:
             issues_res = await tools.get_village_issues(village_id=village_id, issues_list=issues_data)
             tools_called.append(AIToolCall(
                 tool="get_village_issues",
+                agent="AI Coordinator",
                 args={"village_id": village_id},
                 result=issues_res,
             ))
@@ -165,6 +194,7 @@ class GaunPulseAIAgent:
             issues_res = await tools.get_village_issues(village_id=village_id, issues_list=issues_data)
             tools_called.append(AIToolCall(
                 tool="get_village_issues",
+                agent="AI Coordinator",
                 args={"village_id": village_id},
                 result=issues_res,
             ))

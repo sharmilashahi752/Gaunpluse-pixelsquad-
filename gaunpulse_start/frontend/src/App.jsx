@@ -27,8 +27,9 @@ const pages = {
 
 const validPages = new Set(navigationItems.map(({ id }) => id));
 const getPageFromHash = () => {
-  const value = window.location.hash.replace('#/', '');
-  return validPages.has(value) ? value : 'dashboard';
+  const raw = window.location.hash.replace('#/', '').replace('#', '');
+  const page = raw.split('?')[0].split('/')[0];
+  return validPages.has(page) ? page : 'dashboard';
 };
 
 export default function App() {
@@ -40,9 +41,11 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  const navigate = (page) => {
+  const navigate = (target) => {
+    const page = target.replace('#/', '').replace('#', '').split('?')[0].split('/')[0];
     if (!validPages.has(page)) return;
-    window.location.hash = `/${page}`;
+    const cleanTarget = target.startsWith('#/') ? target.slice(2) : (target.startsWith('/') ? target.slice(1) : target);
+    window.location.hash = `/${cleanTarget}`;
     setActivePage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };

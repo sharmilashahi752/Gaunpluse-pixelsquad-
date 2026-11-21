@@ -185,6 +185,7 @@ class AIToolCall(BaseModel):
     tool: str
     args: dict[str, Any]
     result: Any
+    agent: Optional[str] = None
 
 
 class DraftActionPlan(BaseModel):
