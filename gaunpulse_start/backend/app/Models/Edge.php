@@ -15,6 +15,7 @@ class Edge extends Model
             'is_critical' => 'boolean',
             'confidence_score' => 'integer',
             'travel_minutes' => 'float',
+            'geometry' => 'array',
             'change_history' => 'array',
             'verified_at' => 'datetime',
         ];

@@ -1023,8 +1023,9 @@ class VillageController extends Controller
     {
         $radius = $request->integer('radius', 2000);
         $customBounds = $request->input('bounds', null);
+        $force = $request->boolean('force', false);
 
-        $discovery = \App\Services\OsmInfrastructureService::discover($village, $radius, $customBounds);
+        $discovery = \App\Services\OsmInfrastructureService::discover($village, $radius, $customBounds, $force);
         return response()->json($discovery);
     }
 
@@ -1056,7 +1057,7 @@ class VillageController extends Controller
     public function importHistory(Village $village)
     {
         $logs = $village->auditLogs()
-            ->whereIn('action', ['osm_infrastructure_import', 'hierarchy_correction', 'import_geojson', 'import_csv'])
+            ->whereIn('action_type', ['imported', 'osm_infrastructure_import', 'hierarchy_correction', 'import_geojson', 'import_csv'])
             ->latest()
             ->get();
 
@@ -1076,8 +1077,9 @@ class VillageController extends Controller
         $previewOnly = $request->boolean('preview_only', false);
         $radius = $request->integer('radius', 2000);
         $customBounds = $request->input('bounds', null);
+        $force = $request->boolean('force', false);
 
-        $discovery = \App\Services\OsmInfrastructureService::discover($village, $radius, $customBounds);
+        $discovery = \App\Services\OsmInfrastructureService::discover($village, $radius, $customBounds, $force);
 
         if ($previewOnly) {
             return response()->json([

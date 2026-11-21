@@ -60,6 +60,8 @@ export default function VillageMapPage() {
   // Phase 2, 5 & 6: Automatic Infrastructure Discovery & Import Dashboard State
   const [isDiscoveryModalOpen, setIsDiscoveryModalOpen] = useState(false);
   const [discoveryLoading, setDiscoveryLoading] = useState(false);
+  const [discoveryStatus, setDiscoveryStatus] = useState('idle'); // 'idle' | 'searching' | 'processing' | 'ready' | 'empty' | 'provider_unavailable' | 'saving' | 'completed'
+  const [discoveryError, setDiscoveryError] = useState(null);
   const [discoveryRadius, setDiscoveryRadius] = useState(2000); // meters (Phase 3)
   const [discoveryData, setDiscoveryData] = useState(null);
   const [selectedFeatureMap, setSelectedFeatureMap] = useState({}); // featureId -> bool
@@ -373,38 +375,55 @@ export default function VillageMapPage() {
     }
   };
 
-  // Trigger Infrastructure Discovery (Phase 2, 3 & 4)
-  const triggerDiscovery = async (villageId, radius = 2000) => {
+  // Trigger Infrastructure Discovery (Task 1, 2, 3 & 5)
+  const triggerDiscovery = async (villageId, radius = 2000, force = false) => {
     const vId = villageId || selectedVillageId;
     if (!vId) return;
 
+    setDiscoveryStatus('searching');
     setDiscoveryLoading(true);
     setIsDiscoveryModalOpen(true);
     setDiscoveryRadius(radius);
     setDiscoveryData(null);
+    setDiscoveryError(null);
 
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/villages/${vId}/discover-osm?radius=${radius}`);
+      const res = await fetch(`http://127.0.0.1:8000/api/villages/${vId}/discover-osm?radius=${radius}${force ? '&force=true' : ''}`);
       if (!res.ok) {
         throw new Error(`Server returned error code ${res.status}`);
       }
+      setDiscoveryStatus('processing');
       const data = await res.json();
       setDiscoveryData(data);
 
+      if (data.provider_status === 'unavailable' || data.error) {
+        setDiscoveryStatus('provider_unavailable');
+        setDiscoveryError(data.error || 'OpenStreetMap provider is currently unavailable or timed out.');
+        return;
+      }
+
+      const features = data.features || [];
+      if (features.length === 0) {
+        setDiscoveryStatus('empty');
+      } else {
+        setDiscoveryStatus('ready');
+      }
+
       // Initialize selected checkboxes (select all valid non-duplicates)
       const initialMap = {};
-      (data.features || []).forEach((feat) => {
+      features.forEach((feat) => {
         initialMap[feat.id] = (feat.selected ?? true) && !feat.is_duplicate;
       });
       setSelectedFeatureMap(initialMap);
     } catch (err) {
-      alert('Automatic discovery failed: ' + err.message);
+      setDiscoveryStatus('failed');
+      setDiscoveryError(err.message || 'Automatic discovery failed.');
     } finally {
       setDiscoveryLoading(false);
     }
   };
 
-  // Confirm and Save Selected Discovery Features (Phase 4, 7, 8)
+  // Confirm and Save Selected Discovery Features (Task 6 & 7)
   const handleConfirmImport = async () => {
     if (!selectedVillageId || !discoveryData) return;
 
@@ -417,6 +436,7 @@ export default function VillageMapPage() {
     }
 
     setImportingLoading(true);
+    setDiscoveryStatus('saving');
     try {
       const res = await fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/confirm-osm-import`, {
         method: 'POST',
@@ -433,15 +453,17 @@ export default function VillageMapPage() {
       }
 
       const result = await res.json();
+      setDiscoveryStatus('completed');
       setIsDiscoveryModalOpen(false);
       showNotification(`Import complete! ${result.imported_nodes} nodes and ${result.imported_edges} lifeline edges saved to MySQL.`);
 
-      // Refresh village network immediately
+      // Refresh village network immediately from MySQL (Task 7)
       const refreshRes = await fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/network`);
       setVillageData(await refreshRes.json());
       loadVillages();
     } catch (err) {
       alert('Error saving imported features: ' + err.message);
+      setDiscoveryStatus('ready');
     } finally {
       setImportingLoading(false);
     }
@@ -637,7 +659,11 @@ export default function VillageMapPage() {
   ];
 
   const candidateEdgesForMap = discoveryData?.categories?.roads
-    ? [...(discoveryData.categories.roads || []), ...(discoveryData.categories.bridges || [])]
+    ? [...(discoveryData.categories.roads || []), ...(discoveryData.categories.bridges || [])].filter((f) => selectedFeatureMap[f.id])
+    : [];
+
+  const candidateNodesForMap = discoveryData?.features
+    ? (discoveryData.features || []).filter((f) => (f.osm_type === 'node' || !f.source_osm_id) && selectedFeatureMap[f.id])
     : [];
 
   return (
@@ -1067,8 +1093,8 @@ export default function VillageMapPage() {
               : null
           }
           candidatePreviewFeatures={
-            isDiscoveryModalOpen && candidateEdgesForMap.length > 0
-              ? { edges: candidateEdgesForMap }
+            isDiscoveryModalOpen && (candidateEdgesForMap.length > 0 || candidateNodesForMap.length > 0)
+              ? { edges: candidateEdgesForMap, nodes: candidateNodesForMap }
               : null
           }
         />
@@ -1538,7 +1564,7 @@ export default function VillageMapPage() {
                   onChange={(e) => {
                     const newRad = Number(e.target.value);
                     setDiscoveryRadius(newRad);
-                    triggerDiscovery(selectedVillageId, newRad);
+                    triggerDiscovery(selectedVillageId, newRad, true);
                   }}
                   style={{
                     padding: '6px 12px',
@@ -1557,7 +1583,7 @@ export default function VillageMapPage() {
 
                 <button
                   type="button"
-                  onClick={() => triggerDiscovery(selectedVillageId, discoveryRadius)}
+                  onClick={() => triggerDiscovery(selectedVillageId, discoveryRadius, true)}
                   disabled={discoveryLoading}
                   style={{
                     background: '#047857',
@@ -1579,14 +1605,149 @@ export default function VillageMapPage() {
               </div>
             </div>
 
-            {/* Discovery State: Loading / Empty / Loaded */}
-            {discoveryLoading ? (
+            {/* Discovery State: Loading / Provider Unavailable / Empty / Loaded */}
+            {discoveryLoading || discoveryStatus === 'searching' || discoveryStatus === 'processing' || discoveryStatus === 'saving' ? (
               <div style={{ textAlign: 'center', padding: '40px 20px' }}>
                 <RefreshCw size={32} className="animate-spin" color="#047857" style={{ margin: '0 auto 12px' }} />
-                <h4 style={{ margin: '0 0 6px', color: '#092d22' }}>Querying OpenStreetMap Overpass API...</h4>
+                <h4 style={{ margin: '0 0 6px', color: '#092d22' }}>
+                  {discoveryStatus === 'saving'
+                    ? 'Saving infrastructure to village database...'
+                    : discoveryStatus === 'processing'
+                    ? 'Processing geographic features and checking topology...'
+                    : 'Searching OpenStreetMap...'}
+                </h4>
                 <p style={{ margin: 0, fontSize: '12.5px', color: '#64748b' }}>
-                  Parsing roads, suspension bridges, health posts, schools, and water tanks within {discoveryRadius}m radius.
+                  {discoveryStatus === 'saving'
+                    ? 'Persisting road lines, bridge lifelines, and community facilities in MySQL.'
+                    : `Querying roads, bridges, health posts, schools, and water infrastructure within ${discoveryRadius}m radius.`}
                 </p>
+              </div>
+            ) : discoveryStatus === 'provider_unavailable' ? (
+              <div
+                style={{
+                  background: '#fef2f2',
+                  border: '1.5px solid #f87171',
+                  borderRadius: '12px',
+                  padding: '24px',
+                  textAlign: 'center',
+                  marginBottom: '16px',
+                }}
+              >
+                <AlertTriangle size={30} color="#dc2626" style={{ margin: '0 auto 8px' }} />
+                <h4 style={{ margin: '0 0 6px', color: '#991b1b', fontSize: '15px' }}>
+                  OpenStreetMap Provider Unavailable
+                </h4>
+                <p style={{ margin: '0 0 16px', fontSize: '12.5px', color: '#7f1d1d', maxWidth: '500px', marginLeft: 'auto', marginRight: 'auto' }}>
+                  The external OpenStreetMap / Overpass service timed out or was temporarily at capacity.
+                  {discoveryError && (
+                    <span style={{ display: 'block', marginTop: '6px', fontSize: '11.5px', color: '#b91c1c', fontFamily: 'monospace' }}>
+                      Diagnostic detail: {discoveryError}
+                    </span>
+                  )}
+                </p>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => triggerDiscovery(selectedVillageId, discoveryRadius, true)}
+                    style={{
+                      background: '#b91c1c',
+                      color: '#fff',
+                      border: 'none',
+                      padding: '8px 18px',
+                      borderRadius: '6px',
+                      fontSize: '12.5px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <RefreshCw size={13} />
+                    Retry Search
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDiscoveryModalOpen(false);
+                      setIsAddAssetModalOpen(true);
+                    }}
+                    style={{
+                      background: '#fff',
+                      color: '#475569',
+                      border: '1px solid #cbd5e1',
+                      padding: '8px 16px',
+                      borderRadius: '6px',
+                      fontSize: '12.5px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    + Add Manual Asset
+                  </button>
+                </div>
+              </div>
+            ) : discoveryData && discoveryData.features && discoveryData.features.length === 0 ? (
+              <div
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  padding: '24px',
+                  textAlign: 'center',
+                  marginBottom: '16px',
+                }}
+              >
+                <Info size={26} color="#64748b" style={{ margin: '0 auto 8px' }} />
+                <h4 style={{ margin: '0 0 6px', color: '#1e293b', fontSize: '14.5px' }}>
+                  No mapped records found in the selected study area. Local verification is needed.
+                </h4>
+                <p style={{ margin: '0 0 16px', fontSize: '12px', color: '#64748b', maxWidth: '480px', marginLeft: 'auto', marginRight: 'auto' }}>
+                  OpenStreetMap does not currently have mapped infrastructure tags within this {discoveryRadius}m radius. You can expand the study area radius, add assets manually, or import a municipal GeoJSON/CSV file.
+                </p>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                  {discoveryRadius < 5000 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextRad = discoveryRadius === 1000 ? 2000 : (discoveryRadius === 2000 ? 3500 : 5000);
+                        setDiscoveryRadius(nextRad);
+                        triggerDiscovery(selectedVillageId, nextRad, true);
+                      }}
+                      style={{
+                        background: '#047857',
+                        color: '#fff',
+                        border: 'none',
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Expand Radius to {discoveryRadius === 1000 ? '2,000m' : (discoveryRadius === 2000 ? '3,500m' : '5,000m')}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDiscoveryModalOpen(false);
+                      setIsAddAssetModalOpen(true);
+                    }}
+                    style={{
+                      background: '#176342',
+                      color: '#fff',
+                      border: 'none',
+                      padding: '6px 14px',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    + Add Manual Infrastructure
+                  </button>
+                </div>
               </div>
             ) : discoveryData ? (
               <div>
@@ -1737,50 +1898,9 @@ export default function VillageMapPage() {
                   </div>
                 )}
 
-                {/* Empty State when 0 features found (Phase 10: honest missing data messaging) */}
-                {discoveryData.features.length === 0 ? (
-                  <div
-                    style={{
-                      background: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '12px',
-                      padding: '24px',
-                      textAlign: 'center',
-                      marginBottom: '16px',
-                    }}
-                  >
-                    <Info size={24} color="#64748b" style={{ margin: '0 auto 8px' }} />
-                    <h4 style={{ margin: '0 0 6px', color: '#1e293b', fontSize: '14px' }}>
-                      No mapped records found in the selected data source. Local verification is needed.
-                    </h4>
-                    <p style={{ margin: '0 0 14px', fontSize: '12px', color: '#64748b', maxWidth: '440px', marginLeft: 'auto', marginRight: 'auto' }}>
-                      OpenStreetMap does not currently have mapped infrastructure tags within this {discoveryRadius}m radius. You can expand the search radius, add assets manually, or import a municipal GeoJSON/CSV file.
-                    </p>
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsDiscoveryModalOpen(false);
-                          setIsAddAssetModalOpen(true);
-                        }}
-                        style={{
-                          background: '#176342',
-                          color: '#fff',
-                          border: 'none',
-                          padding: '6px 14px',
-                          borderRadius: '6px',
-                          fontSize: '12px',
-                          fontWeight: 'bold',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        + Add Manual Infrastructure
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    {/* Category Tabs & Bulk Selection */}
+                {/* Discovered Features Breakdown & Selection */}
+                <div>
+                  {/* Category Tabs & Bulk Selection */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
                       <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                         {['all', 'roads', 'bridges', 'schools', 'health', 'water', 'settlements'].map((cat) => (
@@ -1911,8 +2031,7 @@ export default function VillageMapPage() {
                       })}
                     </div>
                   </div>
-                )}
-              </div>
+                </div>
             ) : null}
 
             {/* Modal Actions */}

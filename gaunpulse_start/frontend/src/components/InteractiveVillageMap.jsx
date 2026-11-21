@@ -368,6 +368,33 @@ export default function InteractiveVillageMap({
           );
         })}
 
+        {candidatePreviewFeatures?.nodes?.map((candNode, idx) => {
+          if (!candNode.latitude || !candNode.longitude) return null;
+          const nLat = parseFloat(candNode.latitude);
+          const nLng = parseFloat(candNode.longitude);
+          const cat = candNode.category || candNode.node_type || 'facility';
+          const pinColor = cat === 'schools' ? '#1d4ed8' : (cat === 'health' ? '#0f766e' : (cat === 'water' ? '#0284c7' : '#15803d'));
+          return (
+            <Marker
+              key={`preview-node-${idx}`}
+              position={[nLat, nLng]}
+              icon={L.divIcon({
+                className: 'custom-preview-pin',
+                html: `<div style="background:${pinColor}; width:24px; height:24px; border-radius:50%; border:2px dashed white; box-shadow:0 2px 5px rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center; color:white; font-size:10px; font-weight:bold;">🔍</div>`,
+                iconSize: [24, 24],
+                iconAnchor: [12, 12],
+              })}
+            >
+              <Tooltip sticky>
+                <div style={{ fontSize: '11px', fontWeight: 'bold' }}>
+                  🔍 Discovered {candNode.category}: {candNode.name}
+                  <div style={{ fontSize: '10px', color: '#64748b' }}>Status: Ready for import</div>
+                </div>
+              </Tooltip>
+            </Marker>
+          );
+        })}
+
         {/* 1. Nationwide Saved Villages Layer */}
         {activeLayers.savedVillages &&
           allVillages.map((v) => {
@@ -548,13 +575,22 @@ export default function InteractiveVillageMap({
             color = '#f97316';
           }
 
+          let positions = [
+            [parseFloat(sNode.latitude), parseFloat(sNode.longitude)],
+            [parseFloat(tNode.latitude), parseFloat(tNode.longitude)],
+          ];
+          let edgeGeom = edge.geometry;
+          if (typeof edgeGeom === 'string') {
+            try { edgeGeom = JSON.parse(edgeGeom); } catch (e) { edgeGeom = null; }
+          }
+          if (Array.isArray(edgeGeom) && edgeGeom.length >= 2) {
+            positions = edgeGeom;
+          }
+
           return (
             <Polyline
               key={`edge-${edge.id}`}
-              positions={[
-                [parseFloat(sNode.latitude), parseFloat(sNode.longitude)],
-                [parseFloat(tNode.latitude), parseFloat(tNode.longitude)],
-              ]}
+              positions={positions}
               pathOptions={{
                 color,
                 weight,
@@ -586,7 +622,10 @@ export default function InteractiveVillageMap({
                     <p style={{ margin: '2px 0' }}><strong>Type:</strong> {edge.infrastructure_type || edge.type || 'Road'}</p>
                     <p style={{ margin: '2px 0' }}><strong>Surface:</strong> {edge.surface_type || 'Gravel'}</p>
                     <p style={{ margin: '2px 0' }}><strong>Length:</strong> {edge.length_meters ? `${edge.length_meters}m` : 'Estimated'}</p>
+                    <p style={{ margin: '2px 0' }}><strong>Travel Time:</strong> {edge.travel_minutes ? `${edge.travel_minutes} min` : 'Calculated'}</p>
                     <p style={{ margin: '2px 0' }}><strong>Condition:</strong> <span style={{ color, fontWeight: 'bold' }}>{edge.status || 'Operational'}</span></p>
+                    <p style={{ margin: '2px 0' }}><strong>Source:</strong> {edge.provenance_source || edge.source || 'OpenStreetMap'} (© OpenStreetMap)</p>
+                    <p style={{ margin: '2px 0' }}><strong>Verification:</strong> <span style={{ color: edge.verification_status === 'verified' ? '#166534' : '#b45309', fontWeight: '600' }}>{edge.verification_status || 'imported (unverified)'}</span></p>
                     {edge.notes && <p style={{ margin: '4px 0 0', fontStyle: 'italic', color: '#687c73' }}>{edge.notes}</p>}
                     {onSelectEdge && (
                       <button
@@ -658,6 +697,9 @@ export default function InteractiveVillageMap({
                     {isFacility && (
                       <p style={{ margin: '2px 0' }}><strong>Facility Type:</strong> {nodeType.replace('_', ' ').toUpperCase()}</p>
                     )}
+                    <p style={{ margin: '2px 0' }}><strong>Source:</strong> {node.source || 'OpenStreetMap'} (© OpenStreetMap)</p>
+                    <p style={{ margin: '2px 0' }}><strong>Verification:</strong> <span style={{ color: node.verification_status === 'verified' ? '#166534' : '#b45309', fontWeight: '600' }}>{node.verification_status || 'imported (unverified)'}</span></p>
+                    {node.confidence_score && <p style={{ margin: '2px 0' }}><strong>Confidence:</strong> {node.confidence_score}%</p>}
                     {node.description && <p style={{ margin: '4px 0 0', color: '#687c73' }}>{node.description}</p>}
                     <p style={{ margin: '4px 0 0', fontSize: '10px', color: '#94a3b8' }}>
                       Coordinates: {lat.toFixed(5)}, {lng.toFixed(5)}
