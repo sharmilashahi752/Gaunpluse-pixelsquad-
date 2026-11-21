@@ -1,18 +1,10 @@
-import React, {useState} from 'react';
-import {createRoot} from 'react-dom/client';
-import {LayoutDashboard, MapPinned, TriangleAlert, Network, ClipboardList, MessageSquare, ChartNoAxesColumn, Bot, Building2} from 'lucide-react';
-import './style.css';
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import App from './App';
+import './styles/index.css';
 
-const nav = [
- ['Dashboard',LayoutDashboard],['Village Map',MapPinned],['Issues & Alerts',TriangleAlert],['Simulations',Network],
- ['Action Plans',ClipboardList],['Community Voices',MessageSquare],['Reports & Insights',ChartNoAxesColumn],['AI Agent',Bot],['Village Data Manager',Building2]
-];
-function App(){
- const [page,setPage]=useState('Dashboard');
- const [issue,setIssue]=useState('Bridge B is reported damaged');
- const [messages,setMessages]=useState([{role:'assistant',text:'Namaste! I can explain sample village issues. Live data and AI tools will be connected later.'}]);
- const [question,setQuestion]=useState('');
- const send=()=>{if(!question.trim())return;setMessages(m=>[...m,{role:'user',text:question},{role:'assistant',text:'This is an interface placeholder. In the production app, I will retrieve authorized reports and call the NetworkX simulator before giving an evidence-based answer.'}]);setQuestion('')};
- return <div className="app"><aside className="sidebar"><div className="brand"><div className="symbol">⌂</div><div><h2>GaunPulse</h2><small>The Village That Speaks</small></div></div><p className="side-heading">WORKSPACE</p>{nav.map(([label,Icon])=><button key={label} className={'nav '+(page===label?'active':'')} onClick={()=>setPage(label)}><Icon size={18}/>{label}</button>)}<p className="side-bottom">One village. Better decisions.</p></aside><main><header><div><h1>{page==='Dashboard'?'Welcome to GaunPulse':page}</h1><p>Helping communities act on what matters most.</p></div><div className="profile">Demo village · Ward office</div></header><section className="banner"><div><span>GAUNPULSE V1.0 · DESIGN REFERENCE</span><h2>The Village That Speaks</h2><p>Report. Understand. Prioritize. Act.</p></div><div className="hill">⛰️ 🏡 🌳</div></section><section className="stats">{[['Monitored Villages','1'],['Active Issues','3'],['Critical Disruptions','1'],['Affected Households','20']].map(([k,v])=><article key={k} className="stat"><small>{k}</small><strong>{v}</strong><span>Fictional demonstration data</span></article>)}</section>{page==='Dashboard'?<section className="columns"><article className="panel"><h3>Village Infrastructure Map</h3><p>Map layout placeholder — connect React Leaflet in Phase 2.</p><div className="map"><span className="pin one">⌂ Settlement A</span><span className="pin two">⚠ Bridge B</span><span className="pin three">✚ Health Post</span><span className="pin four">⌂ Settlement B</span></div></article><div className="stack"><article className="panel"><h3>Infrastructure Impact Simulation</h3><p>Bridge B closure can be tested with the included Python service.</p><button className="primary" onClick={()=>setPage('Simulations')}>Open Simulator →</button></article><article className="panel"><h3>GaunPulse AI Agent</h3><p>Future: explain verified reports and call NetworkX tools.</p><button className="primary" onClick={()=>setPage('AI Agent')}>Open Agent →</button></article></div></section>:page==='AI Agent'?<article className="panel wide"><h3>GaunPulse AI Agent</h3><p>UI demo only. This is not connected to a model or database.</p><div className="chat">{messages.map((m,i)=><div key={i} className={'bubble '+m.role}>{m.text}</div>)}</div><div className="send"><input value={question} onChange={e=>setQuestion(e.target.value)} onKeyDown={e=>e.key==='Enter'&&send()} placeholder="Ask about bridge closures..."/><button className="primary" onClick={send}>Send</button></div></article>:page==='Issues & Alerts'?<article className="panel wide"><h3>Report Infrastructure Issue</h3><p>Fictional report entry. Data is held only in browser memory.</p><label>Issue description</label><textarea value={issue} onChange={e=>setIssue(e.target.value)}/><button className="primary" onClick={()=>alert('Demo only: connect Laravel POST /api/issues to save records.')}>Submit report</button></article>:<article className="panel wide"><h3>{page}</h3><p>This page is reserved for the {page.toLowerCase()} module. Next, connect Laravel APIs and the appropriate map, form, graph, or chart components.</p>{page==='Simulations'&&<div><p>Sample Python endpoint: <code>POST http://127.0.0.1:8001/simulate</code></p><p>Use the sample-data/demo-network.json network with failed_edge_id <code>bridge_b</code>.</p></div>}</article>}<footer>GaunPulse · Demo data only · No operational safety decisions</footer></main></div>
-}
-createRoot(document.getElementById('root')).render(<App/>);
+createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);
