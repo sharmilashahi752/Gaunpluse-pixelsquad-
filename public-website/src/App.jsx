@@ -8,6 +8,7 @@ import LoadingSpinner from './components/ui/LoadingSpinner';
 const MapPage = lazy(() => import('./pages/MapPage'));
 const DemoPage = lazy(() => import('./pages/DemoPage'));
 const IssuesPage = lazy(() => import('./pages/IssuesPage'));
+const IssueDetailPage = lazy(() => import('./pages/IssueDetailPage'));
 const NoticesPage = lazy(() => import('./pages/NoticesPage'));
 const InsightsPage = lazy(() => import('./pages/InsightsPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
@@ -44,6 +45,14 @@ export function App() {
           element={
             <Suspense fallback={<LoadingSpinner message="Loading Community Issues..." />}>
               <IssuesPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="issues/:id"
+          element={
+            <Suspense fallback={<LoadingSpinner message="Loading Issue Details..." />}>
+              <IssueDetailPage />
             </Suspense>
           }
         />

@@ -1,8 +1,6 @@
 import React from 'react';
 import {
   ArrowRight,
-  Check,
-  Clock,
 } from 'lucide-react';
 import Container from '../components/ui/Container';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -38,22 +36,18 @@ export function AboutPage() {
   const implementedTech = [
     {
       name: 'React 19 & Tailwind CSS',
-      role: 'Interface & Design System',
       desc: 'A responsive, accessible frontend built with custom Nature + Modern design tokens tailored for rural civic technology.',
     },
     {
       name: 'Leaflet & OpenStreetMap',
-      role: 'Spatial Visualization',
       desc: 'Interactive geographic maps displaying roads, bridges, hamlets, schools, and health posts with OpenStreetMap cartography.',
     },
     {
       name: 'Client-Side Graph Engine',
-      role: 'Deterministic Simulation',
       desc: 'Native JavaScript implementation of Dijkstra’s shortest-path algorithm for instantaneous failure scenario calculations.',
     },
     {
       name: 'Recharts Analytics',
-      role: 'Public Insights',
       desc: 'Approachable, responsive visualizations illustrating issue categories, verification statuses, and severity breakdowns.',
     },
   ];
@@ -62,17 +56,14 @@ export function AboutPage() {
   const proposedTech = [
     {
       name: 'Laravel & MySQL Backend',
-      role: 'Proposed Municipal Service',
       desc: 'Planned relational database, role-based ward authentication, audit logs, and formal work order management.',
     },
     {
       name: 'Python & NetworkX Service',
-      role: 'Advanced Topography Engine',
       desc: 'Planned geospatial analysis server for multi-ward elevation models, monsoon slope stability, and complex detour calculations.',
     },
     {
       name: 'AI Explanation Service',
-      role: 'Decision-Support Layer',
       desc: 'Future grounded LLM integration designed to generate plain-language vernacular community summaries from verified field telemetry.',
     },
   ];
@@ -182,46 +173,46 @@ export function AboutPage() {
               </h2>
             </div>
 
-            {/* Two-Column Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-stretch">
-              {/* Left Column: Stacked Mission & Vision Cards (6 cols) */}
-              <div className="lg:col-span-6 flex flex-col gap-6">
+            {/* Two-Column Layout (50% / 50% with ~36px gap, vertically centered) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-[36px] items-center">
+              {/* Left Column: Stacked Compact Mission & Vision Cards */}
+              <div className="flex flex-col gap-4 sm:gap-[18px]">
                 {/* Mission Card */}
-                <div className="flex-1 bg-white border border-[#E5E7EB] rounded-[12px] p-6 sm:p-8 flex flex-col justify-center text-left">
-                  <span className="text-[11px] font-bold tracking-[0.14em] uppercase text-[#E3AD58] block mb-2">
+                <div className="bg-white border border-[#E5E7EB] rounded-[12px] px-7 sm:px-8 py-6 sm:py-[26px] text-left">
+                  <span className="text-[11px] font-bold tracking-[0.14em] uppercase text-[#E3AD58] block mb-1.5">
                     OUR PURPOSE
                   </span>
-                  <h3 className="text-xl sm:text-2xl font-extrabold text-[#173D32] mb-3">
+                  <h3 className="text-xl sm:text-[24px] font-bold text-[#173D32] mb-2.5 leading-snug">
                     Mission
                   </h3>
-                  <p className="text-sm sm:text-[15px] text-[#1B2923]/80 leading-relaxed font-normal">
+                  <p className="text-[15px] sm:text-[16px] text-[#1B2923]/80 leading-[1.6] font-normal">
                     Help communities identify infrastructure problems, understand their wider impact,
                     and support transparent, evidence-informed local decisions.
                   </p>
                 </div>
 
                 {/* Vision Card */}
-                <div className="flex-1 bg-white border border-[#E5E7EB] rounded-[12px] p-6 sm:p-8 flex flex-col justify-center text-left">
-                  <span className="text-[11px] font-bold tracking-[0.14em] uppercase text-[#E3AD58] block mb-2">
+                <div className="bg-white border border-[#E5E7EB] rounded-[12px] px-7 sm:px-8 py-6 sm:py-[26px] text-left">
+                  <span className="text-[11px] font-bold tracking-[0.14em] uppercase text-[#E3AD58] block mb-1.5">
                     LOOKING AHEAD
                   </span>
-                  <h3 className="text-xl sm:text-2xl font-extrabold text-[#173D32] mb-3">
+                  <h3 className="text-xl sm:text-[24px] font-bold text-[#173D32] mb-2.5 leading-snug">
                     Vision
                   </h3>
-                  <p className="text-sm sm:text-[15px] text-[#1B2923]/80 leading-relaxed font-normal">
+                  <p className="text-[15px] sm:text-[16px] text-[#1B2923]/80 leading-[1.6] font-normal">
                     A future where rural communities can access reliable infrastructure information
                     and participate in decisions that improve connectivity, safety, and everyday life.
                   </p>
                 </div>
               </div>
 
-              {/* Right Column: Visual Image Aligning with Blocks (6 cols) */}
-              <div className="lg:col-span-6">
-                <div className="w-full h-full min-h-[340px] sm:min-h-[400px] rounded-[12px] overflow-hidden bg-stone-100 border border-[#E5E7EB] shadow-xs">
+              {/* Right Column: Village Photograph (Compact Height ~420-440px desktop, ~280-320px mobile) */}
+              <div>
+                <div className="w-full h-[280px] sm:h-[320px] lg:h-[430px] rounded-[12px] overflow-hidden bg-stone-100 border border-[#E5E7EB] shadow-xs">
                   <img
                     src="/images/about/village.jpg"
                     alt="Rural village pathway connecting community houses and terraces"
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover object-center"
                     loading="lazy"
                   />
                 </div>
@@ -263,7 +254,7 @@ export function AboutPage() {
       </section>
 
       {/* =========================================================================
-          SECTION FIVE — Technology Architecture (Clean Professional Comparison)
+          SECTION FIVE — Technology Architecture (Directory-Style Information Rows)
           ========================================================================= */}
       <section className="py-16 sm:py-20 lg:py-24 border-b border-[#E5E7EB]/80">
         <Container>
@@ -283,34 +274,25 @@ export function AboutPage() {
             </div>
 
             {/* Two-Column Comparison */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
               {/* Column 1: Implemented Prototype */}
-              <div className="space-y-4 text-left">
-                <div className="flex items-center gap-2 pb-3 border-b border-[#E5E7EB]">
-                  <Check className="w-4 h-4 text-[#42866A] shrink-0" />
-                  <div>
-                    <h3 className="text-base font-bold text-[#173D32]">
-                      Implemented Prototype
-                    </h3>
-                    <span className="text-[12px] text-[#42866A] font-medium">
-                      Operational in the live client demonstration
-                    </span>
-                  </div>
+              <div className="text-left">
+                <div className="pb-3 border-b border-[#E5E7EB]">
+                  <h3 className="text-[17px] sm:text-[18px] font-bold text-[#173D32]">
+                    Implemented Prototype
+                  </h3>
                 </div>
 
-                <div className="space-y-3">
+                <div className="divide-y divide-[#E5E7EB] border-b border-[#E5E7EB]">
                   {implementedTech.map((tech, idx) => (
                     <div
                       key={idx}
-                      className="p-4 rounded-[10px] bg-white border border-[#E5E7EB] space-y-1.5"
+                      className={`py-4 px-3 sm:px-4 ${idx % 2 === 1 ? 'bg-[#F7F8FA]' : 'bg-white'}`}
                     >
-                      <div className="flex flex-wrap items-baseline justify-between gap-1">
-                        <h4 className="text-[14px] font-bold text-[#173D32]">{tech.name}</h4>
-                        <span className="text-[11px] font-semibold text-[#42866A]">
-                          {tech.role}
-                        </span>
-                      </div>
-                      <p className="text-xs text-[#1B2923]/75 leading-relaxed font-normal">
+                      <h4 className="text-[16px] sm:text-[17px] font-bold text-[#173D32] leading-snug">
+                        {tech.name}
+                      </h4>
+                      <p className="text-[14px] sm:text-[15px] text-[#4A5568] leading-[1.6] mt-1.5 font-normal">
                         {tech.desc}
                       </p>
                     </div>
@@ -319,32 +301,23 @@ export function AboutPage() {
               </div>
 
               {/* Column 2: Proposed Backend & AI Architecture */}
-              <div className="space-y-4 text-left">
-                <div className="flex items-center gap-2 pb-3 border-b border-[#E5E7EB]">
-                  <Clock className="w-4 h-4 text-[#E3AD58] shrink-0" />
-                  <div>
-                    <h3 className="text-base font-bold text-[#173D32]">
-                      Proposed Backend & AI Architecture
-                    </h3>
-                    <span className="text-[12px] text-[#8F5E16] font-medium">
-                      Planned horizon for municipal governance
-                    </span>
-                  </div>
+              <div className="text-left">
+                <div className="pb-3 border-b border-[#E5E7EB]">
+                  <h3 className="text-[17px] sm:text-[18px] font-bold text-[#173D32]">
+                    Proposed Backend & AI Architecture
+                  </h3>
                 </div>
 
-                <div className="space-y-3">
+                <div className="divide-y divide-[#E5E7EB] border-b border-[#E5E7EB]">
                   {proposedTech.map((tech, idx) => (
                     <div
                       key={idx}
-                      className="p-4 rounded-[10px] bg-[#F7F8F8] border border-[#E5E7EB] space-y-1.5"
+                      className={`py-4 px-3 sm:px-4 ${idx % 2 === 1 ? 'bg-[#F7F8FA]' : 'bg-white'}`}
                     >
-                      <div className="flex flex-wrap items-baseline justify-between gap-1">
-                        <h4 className="text-[14px] font-bold text-[#173D32]">{tech.name}</h4>
-                        <span className="text-[11px] font-semibold text-[#8F5E16]">
-                          {tech.role}
-                        </span>
-                      </div>
-                      <p className="text-xs text-[#1B2923]/75 leading-relaxed font-normal">
+                      <h4 className="text-[16px] sm:text-[17px] font-bold text-[#173D32] leading-snug">
+                        {tech.name}
+                      </h4>
+                      <p className="text-[14px] sm:text-[15px] text-[#4A5568] leading-[1.6] mt-1.5 font-normal">
                         {tech.desc}
                       </p>
                     </div>
