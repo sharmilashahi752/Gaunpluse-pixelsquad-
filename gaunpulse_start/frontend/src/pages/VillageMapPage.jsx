@@ -29,11 +29,12 @@ import {
 } from 'lucide-react';
 import InteractiveVillageMap from '../components/InteractiveVillageMap';
 import { Card, CardHeader, DemoLabel, FeatureNotice, PageIntro, StatusBadge } from '../components/ui';
+import { useVillageSelection } from '../context/VillageSelectionContext';
 
 export default function VillageMapPage() {
   // Saved Villages & Active Selection
   const [villages, setVillages] = useState([]);
-  const [selectedVillageId, setSelectedVillageId] = useState(null);
+  const { selectedVillageId, setSelectedVillageId } = useVillageSelection();
   const [villageData, setVillageData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [isNationwideView, setIsNationwideView] = useState(false);

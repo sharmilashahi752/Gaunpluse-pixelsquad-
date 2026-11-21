@@ -8,6 +8,7 @@ use App\Models\Facility;
 use App\Models\Node;
 use App\Models\SettlementGroup;
 use App\Models\Village;
+use App\Services\SimulationNetworkService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -419,17 +420,25 @@ class VillageController extends Controller
     /**
      * Full infrastructure network graph for simulator, GIS & data manager.
      */
-    public function network(Village $village)
+    public function network(Village $village, SimulationNetworkService $networks)
     {
+        $village->loadMissing(['nodes', 'edges.source', 'edges.target', 'facilities.node', 'settlements', 'issues']);
+
         return response()->json([
             'village' => $village->loadCount(['settlements', 'issues', 'nodes', 'edges', 'facilities']),
-            'nodes' => $village->nodes()->get(),
-            'edges' => $village->edges()->with(['source', 'target'])->get(),
-            'facilities' => $village->facilities()->with('node')->get(),
-            'settlements' => $village->settlements()->with('node')->get(),
-            'issues' => $village->issues()->latest()->get(),
-            'disclaimer' => 'Rural infrastructure graph records verified by municipal GIS directory.',
+            'nodes' => $village->nodes,
+            'edges' => $village->edges,
+            'facilities' => $village->facilities,
+            'settlements' => $village->settlements,
+            'issues' => $village->issues->sortByDesc('created_at')->values(),
+            'readiness' => $networks->readiness($village),
+            'disclaimer' => 'Simulation confidence follows the graph readiness and verification level returned with this response.',
         ]);
+    }
+
+    public function networkReadiness(Village $village, SimulationNetworkService $networks)
+    {
+        return response()->json($networks->readiness($village));
     }
 
     /**

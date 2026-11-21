@@ -1,32 +1,123 @@
+import json
 from typing import Any, Union
+
 import networkx as nx
 
 
 class GraphValidationError(ValueError):
     """Raised when infrastructure data fails graph integrity checks."""
-    pass
+
+
+FACILITY_NODE_TYPES = {
+    "school",
+    "college",
+    "health_post",
+    "health",
+    "hospital",
+    "clinic",
+    "water_point",
+    "water",
+    "facility",
+}
+
+
+def _as_dict(record: Union[dict, Any]) -> dict[str, Any]:
+    return record if isinstance(record, dict) else record.model_dump()
+
+
+def _positive_number(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number > 0 else None
+
+
+def _edge_length_meters(edge: dict[str, Any]) -> float | None:
+    length = _positive_number(edge.get("length_meters"))
+    if length is not None:
+        return length
+    distance = _positive_number(edge.get("distance"))
+    return distance * 1000.0 if distance is not None else None
+
+
+def _resolve_routing_metric(edges: list[dict[str, Any]], requested: str | None) -> tuple[str, str]:
+    if not edges:
+        raise GraphValidationError("Infrastructure network contains no edges.")
+
+    for edge in edges:
+        raw_minutes = edge.get("minutes") if edge.get("minutes") is not None else edge.get("travel_minutes")
+        if raw_minutes is not None:
+            try:
+                numeric_minutes = float(raw_minutes)
+            except (TypeError, ValueError):
+                numeric_minutes = None
+            if numeric_minutes is not None and numeric_minutes < 0:
+                raise GraphValidationError(
+                    f"Edge {edge.get('id')} has negative travel time: {raw_minutes}"
+                )
+
+    has_all_times = all(
+        _positive_number(edge.get("minutes") if edge.get("minutes") is not None else edge.get("travel_minutes"))
+        is not None
+        for edge in edges
+    )
+    has_all_lengths = all(_edge_length_meters(edge) is not None for edge in edges)
+
+    if requested == "travel_time_minutes" and not has_all_times:
+        raise GraphValidationError("Travel-time routing was requested, but one or more edges have no positive travel time.")
+    if requested == "distance_meters" and not has_all_lengths:
+        raise GraphValidationError("Distance routing was requested, but one or more edges have no positive mapped length.")
+    if requested not in (None, "travel_time_minutes", "distance_meters"):
+        raise GraphValidationError(f"Unsupported routing metric: '{requested}'")
+
+    if requested == "travel_time_minutes" or (requested is None and has_all_times):
+        return "travel_time_minutes", "minutes"
+    if requested == "distance_meters" or (requested is None and has_all_lengths):
+        return "distance_meters", "meters"
+
+    raise GraphValidationError(
+        "Every edge must have a positive travel-time weight or every edge must have a positive mapped length."
+    )
+
+
+def _parse_geometry(value: Any) -> list[list[float]] | None:
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError:
+            return None
+    if not isinstance(value, list) or len(value) < 2:
+        return None
+    if not all(isinstance(point, list) and len(point) >= 2 for point in value):
+        return None
+    try:
+        return [[float(point[0]), float(point[1])] for point in value]
+    except (TypeError, ValueError):
+        return None
 
 
 def build_network_graph(
     nodes: list[Union[dict, Any]],
     edges: list[Union[dict, Any]],
-    facilities: list[Union[dict, Any]] = None,
-    settlements: list[Union[dict, Any]] = None,
-) -> tuple[nx.Graph, dict[str, Any]]:
-    """
-    Constructs a validated NetworkX undirected graph from infrastructure records.
-    Returns (nx.Graph, metadata_dict).
-    """
+    facilities: list[Union[dict, Any]] | None = None,
+    settlements: list[Union[dict, Any]] | None = None,
+    routing_metric: str | None = None,
+) -> tuple[nx.MultiGraph | nx.MultiDiGraph, dict[str, Any]]:
+    """Build a validated graph without inventing missing distances or travel times."""
     if not nodes:
         raise GraphValidationError("Infrastructure network contains no nodes.")
 
-    graph = nx.MultiGraph()
-    node_id_set = set()
-    nodes_by_key = {}  # Map int/str ID and code to canonical node_id
+    raw_edges = [_as_dict(edge) for edge in edges]
+    uses_direction = any(bool(edge.get("is_one_way") or edge.get("oneway")) for edge in raw_edges)
+    graph: nx.MultiGraph | nx.MultiDiGraph = nx.MultiDiGraph() if uses_direction else nx.MultiGraph()
+    node_id_set: set[str] = set()
+    nodes_by_key: dict[str, str] = {}
 
-    # 1. Process and validate nodes
     for raw_node in nodes:
-        node = raw_node if isinstance(raw_node, dict) else raw_node.model_dump()
+        node = _as_dict(raw_node)
         raw_id = node.get("id")
         if raw_id is None:
             raise GraphValidationError("Encountered node without an 'id' attribute.")
@@ -40,11 +131,8 @@ def build_network_graph(
         if node.get("node_code"):
             nodes_by_key[str(node["node_code"])] = canonical_id
 
-        # Determine node type & households
-        node_type = (node.get("type") or node.get("node_type") or "junction").lower()
-        households = node.get("households") or 0
-        population = node.get("population") or 0
-
+        node_type = str(node.get("node_type") or node.get("type") or "junction").lower()
+        households = node.get("households")
         graph.add_node(
             canonical_id,
             raw_id=raw_id,
@@ -53,99 +141,96 @@ def build_network_graph(
             type=node_type,
             latitude=node.get("latitude"),
             longitude=node.get("longitude"),
-            households=households,
-            population=population,
+            households=int(households) if households is not None else None,
+            population=node.get("population"),
             settlement_group_id=node.get("settlement_group_id"),
             description=node.get("description"),
-            is_settlement=(node_type == "settlement" or households > 0),
-            is_facility=(node_type in ("school", "health_post", "facility", "water_point")),
-            facility_type=node_type if node_type in ("school", "health_post", "water_point") else None,
+            is_settlement=node_type == "settlement" or node.get("settlement_group_id") is not None,
+            is_facility=node_type in FACILITY_NODE_TYPES,
+            facility_type=node_type if node_type in FACILITY_NODE_TYPES else None,
         )
 
-    # 2. Attach external settlement groups if provided
+    for edge in raw_edges:
+        edge_id = edge.get("id")
+        source = edge.get("source") if edge.get("source") is not None else edge.get("from")
+        target = edge.get("target") if edge.get("target") is not None else edge.get("to")
+        if isinstance(source, dict):
+            source = source.get("id")
+        if isinstance(target, dict):
+            target = target.get("id")
+        source = source if source is not None else edge.get("source_node_id")
+        target = target if target is not None else edge.get("target_node_id")
+        if source is None or target is None:
+            raise GraphValidationError(f"Edge {edge_id} missing source or target endpoint.")
+        if nodes_by_key.get(str(source)) is None:
+            raise GraphValidationError(f"Edge {edge_id} references nonexistent source node '{source}'")
+        if nodes_by_key.get(str(target)) is None:
+            raise GraphValidationError(f"Edge {edge_id} references nonexistent target node '{target}'")
+
+    resolved_metric, weight_unit = _resolve_routing_metric(raw_edges, routing_metric)
+
     if settlements:
-        for raw_s in settlements:
-            s = raw_s if isinstance(raw_s, dict) else raw_s.model_dump()
-            s_id = s.get("id")
-            s_node_id = s.get("node_id")
-            matched_node_id = None
+        for raw_settlement in settlements:
+            settlement = _as_dict(raw_settlement)
+            settlement_id = settlement.get("id")
+            node_id = settlement.get("node_id")
+            matched_node_id = str(node_id) if node_id is not None and str(node_id) in node_id_set else None
+            if matched_node_id is None and settlement_id is not None:
+                matched_node_id = next(
+                    (
+                        candidate_id
+                        for candidate_id, data in graph.nodes(data=True)
+                        if str(data.get("settlement_group_id")) == str(settlement_id)
+                    ),
+                    None,
+                )
 
-            if s_node_id is not None and str(s_node_id) in node_id_set:
-                matched_node_id = str(s_node_id)
-            else:
-                # Find by settlement_group_id on node
-                for n_id, n_data in graph.nodes(data=True):
-                    if n_data.get("settlement_group_id") == s_id:
-                        matched_node_id = n_id
-                        break
-                if not matched_node_id:
-                    # Match by name / substring
-                    for n_id, n_data in graph.nodes(data=True):
-                        if s.get("name") and s["name"].lower() in n_data.get("name", "").lower():
-                            matched_node_id = n_id
-                            break
-
-            if matched_node_id:
+            if matched_node_id is not None:
                 graph.nodes[matched_node_id]["is_settlement"] = True
-                graph.nodes[matched_node_id]["settlement_name"] = s.get("name")
-                graph.nodes[matched_node_id]["local_name"] = s.get("local_name")
-                if s.get("households"):
-                    graph.nodes[matched_node_id]["households"] = s["households"]
-                if s.get("population"):
-                    graph.nodes[matched_node_id]["population"] = s["population"]
+                graph.nodes[matched_node_id]["settlement_name"] = settlement.get("name")
+                graph.nodes[matched_node_id]["local_name"] = settlement.get("local_name")
+                graph.nodes[matched_node_id]["households"] = settlement.get("households")
+                graph.nodes[matched_node_id]["population"] = settlement.get("population")
 
-    # 3. Attach external facilities if provided
     if facilities:
-        for raw_f in facilities:
-            f = raw_f if isinstance(raw_f, dict) else raw_f.model_dump()
-            f_node_id = f.get("node_id")
-            matched_node_id = None
+        for raw_facility in facilities:
+            facility = _as_dict(raw_facility)
+            node_id = facility.get("node_id")
+            if node_id is None or str(node_id) not in node_id_set:
+                continue
+            matched_node_id = str(node_id)
+            graph.nodes[matched_node_id]["is_facility"] = True
+            graph.nodes[matched_node_id]["facility_name"] = facility.get("name")
+            graph.nodes[matched_node_id]["facility_type"] = str(
+                facility.get("facility_type") or facility.get("type") or "facility"
+            ).lower()
 
-            if f_node_id is not None and str(f_node_id) in node_id_set:
-                matched_node_id = str(f_node_id)
-            else:
-                # Find matching facility node by type/name
-                for n_id, n_data in graph.nodes(data=True):
-                    if n_data.get("node_code") == f.get("facility_type") or n_data.get("type") == "facility":
-                        matched_node_id = n_id
-                        break
+    edge_by_id: dict[str, dict[str, Any]] = {}
+    edges_info_list: list[dict[str, Any]] = []
+    canonical_edge_ids: set[str] = set()
 
-            if matched_node_id:
-                graph.nodes[matched_node_id]["is_facility"] = True
-                graph.nodes[matched_node_id]["facility_name"] = f.get("name")
-                f_type = (f.get("facility_type") or f.get("type") or "facility").lower()
-                graph.nodes[matched_node_id]["facility_type"] = f_type
-
-    # 4. Process and validate edges
-    edge_by_id = {}
-    edges_info_list = []
-
-    for raw_edge in edges:
-        edge = raw_edge if isinstance(raw_edge, dict) else raw_edge.model_dump()
+    for edge in raw_edges:
         raw_edge_id = edge.get("id")
         if raw_edge_id is None:
             raise GraphValidationError("Encountered edge without an 'id' attribute.")
-
         canonical_edge_id = str(raw_edge_id)
+        if canonical_edge_id in canonical_edge_ids:
+            raise GraphValidationError(f"Duplicate edge identifier: {canonical_edge_id}")
+        canonical_edge_ids.add(canonical_edge_id)
+
         source_raw = edge.get("source") if edge.get("source") is not None else edge.get("from")
+        target_raw = edge.get("target") if edge.get("target") is not None else edge.get("to")
         if isinstance(source_raw, dict):
             source_raw = source_raw.get("id")
-        if source_raw is None:
-            source_raw = edge.get("source_node_id")
-
-        target_raw = edge.get("target") if edge.get("target") is not None else edge.get("to")
         if isinstance(target_raw, dict):
             target_raw = target_raw.get("id")
-        if target_raw is None:
-            target_raw = edge.get("target_node_id")
-
+        source_raw = source_raw if source_raw is not None else edge.get("source_node_id")
+        target_raw = target_raw if target_raw is not None else edge.get("target_node_id")
         if source_raw is None or target_raw is None:
             raise GraphValidationError(f"Edge {canonical_edge_id} missing source or target endpoint.")
 
-        # Resolve to canonical node ID
         source_id = nodes_by_key.get(str(source_raw))
         target_id = nodes_by_key.get(str(target_raw))
-
         if source_id is None:
             raise GraphValidationError(
                 f"Edge {canonical_edge_id} references nonexistent source node '{source_raw}'"
@@ -155,94 +240,77 @@ def build_network_graph(
                 f"Edge {canonical_edge_id} references nonexistent target node '{target_raw}'"
             )
         if source_id == target_id:
-            # Self-loops in infrastructure
-            continue
+            raise GraphValidationError(f"Edge {canonical_edge_id} is a self-loop and is not routable.")
 
-        # Calculate travel time in minutes
-        minutes = edge.get("minutes") if edge.get("minutes") is not None else edge.get("travel_minutes")
-        if minutes is not None:
-            try:
-                minutes = float(minutes)
-            except (ValueError, TypeError):
-                minutes = None
-
-        if minutes is not None and minutes < 0:
-            raise GraphValidationError(f"Edge {canonical_edge_id} has negative travel time: {minutes}")
-
-        if minutes is None or minutes <= 0:
-            # Estimate from length or distance
-            length_m = edge.get("length_meters")
-            distance = edge.get("distance")
-            if length_m is not None and float(length_m) > 0:
-                meters = float(length_m)
-            elif distance is not None and float(distance) > 0:
-                # distance in km
-                dist_val = float(distance)
-                meters = dist_val * 1000.0 if dist_val < 50 else dist_val
-            else:
-                meters = 500.0  # reasonable default rural link length
-
-            # Rural mountain walking speed ~ 60 meters / minute (~3.6 km/h)
-            infra_type = str(edge.get("type") or edge.get("infrastructure_type") or "road").lower()
-            speed_mpm = 50.0 if "trail" in infra_type or "footpath" in infra_type else 65.0
-            minutes = round(max(1.0, meters / speed_mpm), 1)
+        minutes = _positive_number(
+            edge.get("minutes") if edge.get("minutes") is not None else edge.get("travel_minutes")
+        )
+        length_meters = _edge_length_meters(edge)
+        weight = minutes if resolved_metric == "travel_time_minutes" else length_meters
+        if weight is None:
+            raise GraphValidationError(f"Edge {canonical_edge_id} has no usable {resolved_metric} weight.")
 
         edge_data = {
             "id": canonical_edge_id,
             "raw_id": raw_edge_id,
             "edge_code": edge.get("edge_code") or canonical_edge_id,
             "name": edge.get("name") or f"Edge {canonical_edge_id}",
-            "type": edge.get("type") or edge.get("infrastructure_type") or "road",
-            "surface_type": edge.get("surface_type") or "gravel",
+            "type": edge.get("infrastructure_type") or edge.get("type") or "road",
+            "surface_type": edge.get("surface_type"),
             "status": edge.get("status") or "operational",
             "source_id": source_id,
             "target_id": target_id,
-            "minutes": float(minutes),
-            "length_meters": edge.get("length_meters"),
+            "minutes": minutes,
+            "length_meters": length_meters,
+            "weight": float(weight),
+            "geometry": _parse_geometry(edge.get("geometry")),
             "is_critical": bool(edge.get("is_critical", False)),
+            "is_one_way": bool(edge.get("is_one_way") or edge.get("oneway")),
             "notes": edge.get("notes"),
         }
-
-        # Store in mapping
         edge_by_id[canonical_edge_id] = edge_data
         if edge.get("edge_code"):
             edge_by_id[str(edge["edge_code"])] = edge_data
-
         edges_info_list.append(edge_data)
 
-        # Add to NetworkX MultiGraph with unique edge_id key
-        graph.add_edge(
-            source_id,
-            target_id,
-            key=canonical_edge_id,
-            edge_id=canonical_edge_id,
-            edge_code=edge.get("edge_code") or canonical_edge_id,
-            name=edge_data["name"],
-            minutes=float(minutes),
-            type=edge_data["type"],
-            status=edge_data["status"],
-            is_critical=edge_data["is_critical"],
-        )
+        attributes = {
+            "edge_id": canonical_edge_id,
+            "edge_code": edge_data["edge_code"],
+            "name": edge_data["name"],
+            "weight": float(weight),
+            "minutes": minutes,
+            "length_meters": length_meters,
+            "type": edge_data["type"],
+            "status": edge_data["status"],
+            "geometry": edge_data["geometry"],
+            "is_critical": edge_data["is_critical"],
+        }
+        graph.add_edge(source_id, target_id, key=canonical_edge_id, **attributes)
+        if uses_direction and not edge_data["is_one_way"]:
+            graph.add_edge(target_id, source_id, key=f"{canonical_edge_id}:reverse", **attributes)
 
-    # Compile settlements and facilities metadata
     settlement_nodes = [
-        {"id": n_id, **data}
-        for n_id, data in graph.nodes(data=True)
-        if data.get("is_settlement") or data.get("type") == "settlement"
+        {"id": node_id, **data}
+        for node_id, data in graph.nodes(data=True)
+        if data.get("is_settlement")
     ]
-
     facility_nodes = [
-        {"id": n_id, **data}
-        for n_id, data in graph.nodes(data=True)
-        if data.get("is_facility") or data.get("type") in ("school", "health_post", "water_point", "facility")
+        {"id": node_id, **data}
+        for node_id, data in graph.nodes(data=True)
+        if data.get("is_facility")
     ]
+    if not settlement_nodes:
+        raise GraphValidationError("Infrastructure graph has no connected settlement access nodes.")
+    if not facility_nodes:
+        raise GraphValidationError("Infrastructure graph has no connected essential facility access nodes.")
 
-    metadata = {
+    return graph, {
         "nodes_by_key": nodes_by_key,
         "edge_by_id": edge_by_id,
         "edges_info_list": edges_info_list,
         "settlement_nodes": settlement_nodes,
         "facility_nodes": facility_nodes,
+        "routing_metric": resolved_metric,
+        "weight_unit": weight_unit,
+        "is_directed": uses_direction,
     }
-
-    return graph, metadata

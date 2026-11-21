@@ -1,0 +1,11 @@
+{
+    "mcpServers": {
+        "laravel-boost": {
+            "command": "C:\\ServBay\\packages\\php\\current\\php.exe",
+            "args": [
+                "C:\\Users\\User\\OneDrive\\Desktop\\hackthon_gaunpluse\\Gaunpluse-pixelsquad-\\gaunpulse_start\\backend\\artisan",
+                "boost:mcp"
+            ]
+        }
+    }
+}

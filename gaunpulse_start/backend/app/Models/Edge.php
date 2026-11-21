@@ -51,7 +51,7 @@ class Edge extends Model
         return $this->attributes['infrastructure_type'] ?? $this->attributes['type'] ?? 'road';
     }
 
-    public function getLengthMetersAttribute()
+    public function getLengthMetersAttribute(): ?float
     {
         if (isset($this->attributes['length_meters'])) {
             return (float) $this->attributes['length_meters'];
@@ -59,6 +59,6 @@ class Edge extends Model
         if (isset($this->attributes['distance'])) {
             return (float) ($this->attributes['distance'] * 1000);
         }
-        return 100.0;
+        return null;
     }
 }

@@ -75,6 +75,10 @@ def simulate_endpoint(payload: Union[SimulationRequest, dict[str, Any]]):
             facilities=req.facilities,
             settlements=req.settlements,
             failed_edge_id=req.failed_edge_id,
+            baseline_blocked_edge_ids=req.baseline_blocked_edge_ids,
+            routing_metric=req.routing_metric,
+            data_quality=req.data_quality,
+            graph_version=req.graph_version,
         )
         return result
     except GraphValidationError as exc:
@@ -106,6 +110,9 @@ def compare_repairs_endpoint(payload: RepairComparisonRequest):
             scenario_b_repair_ids=payload.scenario_b.repair_edge_ids,
             facilities=payload.facilities,
             settlements=payload.settlements,
+            routing_metric=payload.routing_metric,
+            data_quality=payload.data_quality,
+            graph_version=payload.graph_version,
         )
         return result
     except GraphValidationError as exc:
@@ -153,4 +160,3 @@ async def ai_insights_post_endpoint(payload: dict[str, Any]):
         return await ai_agent.get_insights(village_id=village_id, issues_list=issues_list)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"AI Insights error: {str(exc)}") from exc
-

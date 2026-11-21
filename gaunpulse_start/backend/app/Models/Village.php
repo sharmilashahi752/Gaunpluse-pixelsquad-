@@ -17,6 +17,7 @@ class Village extends Model
             'metadata' => 'array',
             'reference_year' => 'integer',
             'onboarding_step' => 'integer',
+            'last_imported_at' => 'datetime',
         ];
     }
 
@@ -27,19 +28,31 @@ class Village extends Model
     public function issues() { return $this->hasMany(Issue::class); }
     public function auditLogs() { return $this->hasMany(AuditLog::class); }
 
-    public function getCenterLatAttribute() {
-        return (float) ($this->attributes['center_lat'] ?? $this->attributes['latitude'] ?? 27.8635);
+    public function getCenterLatAttribute(): ?float
+    {
+        $value = $this->attributes['center_lat'] ?? $this->attributes['latitude'] ?? null;
+
+        return $value !== null ? (float) $value : null;
     }
 
-    public function getCenterLngAttribute() {
-        return (float) ($this->attributes['center_lng'] ?? $this->attributes['longitude'] ?? 85.5815);
+    public function getCenterLngAttribute(): ?float
+    {
+        $value = $this->attributes['center_lng'] ?? $this->attributes['longitude'] ?? null;
+
+        return $value !== null ? (float) $value : null;
     }
 
-    public function getLatitudeAttribute() {
-        return (float) ($this->attributes['latitude'] ?? $this->attributes['center_lat'] ?? 27.8635);
+    public function getLatitudeAttribute(): ?float
+    {
+        $value = $this->attributes['latitude'] ?? $this->attributes['center_lat'] ?? null;
+
+        return $value !== null ? (float) $value : null;
     }
 
-    public function getLongitudeAttribute() {
-        return (float) ($this->attributes['longitude'] ?? $this->attributes['center_lng'] ?? 85.5815);
+    public function getLongitudeAttribute(): ?float
+    {
+        $value = $this->attributes['longitude'] ?? $this->attributes['center_lng'] ?? null;
+
+        return $value !== null ? (float) $value : null;
     }
 }

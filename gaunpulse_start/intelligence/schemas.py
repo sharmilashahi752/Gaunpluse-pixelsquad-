@@ -11,7 +11,7 @@ class NodeSchema(BaseModel):
     type: Optional[str] = Field(default=None, alias='node_type')
     latitude: Optional[float] = None
     longitude: Optional[float] = None
-    households: Optional[int] = 0
+    households: Optional[int] = None
     population: Optional[int] = None
     settlement_group_id: Optional[int] = None
     description: Optional[str] = None
@@ -64,8 +64,8 @@ class SettlementSchema(BaseModel):
     id: Optional[Union[int, str]] = None
     name: str
     local_name: Optional[str] = None
-    households: Optional[int] = 0
-    population: Optional[int] = 0
+    households: Optional[int] = None
+    population: Optional[int] = None
     node_id: Optional[Union[int, str]] = None
 
 
@@ -75,7 +75,12 @@ class SimulationRequest(BaseModel):
     facilities: Optional[list[Union[FacilitySchema, dict[str, Any]]]] = Field(default_factory=list)
     settlements: Optional[list[Union[SettlementSchema, dict[str, Any]]]] = Field(default_factory=list)
     blocked_edge_ids: Optional[list[Union[int, str]]] = Field(default_factory=list)
+    baseline_blocked_edge_ids: Optional[list[Union[int, str]]] = Field(default_factory=list)
     failed_edge_id: Optional[Union[int, str]] = None
+    routing_metric: Optional[str] = None
+    data_quality: str = 'unverified'
+    graph_version: Optional[str] = None
+    scenario_type: str = 'complete_closure'
     network: Optional[dict[str, Any]] = None
 
     @model_validator(mode='after')
@@ -102,17 +107,29 @@ class AccessComparison(BaseModel):
     facility_type: str
     before_minutes: Optional[float] = None
     after_minutes: Optional[float] = None
+    before_distance_meters: Optional[float] = None
+    after_distance_meters: Optional[float] = None
+    before_value: Optional[float] = None
+    after_value: Optional[float] = None
+    routing_metric: str = 'travel_time_minutes'
+    unit: str = 'minutes'
     travel_time_change: Optional[float] = None
     status: str  # 'unreachable', 'detour', 'unchanged', 'already_disconnected'
     baseline_path: list[Union[int, str]] = Field(default_factory=list)
     alternative_path: Optional[list[Union[int, str]]] = None
+    baseline_edge_ids: list[Union[int, str]] = Field(default_factory=list)
+    alternative_edge_ids: list[Union[int, str]] = Field(default_factory=list)
 
 
 class SimulationResult(BaseModel):
     failed_edge_id: Optional[Union[int, str]] = None
     blocked_edge_ids: list[Union[int, str]]
+    baseline_blocked_edge_ids: list[Union[int, str]] = Field(default_factory=list)
+    already_blocked_edge_ids: list[Union[int, str]] = Field(default_factory=list)
     blocked_edges_info: list[dict[str, Any]] = Field(default_factory=list)
     affected_households: int
+    household_estimate_complete: bool = True
+    affected_settlements_with_unknown_households: int = 0
     newly_disconnected_households: int
     already_disconnected_households: int
     isolated_settlements: list[dict[str, Any]] = Field(default_factory=list)
@@ -120,7 +137,10 @@ class SimulationResult(BaseModel):
     essential_facilities_affected: list[dict[str, Any]] = Field(default_factory=list)
     access_comparisons: list[AccessComparison]
     summary_explanation: str
-    data_quality: str = 'fictional_demo'
+    data_quality: str = 'unverified'
+    graph_version: Optional[str] = None
+    routing_metric: str = 'travel_time_minutes'
+    unit: str = 'minutes'
     calculation_timestamp: str
 
 
@@ -134,6 +154,9 @@ class RepairComparisonRequest(BaseModel):
     edges: Optional[list[Union[EdgeSchema, dict[str, Any]]]] = Field(default_factory=list)
     facilities: Optional[list[Union[FacilitySchema, dict[str, Any]]]] = Field(default_factory=list)
     settlements: Optional[list[Union[SettlementSchema, dict[str, Any]]]] = Field(default_factory=list)
+    routing_metric: Optional[str] = None
+    data_quality: str = 'unverified'
+    graph_version: Optional[str] = None
     currently_blocked_edge_ids: list[Union[int, str]]
     scenario_a: RepairScenarioModel
     scenario_b: RepairScenarioModel
@@ -145,6 +168,9 @@ class RepairScenarioOutcome(BaseModel):
     households_regaining_access: int
     facilities_restored: int
     travel_time_improvement_minutes: float
+    route_improvement_value: float = 0.0
+    route_improvement_unit: str = 'minutes'
+    restored_routes_count: int = 0
     remaining_blocked_edges: list[Union[int, str]]
     remaining_affected_households: int
     unreachable_routes_count: int
@@ -223,4 +249,3 @@ class AIInsightsResponse(BaseModel):
     recommended_action: str
     database_backed: bool = True
     metrics: dict[str, Any] = Field(default_factory=dict)
-

@@ -19,12 +19,13 @@ import {
   Wrench,
 } from 'lucide-react';
 import { Card, CardHeader, StatusBadge } from '../ui';
+import { useVillageSelection } from '../../context/VillageSelectionContext';
 
 export default function AIImpactSection({ onSelectTab, onNavigate }) {
   const [villages, setVillages] = useState([]);
-  const [selectedVillageId, setSelectedVillageId] = useState('1');
+  const { selectedVillageId, setSelectedVillageId } = useVillageSelection();
   const [edges, setEdges] = useState([]);
-  const [selectedEdgeId, setSelectedEdgeId] = useState('2');
+  const [selectedEdgeId, setSelectedEdgeId] = useState('');
   const [scenario, setScenario] = useState('monsoon_torrent');
   const [simulating, setSimulating] = useState(false);
   const [simResult, setSimResult] = useState(null);
