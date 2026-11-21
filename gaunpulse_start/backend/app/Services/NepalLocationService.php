@@ -721,4 +721,69 @@ class NepalLocationService
 
         return $hierarchy;
     }
+
+    /**
+     * Resolve latitude and longitude for any place in Nepal using catalog or OSM Nominatim.
+     */
+    public static function resolveCoordinates(string $placeName, ?string $district = null, ?string $municipality = null): ?array
+    {
+        $cleanPlace = trim(preg_replace('/\(.*?\)/', '', $placeName));
+
+        // 1. Check known municipalities catalog
+        foreach (self::$municipalities as $m) {
+            if (strcasecmp($m['name'], $placeName) === 0 || strcasecmp($m['name'], $cleanPlace) === 0) {
+                return ['lat' => (float) $m['center_lat'], 'lng' => (float) $m['center_lng']];
+            }
+            if (!empty($m['notable_villages'])) {
+                foreach ($m['notable_villages'] as $nv) {
+                    if (strcasecmp($nv, $cleanPlace) === 0) {
+                        return ['lat' => (float) $m['center_lat'], 'lng' => (float) $m['center_lng']];
+                    }
+                }
+            }
+        }
+
+        // 2. Query Nominatim with place, district, Nepal
+        $queries = [];
+        if ($district && $cleanPlace && strcasecmp($district, $cleanPlace) !== 0) {
+            $queries[] = "{$cleanPlace}, {$district}, Nepal";
+        }
+        if ($cleanPlace) {
+            $queries[] = "{$cleanPlace}, Nepal";
+        }
+        if ($municipality) {
+            $queries[] = "{$municipality}, Nepal";
+        }
+        if ($district) {
+            $queries[] = "{$district}, Nepal";
+        }
+
+        foreach ($queries as $q) {
+            try {
+                $response = \Illuminate\Support\Facades\Http::withHeaders([
+                    'User-Agent' => 'GaunPulse-Nepal-Geocoding/1.0 (contact@gaunpulse.gov.np)',
+                ])->timeout(3)->get('https://nominatim.openstreetmap.org/search', [
+                    'q' => $q,
+                    'format' => 'json',
+                    'limit' => 1,
+                ]);
+
+                if ($response->successful()) {
+                    $data = $response->json();
+                    if (!empty($data) && isset($data[0]['lat']) && isset($data[0]['lon'])) {
+                        $lat = (float) $data[0]['lat'];
+                        $lon = (float) $data[0]['lon'];
+                        // Nepal bounding box: lat 26.0 - 31.0, lon 80.0 - 89.0
+                        if ($lat >= 26.0 && $lat <= 31.0 && $lon >= 80.0 && $lon <= 89.0) {
+                            return ['lat' => round($lat, 6), 'lng' => round($lon, 6)];
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                // proceed to next query or fallback
+            }
+        }
+
+        return null;
+    }
 }

@@ -42,6 +42,7 @@ Route::get('/villages/{village}/export-geojson', [VillageController::class, 'exp
 Route::post('/villages/{village}/import-geojson', [VillageController::class, 'importGeoJson']);
 Route::post('/villages/{village}/import-csv', [VillageController::class, 'importCsv']);
 Route::post('/villages/{village}/import-osm', [VillageController::class, 'importOsm']);
+Route::post('/villages/{village}/auto-populate', [VillageController::class, 'autoPopulate']);
 Route::get('/villages/{village}/discover-osm', [VillageController::class, 'discoverOsm']);
 Route::post('/villages/{village}/confirm-osm-import', [VillageController::class, 'confirmOsmImport']);
 Route::get('/villages/{village}/import-history', [VillageController::class, 'importHistory']);

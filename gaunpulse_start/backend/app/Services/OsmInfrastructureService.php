@@ -48,6 +48,7 @@ class OsmInfrastructureService
      */
     public static function discover(Village $village, int $radiusMeters = 2000, ?array $customBounds = null, bool $force = false): array
     {
+        @ini_set('memory_limit', '512M');
         // 1. Precise location selection (Task 2): Use actual village coordinates
         $lat = (float) ($village->center_lat ?? $village->latitude ?? 27.8635);
         $lng = (float) ($village->center_lng ?? $village->longitude ?? 85.5815);
@@ -182,6 +183,26 @@ class OsmInfrastructureService
                 'User-Agent' => 'GaunPulse-Nepal-Intelligence/1.0 (contact@gaunpulse.gov.np)',
             ])->timeout(14)->get($osmMapUrl);
 
+            // If too many nodes (>50,000 in denser rural towns/junctions), automatically shrink radius and retry immediately
+            if ($response->status() === 400 && str_contains(strtolower($response->body()), 'too many nodes')) {
+                $centerLat = ($south + $north) / 2.0;
+                $centerLng = ($west + $east) / 2.0;
+                $smaller = self::computeBoundingBox($centerLat, $centerLng, 1000);
+                $retryUrl = "https://api.openstreetmap.org/api/0.6/map?bbox={$smaller['west']},{$smaller['south']},{$smaller['east']},{$smaller['north']}";
+                $response = Http::withHeaders([
+                    'User-Agent' => 'GaunPulse-Nepal-Intelligence/1.0 (contact@gaunpulse.gov.np)',
+                ])->timeout(12)->get($retryUrl);
+
+                // If still too many nodes (very high density hub), shrink to 700m
+                if ($response->status() === 400 && str_contains(strtolower($response->body()), 'too many nodes')) {
+                    $smaller700 = self::computeBoundingBox($centerLat, $centerLng, 700);
+                    $retry700Url = "https://api.openstreetmap.org/api/0.6/map?bbox={$smaller700['west']},{$smaller700['south']},{$smaller700['east']},{$smaller700['north']}";
+                    $response = Http::withHeaders([
+                        'User-Agent' => 'GaunPulse-Nepal-Intelligence/1.0 (contact@gaunpulse.gov.np)',
+                    ])->timeout(10)->get($retry700Url);
+                }
+            }
+
             if ($response->successful()) {
                 $body = $response->body();
                 if (str_contains($body, '<osm') && str_contains($body, '</osm>')) {
@@ -255,6 +276,7 @@ OVERPASS;
      */
     protected static function convertOsmXmlToElements(string $xmlContent): array
     {
+        @ini_set('memory_limit', '512M');
         $elements = [];
         $nodeCoords = [];
 
@@ -262,44 +284,54 @@ OVERPASS;
             $xml = simplexml_load_string($xmlContent);
             if (!$xml) return [];
 
-            // 1. Process all nodes
+            // 1. Process all nodes (only retain tagged civic/infrastructure nodes to prevent memory exhaustion)
             foreach ($xml->node as $node) {
                 $id = (int) $node['id'];
                 $lat = (float) $node['lat'];
                 $lon = (float) $node['lon'];
                 $tags = [];
-                foreach ($node->tag as $tag) {
-                    $tags[(string)$tag['k']] = (string)$tag['v'];
+                if (isset($node->tag)) {
+                    foreach ($node->tag as $tag) {
+                        $tags[(string)$tag['k']] = (string)$tag['v'];
+                    }
                 }
 
                 $nodeCoords[$id] = ['lat' => $lat, 'lon' => $lon];
-                $elements[] = [
-                    'type' => 'node',
-                    'id' => $id,
-                    'lat' => $lat,
-                    'lon' => $lon,
-                    'tags' => $tags,
-                ];
+
+                // Only add to elements if node is a tagged point of interest / infrastructure
+                if (!empty($tags)) {
+                    $elements[] = [
+                        'type' => 'node',
+                        'id' => $id,
+                        'lat' => $lat,
+                        'lon' => $lon,
+                        'tags' => $tags,
+                    ];
+                }
             }
 
             // 2. Process all ways
             foreach ($xml->way as $way) {
                 $id = (int) $way['id'];
                 $tags = [];
-                foreach ($way->tag as $tag) {
-                    $tags[(string)$tag['k']] = (string)$tag['v'];
+                if (isset($way->tag)) {
+                    foreach ($way->tag as $tag) {
+                        $tags[(string)$tag['k']] = (string)$tag['v'];
+                    }
                 }
 
                 $nodes = [];
                 $geometry = [];
-                foreach ($way->nd as $nd) {
-                    $ndId = (int) $nd['ref'];
-                    $nodes[] = $ndId;
-                    if (isset($nodeCoords[$ndId])) {
-                        $geometry[] = [
-                            'lat' => $nodeCoords[$ndId]['lat'],
-                            'lon' => $nodeCoords[$ndId]['lon'],
-                        ];
+                if (isset($way->nd)) {
+                    foreach ($way->nd as $nd) {
+                        $ndId = (int) $nd['ref'];
+                        $nodes[] = $ndId;
+                        if (isset($nodeCoords[$ndId])) {
+                            $geometry[] = [
+                                'lat' => $nodeCoords[$ndId]['lat'],
+                                'lon' => $nodeCoords[$ndId]['lon'],
+                            ];
+                        }
                     }
                 }
 
@@ -729,6 +761,7 @@ OVERPASS;
      */
     public static function persistDiscovered(Village $village, array $approvedFeatures, ?string $batchId = null): array
     {
+        @ini_set('memory_limit', '512M');
         $batchId = $batchId ?? ('osm_import_' . Str::random(10));
         $createdNodes = 0;
         $createdEdges = 0;
@@ -742,6 +775,21 @@ OVERPASS;
 
         DB::beginTransaction();
         try {
+            // Pre-load existing nodes & edges into memory to prevent thousands of slow database roundtrips
+            $existingNodes = Node::where('village_id', $village->id)->get()->keyBy('node_code');
+            $existingOsmIdMap = [];
+            foreach ($existingNodes as $n) {
+                if ($n->osm_id) $existingOsmIdMap[(string)$n->osm_id] = $n;
+            }
+
+            $existingEdges = Edge::where('village_id', $village->id)->get();
+            $existingEdgeCodeMap = [];
+            $existingEdgePairMap = [];
+            foreach ($existingEdges as $e) {
+                if ($e->edge_code) $existingEdgeCodeMap[$e->edge_code] = $e;
+                $existingEdgePairMap["{$e->source_node_id}_{$e->target_node_id}"] = $e;
+            }
+
             // 1. Save or Update Point Nodes (Schools, Health, Water, Settlements)
             $nodeDbMap = []; // osmId -> Node model
 
@@ -749,11 +797,7 @@ OVERPASS;
                 $osmId = $pf['osm_id'] ?? null;
                 $nodeCode = "osm_" . ($osmId ?? Str::random(8));
 
-                $existing = Node::where('village_id', $village->id)
-                    ->where(function ($q) use ($nodeCode, $osmId) {
-                        $q->where('node_code', $nodeCode);
-                        if ($osmId) $q->orWhere('osm_id', (string) $osmId);
-                    })->first();
+                $existing = $existingNodes[$nodeCode] ?? ($osmId ? ($existingOsmIdMap[(string)$osmId] ?? null) : null);
 
                 // Respect verified records: do not overwrite
                 if ($existing && in_array($existing->verification_status, ['verified', 'community_endorsed'])) {
@@ -779,13 +823,17 @@ OVERPASS;
                 if (Schema::hasColumn('nodes', 'osm_type')) $nodeAttrs['osm_type'] = $pf['osm_type'] ?? 'node';
                 if (Schema::hasColumn('nodes', 'import_batch_id')) $nodeAttrs['import_batch_id'] = $batchId;
 
-                $node = Node::updateOrCreate(
-                    ['village_id' => $village->id, 'node_code' => $nodeCode],
-                    $nodeAttrs
-                );
+                if ($existing) {
+                    $existing->update($nodeAttrs);
+                    $node = $existing;
+                } else {
+                    $node = Node::create($nodeAttrs);
+                    $existingNodes[$nodeCode] = $node;
+                    if ($osmId) $existingOsmIdMap[(string)$osmId] = $node;
+                    $createdNodes++;
+                }
 
                 $nodeDbMap[$osmId] = $node;
-                $createdNodes++;
 
                 // If School or Health Post or Water, also register in facilities table
                 if (in_array($pf['category'] ?? '', ['schools', 'health', 'water'])) {
@@ -826,28 +874,32 @@ OVERPASS;
                         $coord = $ef[$coordKey] ?? null;
                         if ($coord) {
                             $jCode = "osm_junction_{$jOsmId}";
-                            $jNodeAttrs = [
-                                'village_id' => $village->id,
-                                'name' => "Road Junction #{$jOsmId}",
-                                'latitude' => (float) $coord['lat'],
-                                'longitude' => (float) $coord['lon'],
-                                'node_code' => $jCode,
-                                'source' => 'osm',
-                                'verification_status' => 'imported',
-                                'confidence_score' => 70,
-                            ];
-                            if (Schema::hasColumn('nodes', 'node_type')) $jNodeAttrs['node_type'] = 'junction';
-                            if (Schema::hasColumn('nodes', 'type')) $jNodeAttrs['type'] = 'junction';
-                            if (Schema::hasColumn('nodes', 'osm_id')) $jNodeAttrs['osm_id'] = (string) $jOsmId;
-                            if (Schema::hasColumn('nodes', 'osm_type')) $jNodeAttrs['osm_type'] = 'node';
-                            if (Schema::hasColumn('nodes', 'import_batch_id')) $jNodeAttrs['import_batch_id'] = $batchId;
+                            $existing = $existingNodes[$jCode] ?? ($existingOsmIdMap[(string)$jOsmId] ?? null);
+                            if ($existing) {
+                                $jNode = $existing;
+                            } else {
+                                $jNodeAttrs = [
+                                    'village_id' => $village->id,
+                                    'name' => "Road Junction #{$jOsmId}",
+                                    'latitude' => (float) $coord['lat'],
+                                    'longitude' => (float) $coord['lon'],
+                                    'node_code' => $jCode,
+                                    'source' => 'osm',
+                                    'verification_status' => 'imported',
+                                    'confidence_score' => 70,
+                                ];
+                                if (Schema::hasColumn('nodes', 'node_type')) $jNodeAttrs['node_type'] = 'junction';
+                                if (Schema::hasColumn('nodes', 'type')) $jNodeAttrs['type'] = 'junction';
+                                if (Schema::hasColumn('nodes', 'osm_id')) $jNodeAttrs['osm_id'] = (string) $jOsmId;
+                                if (Schema::hasColumn('nodes', 'osm_type')) $jNodeAttrs['osm_type'] = 'node';
+                                if (Schema::hasColumn('nodes', 'import_batch_id')) $jNodeAttrs['import_batch_id'] = $batchId;
 
-                            $jNode = Node::updateOrCreate(
-                                ['village_id' => $village->id, 'node_code' => $jCode],
-                                $jNodeAttrs
-                            );
+                                $jNode = Node::create($jNodeAttrs);
+                                $existingNodes[$jCode] = $jNode;
+                                $existingOsmIdMap[(string)$jOsmId] = $jNode;
+                                $createdNodes++;
+                            }
                             $nodeDbMap[$jOsmId] = $jNode;
-                            $createdNodes++;
                         }
                     }
                 }
@@ -860,14 +912,9 @@ OVERPASS;
 
                 if ($src && $tgt && $src->id !== $tgt->id) {
                     $edgeCode = $ef['id'] ?? ("osm_edge_" . ($ef['osm_id'] ?? rand(1000, 9999)));
+                    $pairKey = "{$src->id}_{$tgt->id}";
 
-                    $existingEdge = Edge::where('village_id', $village->id)
-                        ->where(function ($q) use ($edgeCode, $src, $tgt) {
-                            $q->where('edge_code', $edgeCode)
-                              ->orWhere(function ($q2) use ($src, $tgt) {
-                                  $q2->where('source_node_id', $src->id)->where('target_node_id', $tgt->id);
-                              });
-                        })->first();
+                    $existingEdge = $existingEdgeCodeMap[$edgeCode] ?? ($existingEdgePairMap[$pairKey] ?? null);
 
                     if ($existingEdge && in_array($existingEdge->verification_status, ['verified', 'community_endorsed'])) {
                         $skippedVerified++;
@@ -901,11 +948,14 @@ OVERPASS;
                     if (Schema::hasColumn('edges', 'geometry')) $edgeAttrs['geometry'] = json_encode($ef['geometry'] ?? []);
                     if (Schema::hasColumn('edges', 'import_batch_id')) $edgeAttrs['import_batch_id'] = $batchId;
 
-                    Edge::updateOrCreate(
-                        ['village_id' => $village->id, 'edge_code' => $edgeCode],
-                        $edgeAttrs
-                    );
-                    $createdEdges++;
+                    if ($existingEdge) {
+                        $existingEdge->update($edgeAttrs);
+                    } else {
+                        $newEdge = Edge::create($edgeAttrs);
+                        $existingEdgeCodeMap[$edgeCode] = $newEdge;
+                        $existingEdgePairMap[$pairKey] = $newEdge;
+                        $createdEdges++;
+                    }
                 }
             }
 

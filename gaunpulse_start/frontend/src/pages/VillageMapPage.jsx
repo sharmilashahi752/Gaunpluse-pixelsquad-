@@ -186,7 +186,12 @@ export default function VillageMapPage() {
           setMunicipalities(data);
           const currentMuniValid = data.some((m) => m.name === villageForm.municipality);
           if (!currentMuniValid && data.length > 0) {
-            setVillageForm((prev) => ({ ...prev, municipality: data[0].name }));
+            setVillageForm((prev) => ({
+              ...prev,
+              municipality: data[0].name,
+              center_lat: data[0].center_lat || prev.center_lat,
+              center_lng: data[0].center_lng || prev.center_lng,
+            }));
           }
         }
       })
@@ -329,7 +334,7 @@ export default function VillageMapPage() {
     setIsAddAssetModalOpen(true);
   };
 
-  // Submit New Village -> Automatically triggers Discovery (Phase 5)
+  // Submit New Village -> Automatically ingests real Nepal OSM data (Phase 5)
   const handleCreateVillage = async (e) => {
     e.preventDefault();
     try {
@@ -340,11 +345,12 @@ export default function VillageMapPage() {
         district: villageForm.district,
         municipality: villageForm.municipality,
         ward_no: villageForm.ward_no || '1',
-        center_lat: parseFloat(villageForm.center_lat),
-        center_lng: parseFloat(villageForm.center_lng),
+        center_lat: parseFloat(villageForm.center_lat) || undefined,
+        center_lng: parseFloat(villageForm.center_lng) || undefined,
         description: villageForm.description,
         data_source: villageForm.data_source,
         verification_status: villageForm.verification_status,
+        auto_import: true,
       };
 
       const res = await fetch('http://127.0.0.1:8000/api/villages', {
@@ -360,16 +366,25 @@ export default function VillageMapPage() {
 
       const newVillage = await res.json();
       setIsAddVillageModalOpen(false);
-      showNotification(`Village "${newVillage.name}" registered! Starting automatic infrastructure discovery...`);
+
+      const nodeCount = newVillage.imported_nodes || newVillage.nodes_count || 0;
+      const edgeCount = newVillage.imported_edges || newVillage.edges_count || 0;
+      showNotification(
+        `🎉 Village "${newVillage.name}" successfully added! Automatically imported ${nodeCount} infrastructure nodes and ${edgeCount} lifeline roads from OpenStreetMap.`
+      );
 
       // Refresh village list and switch to new village
-      loadVillages();
+      await loadVillages();
       setSelectedVillageId(newVillage.id);
       setIsNationwideView(false);
       setSelectedLocationMarker(null);
 
-      // Phase 5: Automatically launch discovery workflow for newly created village
-      triggerDiscovery(newVillage.id, 2000);
+      // Instantly load the new village's network into map
+      const netRes = await fetch(`http://127.0.0.1:8000/api/villages/${newVillage.id}/network`);
+      if (netRes.ok) {
+        const netData = await netRes.json();
+        setVillageData(netData);
+      }
     } catch (err) {
       alert('Error creating village: ' + err.message);
     }
@@ -1333,7 +1348,15 @@ export default function VillageMapPage() {
                   </label>
                   <select
                     value={villageForm.municipality}
-                    onChange={(e) => setVillageForm({ ...villageForm, municipality: e.target.value })}
+                    onChange={(e) => {
+                      const chosen = municipalities.find((m) => m.name === e.target.value);
+                      setVillageForm({
+                        ...villageForm,
+                        municipality: e.target.value,
+                        center_lat: chosen?.center_lat || villageForm.center_lat,
+                        center_lng: chosen?.center_lng || villageForm.center_lng,
+                      });
+                    }}
                     style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
                     required
                   >

@@ -90,8 +90,24 @@ class VillageController extends Controller
             ], 422);
         }
 
-        $lat = $validated['center_lat'] ?? $validated['latitude'] ?? 27.8635;
-        $lng = $validated['center_lng'] ?? $validated['longitude'] ?? 85.5815;
+        $lat = $validated['center_lat'] ?? $validated['latitude'] ?? null;
+        $lng = $validated['center_lng'] ?? $validated['longitude'] ?? null;
+
+        // Auto-resolve real Nepal coordinates if missing or out of Nepal boundaries (lat 26-31, lng 80-89)
+        if ($lat === null || $lng === null || $lat < 26.0 || $lat > 31.0 || $lng < 80.0 || $lng > 89.0) {
+            $resolvedCoords = \App\Services\NepalLocationService::resolveCoordinates(
+                $validated['name'],
+                $validated['district'] ?? null,
+                $validated['municipality'] ?? null
+            );
+            if ($resolvedCoords) {
+                $lat = $resolvedCoords['lat'];
+                $lng = $resolvedCoords['lng'];
+            } else {
+                $lat = $lat ?? 27.7172;
+                $lng = $lng ?? 85.3240;
+            }
+        }
 
         $attrs = [
             'name' => $validated['name'],
@@ -132,7 +148,38 @@ class VillageController extends Controller
             'details' => ['status' => $village->status, 'ward' => $village->ward_no],
         ]);
 
-        return response()->json($village->loadCount(['settlements', 'issues', 'nodes', 'edges', 'facilities']), 201);
+        // Automatic Infrastructure Discovery and Ingestion for ANY location across Nepal
+        $autoImport = $request->boolean('auto_import', true);
+        $importSummary = null;
+        if ($autoImport && $lat && $lng) {
+            try {
+                $discovery = \App\Services\OsmInfrastructureService::discover($village, 1800, null, true);
+                if (empty($discovery['features']) || count($discovery['features']) === 0) {
+                    $discovery = \App\Services\OsmInfrastructureService::discover($village, 3000, null, true);
+                }
+
+                if (!empty($discovery['features'])) {
+                    $featuresToPersist = array_filter($discovery['features'], fn($f) => !($f['is_duplicate'] ?? false));
+                    if (!empty($featuresToPersist)) {
+                        $importSummary = \App\Services\OsmInfrastructureService::persistDiscovered($village, array_values($featuresToPersist));
+                        $this->buildNetwork(new Request(), $village);
+                    }
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("Automatic OSM infrastructure onboarding for {$village->name} had exception: " . $e->getMessage());
+            }
+        }
+
+        $villageData = $village->loadCount(['settlements', 'issues', 'nodes', 'edges', 'facilities'])->toArray();
+        if ($importSummary) {
+            $villageData['auto_imported'] = true;
+            $villageData['imported_nodes'] = $importSummary['imported_nodes'] ?? 0;
+            $villageData['imported_edges'] = $importSummary['imported_edges'] ?? 0;
+            $villageData['imported_facilities'] = $importSummary['imported_facilities'] ?? 0;
+            $villageData['import_message'] = $importSummary['message'] ?? 'Infrastructure automatically imported.';
+        }
+
+        return response()->json($villageData, 201);
     }
 
     /**
@@ -236,10 +283,74 @@ class VillageController extends Controller
             'details' => ['active_at' => now()->toIso8601String()],
         ]);
 
+        // If newly activated village has no nodes, auto-populate from OpenStreetMap
+        if ($village->nodes()->count() === 0) {
+            try {
+                $this->autoPopulate($request, $village);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("Auto-populate during activation of {$village->name} had exception: " . $e->getMessage());
+            }
+        }
+
         return response()->json([
             'success' => true,
             'village' => $village->loadCount(['settlements', 'issues', 'nodes', 'edges', 'facilities']),
             'message' => "Village '{$village->name}' has been successfully activated and is now operational across all GaunPulse modules.",
+        ]);
+    }
+
+    /**
+     * Auto-populate real Nepal geographic infrastructure for any village.
+     */
+    public function autoPopulate(Request $request, Village $village)
+    {
+        $lat = (float) ($village->center_lat ?? $village->latitude ?? 0);
+        $lng = (float) ($village->center_lng ?? $village->longitude ?? 0);
+
+        // Auto-resolve coordinates if missing or out of Nepal boundaries
+        if ($lat < 26.0 || $lat > 31.0 || $lng < 80.0 || $lng > 89.0) {
+            $resolved = \App\Services\NepalLocationService::resolveCoordinates(
+                $village->name,
+                $village->district,
+                $village->municipality
+            );
+            if ($resolved) {
+                $lat = $resolved['lat'];
+                $lng = $resolved['lng'];
+                $coordUpdates = [];
+                if (Schema::hasColumn('villages', 'center_lat')) {
+                    $coordUpdates['center_lat'] = $lat;
+                    $coordUpdates['center_lng'] = $lng;
+                }
+                if (Schema::hasColumn('villages', 'latitude')) {
+                    $coordUpdates['latitude'] = $lat;
+                    $coordUpdates['longitude'] = $lng;
+                }
+                $village->update($coordUpdates);
+            }
+        }
+
+        $radius = $request->integer('radius', 1800);
+        $force = $request->boolean('force', true);
+
+        $discovery = \App\Services\OsmInfrastructureService::discover($village, $radius, null, $force);
+        if (empty($discovery['features']) || count($discovery['features']) === 0) {
+            $discovery = \App\Services\OsmInfrastructureService::discover($village, 3000, null, $force);
+        }
+
+        $features = array_filter($discovery['features'] ?? [], fn($f) => !($f['is_duplicate'] ?? false));
+        $importResult = \App\Services\OsmInfrastructureService::persistDiscovered($village, array_values($features));
+
+        // Build travel-times and graph topology
+        $this->buildNetwork(new Request(), $village);
+
+        return response()->json([
+            'success' => true,
+            'village' => $village->loadCount(['settlements', 'issues', 'nodes', 'edges', 'facilities']),
+            'imported_nodes' => $importResult['imported_nodes'] ?? 0,
+            'imported_edges' => $importResult['imported_edges'] ?? 0,
+            'imported_facilities' => $importResult['imported_facilities'] ?? 0,
+            'message' => $importResult['message'] ?? 'Infrastructure automatically populated.',
         ]);
     }
 

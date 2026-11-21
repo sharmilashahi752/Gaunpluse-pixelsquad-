@@ -20,13 +20,17 @@ export default function DashboardPage({ onNavigate }) {
       .catch((err) => console.error('Failed to load dashboard stats:', err));
   }, []);
 
+  const villageCount = stats?.monitored_villages ?? 1;
+  const isRealData = villageCount > 1;
+
   const liveStats = [
     {
       label: 'Monitored Villages',
-      value: String(stats?.monitored_villages ?? 1),
-      change: '1 demo network active',
+      value: String(villageCount),
+      change: isRealData ? `${villageCount} municipal networks active` : '1 demo network active',
       tone: 'green',
       icon: MapPinned,
+      isLive: isRealData,
     },
     {
       label: 'Active Issues',
@@ -34,13 +38,15 @@ export default function DashboardPage({ onNavigate }) {
       change: `${stats?.resolved_issues ?? 1} resolved`,
       tone: 'orange',
       icon: Radio,
+      isLive: isRealData,
     },
     {
       label: 'Critical Disruptions',
       value: String(stats?.critical_disruptions ?? 1),
-      change: 'Needs immediate review',
+      change: (stats?.critical_disruptions ?? 0) > 0 ? 'Needs immediate review' : 'All critical lifelines operational',
       tone: 'red',
       icon: TriangleAlert,
+      isLive: isRealData,
     },
     {
       label: 'Affected Households',
@@ -48,6 +54,7 @@ export default function DashboardPage({ onNavigate }) {
       change: 'Across active village wards',
       tone: 'mint',
       icon: Users,
+      isLive: isRealData,
     },
   ];
 
