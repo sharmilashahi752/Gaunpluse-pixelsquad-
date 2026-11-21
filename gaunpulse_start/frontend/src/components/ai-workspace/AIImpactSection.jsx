@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Card, CardHeader, StatusBadge } from '../ui';
 import { useVillageSelection } from '../../context/VillageSelectionContext';
+import { deduplicateVillages, formatVillageLabel } from '../../utils/villageUtils';
 
 export default function AIImpactSection({ onSelectTab, onNavigate }) {
   const [villages, setVillages] = useState([]);
@@ -134,9 +135,9 @@ export default function AIImpactSection({ onSelectTab, onNavigate }) {
                 onChange={(e) => setSelectedVillageId(e.target.value)}
                 style={{ padding: '7px 12px', borderRadius: 6, border: '1px solid #c8d8cc', fontSize: 12, color: '#176342', fontWeight: 600, background: '#ffffff' }}
               >
-                {villages.map((v) => (
+                {deduplicateVillages(villages).map((v) => (
                   <option key={v.id} value={v.id}>
-                    {v.name} ({v.municipality || 'Helambu Ward 4'})
+                    {formatVillageLabel(v)}
                   </option>
                 ))}
               </select>

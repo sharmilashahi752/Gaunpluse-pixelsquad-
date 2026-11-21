@@ -30,6 +30,7 @@ import {
 import InteractiveVillageMap from '../components/InteractiveVillageMap';
 import { Card, CardHeader, DemoLabel, FeatureNotice, PageIntro, StatusBadge } from '../components/ui';
 import { useVillageSelection } from '../context/VillageSelectionContext';
+import { deduplicateVillages, formatVillageLabel } from '../utils/villageUtils';
 
 export default function VillageMapPage() {
   // Saved Villages & Active Selection
@@ -89,6 +90,7 @@ export default function VillageMapPage() {
     data_source: 'Municipal Field Survey',
     verification_status: 'verified',
   });
+  const [isSubmittingVillage, setIsSubmittingVillage] = useState(false);
 
   // Form States: New Asset
   const [assetCategory, setAssetCategory] = useState('point'); // 'point' | 'linear'
@@ -338,6 +340,8 @@ export default function VillageMapPage() {
   // Submit New Village -> Automatically ingests real Nepal OSM data (Phase 5)
   const handleCreateVillage = async (e) => {
     e.preventDefault();
+    if (isSubmittingVillage) return;
+    setIsSubmittingVillage(true);
     try {
       const payload = {
         name: villageForm.name,
@@ -362,6 +366,19 @@ export default function VillageMapPage() {
 
       if (!res.ok) {
         const errData = await res.json();
+        if (res.status === 409 && errData.is_duplicate && errData.existing_village_id) {
+          const shouldSwitch = confirm(
+            `This village ("${errData.duplicate_village?.name || villageForm.name}") is already registered in ${errData.duplicate_village?.district || villageForm.district} (${errData.duplicate_village?.municipality || villageForm.municipality}).\n\nWould you like to open and inspect the existing village record?`
+          );
+          if (shouldSwitch) {
+            setIsAddVillageModalOpen(false);
+            await loadVillages();
+            setSelectedVillageId(errData.existing_village_id);
+            setIsNationwideView(false);
+            setSelectedLocationMarker(null);
+          }
+          return;
+        }
         throw new Error(errData.message || 'Failed to create village');
       }
 
@@ -388,6 +405,8 @@ export default function VillageMapPage() {
       }
     } catch (err) {
       alert('Error creating village: ' + err.message);
+    } finally {
+      setIsSubmittingVillage(false);
     }
   };
 
@@ -815,9 +834,9 @@ export default function VillageMapPage() {
               }}
             >
               <option value="" disabled>-- Select Saved Village --</option>
-              {villages.map((v) => (
+              {deduplicateVillages(villages).map((v) => (
                 <option key={v.id} value={v.id}>
-                  {v.name} ({v.district})
+                  {formatVillageLabel(v)}
                 </option>
               ))}
             </select>
@@ -1492,17 +1511,28 @@ export default function VillageMapPage() {
                 </button>
                 <button
                   type="submit"
+                  disabled={isSubmittingVillage}
                   style={{
                     padding: '8px 18px',
                     borderRadius: '6px',
                     border: 'none',
-                    background: '#176342',
+                    background: isSubmittingVillage ? '#4b695a' : '#176342',
                     color: '#fff',
                     fontWeight: 'bold',
-                    cursor: 'pointer',
+                    cursor: isSubmittingVillage ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
                   }}
                 >
-                  Save Village & Discover Lifelines →
+                  {isSubmittingVillage ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" />
+                      Registering & Ingesting OSM Data...
+                    </>
+                  ) : (
+                    'Save Village & Discover Lifelines →'
+                  )}
                 </button>
               </div>
             </form>

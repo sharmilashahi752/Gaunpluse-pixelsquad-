@@ -19,6 +19,7 @@ import {
 import InteractiveVillageMap from '../components/InteractiveVillageMap';
 import { Card, CardHeader, FeatureNotice, PageIntro, StatusBadge } from '../components/ui';
 import { useVillageSelection } from '../context/VillageSelectionContext';
+import { deduplicateVillages, formatVillageLabel } from '../utils/villageUtils';
 
 const API_BASE = 'http://127.0.0.1:8000/api';
 const BLOCKED_STATUSES = new Set(['blocked', 'closed', 'impassable', 'failed', 'out_of_service']);
@@ -309,7 +310,7 @@ export default function SimulationsPage({ onNavigate }) {
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <select id="village-select" aria-label="Select village" value={selectedVillageId || ''} onChange={(event) => setSelectedVillageId(event.target.value)} style={{ padding: '9px 12px', border: '1px solid #cad7cf', borderRadius: 8, background: '#fff' }}>
-              {villages.map((village) => <option key={village.id} value={village.id}>{village.name} ({village.district})</option>)}
+              {deduplicateVillages(villages).map((village) => <option key={village.id} value={village.id}>{formatVillageLabel(village)}</option>)}
             </select>
             {readiness && <StatusBadge tone={readinessTone(readiness.status)}>{readinessLabel(readiness.status)}</StatusBadge>}
           </div>

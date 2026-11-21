@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import { Card, CardHeader, FeatureNotice, LiveLabel, PageIntro, StatusBadge } from '../components/ui';
+import { deduplicateVillages, formatVillageLabel } from '../utils/villageUtils';
 
 const CATEGORIES = [
   { value: 'damaged_bridge', label: 'Damaged Bridge' },
@@ -487,9 +488,9 @@ export default function IssuesPage({ onNavigate }) {
                     }}
                     style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #dfe6df' }}
                   >
-                    {villages.map((v) => (
+                    {deduplicateVillages(villages).map((v) => (
                       <option key={v.id} value={v.id}>
-                        {v.name} ({v.district})
+                        {formatVillageLabel(v)}
                       </option>
                     ))}
                   </select>

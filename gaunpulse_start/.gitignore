@@ -6,3 +6,8 @@ vendor/
 .env
 .DS_Store
 Thumbs.db
+
+*.sql
+backend/database/backups/
+audit_duplicates.php
+backup_database.php

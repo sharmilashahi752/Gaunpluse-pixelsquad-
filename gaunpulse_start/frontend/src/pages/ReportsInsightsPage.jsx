@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { Chart, registerables } from 'chart.js';
 import { Card, CardHeader, PageIntro, StatusBadge } from '../components/ui';
+import { deduplicateVillages, formatVillageLabel } from '../utils/villageUtils';
 
 // Register Chart.js components
 Chart.register(...registerables);
@@ -826,11 +827,11 @@ export default function ReportsInsightsPage({ onNavigate }) {
             <label style={filterLabelStyle}>Village</label>
             <select value={villageId} onChange={handleVillageChange} style={filterSelectStyle}>
               <option value="">All Villages</option>
-              {villagesList
+              {deduplicateVillages(villagesList)
                 .filter((v) => !municipality || v.municipality === municipality)
                 .map((v) => (
                   <option key={v.id} value={v.id}>
-                    {v.name} ({v.district})
+                    {formatVillageLabel(v)}
                   </option>
                 ))}
             </select>

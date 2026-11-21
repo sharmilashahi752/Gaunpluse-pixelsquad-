@@ -8,6 +8,7 @@ use App\Models\Facility;
 use App\Models\Node;
 use App\Models\SettlementGroup;
 use App\Models\Village;
+use App\Services\DuplicateVillageService;
 use App\Services\SimulationNetworkService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -136,6 +137,24 @@ class VillageController extends Controller
         if (Schema::hasColumn('villages', 'data_source')) $attrs['data_source'] = $validated['data_source'] ?? 'Municipal Field Survey';
         if (Schema::hasColumn('villages', 'reference_year')) $attrs['reference_year'] = $validated['reference_year'] ?? (int) date('Y');
 
+        // Prevent duplicate village registrations (Step 6)
+        $existing = DuplicateVillageService::findExistingDuplicate(
+            $validated['name'],
+            $validated['municipality'],
+            $validated['ward_no'] ?? null,
+            $lat,
+            $lng
+        );
+
+        if ($existing) {
+            return response()->json([
+                'message' => 'This village may already be registered. Would you like to open the existing record?',
+                'is_duplicate' => true,
+                'existing_village_id' => $existing->id,
+                'existing_village' => $existing->loadCount(['settlements', 'issues', 'nodes', 'edges', 'facilities']),
+            ], 409);
+        }
+
         $village = Village::create($attrs);
 
         // Audit log
@@ -241,7 +260,20 @@ class VillageController extends Controller
             $village = Village::findOrFail($validated['draft_id']);
             $village->update($attrs);
         } else {
-            $village = Village::create($attrs);
+            // Check for existing matching village or draft before creating a new row
+            $existing = DuplicateVillageService::findExistingDuplicate(
+                $validated['name'],
+                $validated['municipality'],
+                $validated['ward_no'] ?? null,
+                $lat,
+                $lng
+            );
+            if ($existing) {
+                $village = $existing;
+                $village->update($attrs);
+            } else {
+                $village = Village::create($attrs);
+            }
         }
 
         // Audit log
@@ -1134,6 +1166,61 @@ class VillageController extends Controller
             'message' => "Administrative hierarchy corrected for village '{$village->name}'.",
             'village' => $updated,
         ]);
+    }
+
+    /**
+     * Audit villages for duplicate registration groups (Read-Only).
+     */
+    public function duplicateAudit()
+    {
+        $audit = DuplicateVillageService::auditDuplicates();
+        return response()->json($audit);
+    }
+
+    /**
+     * Preview proposed consolidation for a duplicate group (Read-Only).
+     */
+    public function previewConsolidation(Request $request)
+    {
+        $validated = $request->validate([
+            'canonical_id' => 'required|integer|exists:villages,id',
+            'duplicate_ids' => 'required|array',
+            'duplicate_ids.*' => 'integer|exists:villages,id',
+        ]);
+
+        $preview = DuplicateVillageService::previewConsolidation(
+            $validated['canonical_id'],
+            $validated['duplicate_ids']
+        );
+
+        return response()->json($preview);
+    }
+
+    /**
+     * Execute transactional consolidation of confirmed duplicate villages (Explicit Confirmation Required).
+     */
+    public function consolidateDuplicates(Request $request)
+    {
+        $validated = $request->validate([
+            'canonical_id' => 'required|integer|exists:villages,id',
+            'duplicate_ids' => 'required|array',
+            'duplicate_ids.*' => 'integer|exists:villages,id',
+            'confirmed' => 'required|boolean',
+        ]);
+
+        if (!$validated['confirmed']) {
+            return response()->json([
+                'message' => 'Explicit user confirmation is required to execute duplicate consolidation.',
+            ], 422);
+        }
+
+        $result = DuplicateVillageService::consolidate(
+            $validated['canonical_id'],
+            $validated['duplicate_ids'],
+            true
+        );
+
+        return response()->json($result);
     }
 
     /**

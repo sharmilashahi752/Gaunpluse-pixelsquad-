@@ -18,6 +18,7 @@ import {
   Search,
   Waypoints,
 } from 'lucide-react';
+import { deduplicateVillages } from '../utils/villageUtils';
 
 // Controller to smoothly fly/re-center map when location or village changes
 function ChangeView({ center, zoom }) {
@@ -397,7 +398,7 @@ export default function InteractiveVillageMap({
 
         {/* 1. Nationwide Saved Villages Layer */}
         {activeLayers.savedVillages &&
-          allVillages.map((v) => {
+          deduplicateVillages(allVillages).map((v) => {
             const vLat = parseFloat(v.center_lat || v.latitude);
             const vLng = parseFloat(v.center_lng || v.longitude);
             if (!vLat || !vLng || isNaN(vLat) || isNaN(vLng)) return null;

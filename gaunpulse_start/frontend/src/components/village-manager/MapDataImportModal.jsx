@@ -21,6 +21,7 @@ import {
   Wrench,
   X,
 } from 'lucide-react';
+import { deduplicateVillages, formatVillageLabel } from '../../utils/villageUtils';
 
 const API_BASE = 'http://127.0.0.1:8000/api';
 
@@ -305,9 +306,9 @@ export default function MapDataImportModal({
               className="vm-filter-select"
               style={{ width: '100%' }}
             >
-              {villages.map((v) => (
+              {deduplicateVillages(villages).map((v) => (
                 <option key={v.id} value={v.id}>
-                  {v.name} ({v.municipality} · Ward {v.ward_no || '1'})
+                  {formatVillageLabel(v)}
                 </option>
               ))}
             </select>

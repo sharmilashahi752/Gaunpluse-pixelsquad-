@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
@@ -25,6 +25,8 @@ import {
   Waypoints,
   Wrench,
 } from 'lucide-react';
+import { deduplicateVillages, formatVillageLabel } from '../../utils/villageUtils';
+import ReviewDuplicatesModal from './ReviewDuplicatesModal';
 
 export default function VillageManagerHome({
   villages = [],
@@ -36,14 +38,19 @@ export default function VillageManagerHome({
 }) {
   const [search, setSearch] = useState('');
   const [municipalityFilter, setMunicipalityFilter] = useState('all');
+  const [showDuplicatesModal, setShowDuplicatesModal] = useState(false);
+
+  // Deduplicate villages so each genuine geographical village appears once (Step 5 & 7)
+  const cleanVillages = useMemo(() => deduplicateVillages(villages), [villages]);
+  const duplicateCount = villages.length - cleanVillages.length;
 
   // Extract unique municipalities for filter dropdown
   const uniqueMunicipalities = Array.from(
-    new Set(villages.map((v) => v.municipality).filter(Boolean))
+    new Set(cleanVillages.map((v) => v.municipality).filter(Boolean))
   ).sort();
 
   // Filter villages by search and municipality
-  const filteredVillages = villages.filter((v) => {
+  const filteredVillages = cleanVillages.filter((v) => {
     const q = search.toLowerCase().trim();
     const matchesSearch =
       !q ||
@@ -179,6 +186,48 @@ export default function VillageManagerHome({
         </div>
       </div>
 
+      {/* Administrative Notice: Duplicate Village Records in MySQL */}
+      {duplicateCount > 0 && (
+        <div
+          style={{
+            background: '#fffbeb',
+            border: '1px solid #fed7aa',
+            borderRadius: '12px',
+            padding: '12px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <AlertTriangle size={18} color="#b45309" />
+            <span style={{ fontSize: '13px', color: '#92400e', fontWeight: 600 }}>
+              <strong>Administrative Duplicate Audit:</strong> {duplicateCount} duplicate village registrations detected in MySQL. Clean unique records are presented below.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowDuplicatesModal(true)}
+            className="button button--secondary"
+            style={{
+              fontSize: '12.5px',
+              padding: '6px 14px',
+              background: '#ffffff',
+              color: '#b45309',
+              borderColor: '#fde68a',
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <Database size={14} /> Review & Consolidate ({duplicateCount})
+          </button>
+        </div>
+      )}
+
       {/* 3. Search and Filter Toolbar */}
       <div id="saved-villages-section" className="vm-toolbar">
         <div className="vm-search-box">
@@ -281,16 +330,16 @@ export default function VillageManagerHome({
             const isDraft = v.status === 'draft';
             const totalInfra = (v.nodes_count || 0) + (v.edges_count || 0) + (v.facilities_count || 0);
 
-            // Determine data completeness status
+            // Determine data completeness status: distinguish field verification from technical topology
             let statusBadgeClass = 'vm-quality-badge--getting-started';
             let statusLabel = 'Getting Started';
             if (isDraft) {
               statusBadgeClass = 'vm-quality-badge--draft';
               statusLabel = `Draft (Step ${v.onboarding_step || 1}/4)`;
-            } else if (totalInfra >= 15) {
+            } else if (v.verification_status === 'verified' || v.is_verified) {
               statusBadgeClass = 'vm-quality-badge--verified';
               statusLabel = 'Verified Network';
-            } else if (totalInfra >= 5) {
+            } else if (v.nodes_count > 0 && v.edges_count > 0) {
               statusBadgeClass = 'vm-quality-badge--ready';
               statusLabel = 'Ready for Simulation';
             } else if (totalInfra > 0) {
@@ -360,6 +409,18 @@ export default function VillageManagerHome({
             );
           })}
         </div>
+      )}
+
+      {/* Administrative Review Duplicates Modal */}
+      {showDuplicatesModal && (
+        <ReviewDuplicatesModal
+          isOpen={showDuplicatesModal}
+          onClose={() => setShowDuplicatesModal(false)}
+          onConsolidationComplete={() => {
+            setShowDuplicatesModal(false);
+            if (onRefresh) onRefresh();
+          }}
+        />
       )}
     </div>
   );

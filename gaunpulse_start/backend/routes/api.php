@@ -30,6 +30,9 @@ Route::get('/locations/search', [LocationController::class, 'search']);
 
 // Public / Demo Village & Network Routes
 Route::get('/villages/audit-hierarchy', [VillageController::class, 'auditHierarchy']);
+Route::get('/villages/duplicate-audit', [VillageController::class, 'duplicateAudit']);
+Route::post('/villages/preview-consolidation', [VillageController::class, 'previewConsolidation']);
+Route::post('/villages/consolidate', [VillageController::class, 'consolidateDuplicates']);
 Route::get('/villages', [VillageController::class, 'index']);
 Route::post('/villages', [VillageController::class, 'store']);
 Route::post('/villages/wizard-draft', [VillageController::class, 'storeWizardDraft']);

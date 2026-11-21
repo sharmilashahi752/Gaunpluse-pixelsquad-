@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { Card, CardHeader, DemoLabel, FeatureNotice, PageIntro, StatusBadge } from '../components/ui';
+import { deduplicateVillages, formatVillageLabel } from '../utils/villageUtils';
 
 const PRIORITIES = ['Critical', 'High', 'Medium', 'Low'];
 const STATUSES = [
@@ -548,9 +549,9 @@ export default function ActionPlansPage() {
                     onChange={(e) => setFormData((prev) => ({ ...prev, village_id: e.target.value }))}
                     style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #dfe6df' }}
                   >
-                    {villages.map((v) => (
+                    {deduplicateVillages(villages).map((v) => (
                       <option key={v.id} value={v.id}>
-                        {v.name}
+                        {formatVillageLabel(v)}
                       </option>
                     ))}
                   </select>
