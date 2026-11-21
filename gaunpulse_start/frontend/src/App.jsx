@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import AppLayout from './layouts/AppLayout';
+import ActionPlansPage from './pages/ActionPlansPage';
+import CommunityVoicesPage from './pages/CommunityVoicesPage';
 import DashboardPage from './pages/DashboardPage';
+import IssuesPage from './pages/IssuesPage';
 import SimulationsPage from './pages/SimulationsPage';
 import VillageMapPage from './pages/VillageMapPage';
 import {
-  ActionPlansPage,
   AIAgentPage,
-  CommunityVoicesPage,
-  IssuesAlertsPage,
   ReportsInsightsPage,
   VillageDataPage,
 } from './pages/ModulePages';
@@ -16,7 +16,7 @@ import { navigationItems } from './data/demoData';
 const pages = {
   dashboard: DashboardPage,
   'village-map': VillageMapPage,
-  'issues-alerts': IssuesAlertsPage,
+  'issues-alerts': IssuesPage,
   simulations: SimulationsPage,
   'action-plans': ActionPlansPage,
   'community-voices': CommunityVoicesPage,

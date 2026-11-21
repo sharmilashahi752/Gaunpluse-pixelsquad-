@@ -46,6 +46,9 @@ function createCustomIcon(type, status = 'operational', count = null) {
   } else if (type === 'water_point' || type === 'water') {
     bg = '#0284c7'; // cyan/water
     svgPath = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg>`;
+  } else if (type === 'issue' || type === 'hazard') {
+    bg = status === 'critical' ? '#b91c1c' : '#c2410c'; // intense red / amber
+    svgPath = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
   } else {
     // Junction / transit
     bg = '#64748b';
@@ -89,10 +92,12 @@ export default function InteractiveVillageMap({
     facilities: true,
     roads: true,
     bridges: true,
+    issues: true,
   });
 
   const nodes = villageData?.nodes || [];
   const edges = villageData?.edges || [];
+  const issues = villageData?.issues || [];
   const village = villageData?.village || {};
 
   const centerLat = parseFloat(village.center_lat || village.latitude || 27.8635);
@@ -171,6 +176,20 @@ export default function InteractiveVillageMap({
           }}
         >
           Bridges
+        </button>
+        <button
+          type="button"
+          onClick={() => toggleLayer('issues')}
+          style={{
+            border: 'none',
+            padding: '4px 8px',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            background: activeLayers.issues ? '#fee2e2' : '#f1f5f9',
+            color: activeLayers.issues ? '#b91c1c' : '#64748b',
+          }}
+        >
+          ⚠️ Issues ({issues.length})
         </button>
       </div>
 
@@ -344,6 +363,66 @@ export default function InteractiveVillageMap({
             </Marker>
           );
         })}
+
+        {/* 3. Reported Infrastructure Issues Layer */}
+        {activeLayers.issues &&
+          issues.map((issue) => {
+            if (!issue.latitude || !issue.longitude) return null;
+            const lat = parseFloat(issue.latitude);
+            const lng = parseFloat(issue.longitude);
+            const isCritical = (issue.severity || '').toLowerCase() === 'critical';
+            const icon = createCustomIcon('issue', isCritical ? 'critical' : 'limited');
+
+            return (
+              <Marker key={`issue-marker-${issue.id}`} position={[lat, lng]} icon={icon}>
+                <Popup>
+                  <div style={{ minWidth: '220px', padding: '4px' }}>
+                    <div style={{ display: 'flex', gap: '6px', marginBottom: '4px' }}>
+                      <span
+                        style={{
+                          background: isCritical ? '#fee2e2' : '#ffedd5',
+                          color: isCritical ? '#991b1b' : '#c2410c',
+                          fontSize: '10px',
+                          fontWeight: '800',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        {issue.severity || 'Hazard'}
+                      </span>
+                      <span
+                        style={{
+                          background: '#e2e8f0',
+                          color: '#475569',
+                          fontSize: '10px',
+                          fontWeight: '700',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                        }}
+                      >
+                        {issue.status || 'Reported'}
+                      </span>
+                    </div>
+                    <h4 style={{ margin: '4px 0', color: '#092d22', fontSize: '13px' }}>
+                      {issue.title}
+                    </h4>
+                    <p style={{ margin: '0 0 6px', fontSize: '11px', color: '#687c73' }}>
+                      <strong>Code:</strong> {issue.tracking_code || `GP-${issue.id}`} · <strong>Category:</strong> {(issue.category || '').replace('_', ' ')}
+                    </p>
+                    <p style={{ margin: '0 0 6px', fontSize: '12px', color: '#19392f', lineHeight: '1.4' }}>
+                      {issue.description}
+                    </p>
+                    {issue.reporter_name && (
+                      <p style={{ margin: 0, fontSize: '10.5px', color: '#64748b', fontStyle: 'italic' }}>
+                        Reported by: {issue.reporter_name}
+                      </p>
+                    )}
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
       </MapContainer>
 
       {/* Map Legend Footer */}
@@ -375,6 +454,10 @@ export default function InteractiveVillageMap({
         <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#0284c7' }}></span>
           Water Reservoir
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#b91c1c' }}></span>
+          Reported Issue / Hazard
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span style={{ width: '16px', height: '3px', background: '#248157' }}></span>
