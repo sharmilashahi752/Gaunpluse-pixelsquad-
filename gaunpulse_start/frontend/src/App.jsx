@@ -7,9 +7,9 @@ import DashboardPage from './pages/DashboardPage';
 import IssuesPage from './pages/IssuesPage';
 import SimulationsPage from './pages/SimulationsPage';
 import VillageMapPage from './pages/VillageMapPage';
+import VillageDataPage from './pages/VillageDataPage';
 import {
   ReportsInsightsPage,
-  VillageDataPage,
 } from './pages/ModulePages';
 import { navigationItems } from './data/demoData';
 

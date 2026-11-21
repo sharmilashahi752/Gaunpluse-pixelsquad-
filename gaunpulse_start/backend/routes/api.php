@@ -20,7 +20,26 @@ use Illuminate\Support\Facades\Route;
 
 // Public / Demo Village & Network Routes
 Route::get('/villages', [VillageController::class, 'index']);
+Route::post('/villages', [VillageController::class, 'store']);
+Route::get('/villages/{village}', [VillageController::class, 'show']);
+Route::put('/villages/{village}', [VillageController::class, 'update']);
+Route::delete('/villages/{village}', [VillageController::class, 'destroy']);
 Route::get('/villages/{village}/network', [VillageController::class, 'network']);
+Route::get('/villages/{village}/export-geojson', [VillageController::class, 'exportGeoJson']);
+Route::post('/villages/{village}/import-geojson', [VillageController::class, 'importGeoJson']);
+Route::get('/villages/{village}/integrity', [VillageController::class, 'integrity']);
+
+// Village Infrastructure Elements CRUD
+Route::post('/villages/{village}/nodes', [VillageController::class, 'storeNode']);
+Route::put('/villages/{village}/nodes/{node}', [VillageController::class, 'updateNode']);
+Route::delete('/villages/{village}/nodes/{node}', [VillageController::class, 'destroyNode']);
+
+Route::post('/villages/{village}/edges', [VillageController::class, 'storeEdge']);
+Route::put('/villages/{village}/edges/{edge}', [VillageController::class, 'updateEdge']);
+Route::delete('/villages/{village}/edges/{edge}', [VillageController::class, 'destroyEdge']);
+
+Route::post('/villages/{village}/facilities', [VillageController::class, 'storeFacility']);
+Route::delete('/villages/{village}/facilities/{facility}', [VillageController::class, 'destroyFacility']);
 
 // Public / Demo Issues Routes
 Route::get('/issues', [IssueController::class, 'index']);
