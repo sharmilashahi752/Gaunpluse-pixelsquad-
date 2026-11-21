@@ -7,6 +7,7 @@ import {
   HardHat,
   HelpCircle,
   Home,
+  Info,
   Layers,
   Loader2,
   MapPin,
@@ -470,9 +471,9 @@ export default function SimulationsPage() {
                               {isUnreachable ? (
                                 <span style={{ color: '#c94b46' }}>Isolated from destination</span>
                               ) : isDetour ? (
-                                <span>Alt: {comp.alternative_path?.join(' → ')}</span>
+                                <span>Alt: {Array.isArray(comp.alternative_path) ? comp.alternative_path.join(' → ') : (comp.alternative_path || 'Detour available')}</span>
                               ) : (
-                                <span>Route: {comp.baseline_path?.join(' → ')}</span>
+                                <span>Route: {Array.isArray(comp.baseline_path) ? comp.baseline_path.join(' → ') : (comp.baseline_path || 'Direct path')}</span>
                               )}
                             </td>
                           </tr>
