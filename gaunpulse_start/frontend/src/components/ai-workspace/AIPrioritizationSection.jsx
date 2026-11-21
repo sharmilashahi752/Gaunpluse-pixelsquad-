@@ -140,31 +140,27 @@ export default function AIPrioritizationSection({ onNavigate, onSelectTab }) {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Policy and Algorithm Banner */}
-      <div
-        style={{
-          background: '#f4f8f4',
-          border: '1px solid #c9dec9',
-          borderRadius: 10,
-          padding: '12px 18px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-          fontSize: 12,
-          color: '#274b39',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Sliders size={20} color="#176342" style={{ flexShrink: 0 }} />
-          <div>
-            <strong>Deterministic Priority Scoring Algorithm:</strong> Weighted criteria: Population Impact (30%), Essential Service Disruption (25%), Structural Severity (30%), Ground Verification (15%).
-            Scores are calculated deterministically without LLM hallucinations.
-          </div>
-        </div>
-        <StatusBadge tone="green">Deterministic Formula</StatusBadge>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Human-Centered Task Header (Phase 7) */}
+      <div>
+        <span className="eyebrow" style={{ color: '#176342', fontWeight: 700 }}>Priority Ranking</span>
+        <h2 style={{ margin: '4px 0', fontSize: 22, color: '#092d22', fontFamily: 'Georgia, serif' }}>
+          Which problems need attention first?
+        </h2>
+        <p style={{ margin: 0, fontSize: 13, color: '#556e62' }}>
+          Discover which municipal issues require rapid deployment and engineering inspection based on population risk and facility access.
+        </p>
       </div>
+
+      {/* Expandable Scoring Methodology (Hidden by default for non-technical users) */}
+      <details className="ai-details-toggle">
+        <summary>
+          <Sliders size={14} /> View scoring methodology & criteria weights
+        </summary>
+        <div style={{ marginTop: 8, fontSize: 12, color: '#274b39', lineHeight: 1.5 }}>
+          <strong>Deterministic Formula:</strong> Population Impact (30%), Essential Service Disruption (25%), Structural Severity (30%), Ground Verification (15%). Calculated deterministically from verified municipal records.
+        </div>
+      </details>
 
       {/* Filter and Control Bar */}
       <Card style={{ padding: '14px 18px' }}>

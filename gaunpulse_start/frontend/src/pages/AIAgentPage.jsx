@@ -1,38 +1,51 @@
 import { useEffect, useState } from 'react';
 import {
-  BarChart3,
-  Bot,
-  BrainCircuit,
-  Cpu,
-  Layers,
-  MessageSquareText,
-  Network,
-  ShieldCheck,
-  Sliders,
+  ArrowLeft,
+  ChevronRight,
+  Globe,
   Sparkles,
-  Wrench,
 } from 'lucide-react';
-import { PageIntro } from '../components/ui';
-import AIWorkspaceNav from '../components/ai-workspace/AIWorkspaceNav';
-import AIOverviewSection from '../components/ai-workspace/AIOverviewSection';
+import AIHomeScreen from '../components/ai-workspace/AIHomeScreen';
 import AIPrioritizationSection from '../components/ai-workspace/AIPrioritizationSection';
 import AIImpactSection from '../components/ai-workspace/AIImpactSection';
 import AIVisualizationSection from '../components/ai-workspace/AIVisualizationSection';
 import AIRepairPlanningSection from '../components/ai-workspace/AIRepairPlanningSection';
 import AICitizenAssistanceSection from '../components/ai-workspace/AICitizenAssistanceSection';
 import AICoordinatorSection from '../components/ai-workspace/AICoordinatorSection';
+import AIOverviewSection from '../components/ai-workspace/AIOverviewSection';
 
-const VALID_TABS = ['overview', 'prioritization', 'impact', 'visualization', 'planning', 'citizen', 'coordinator'];
+const VALID_TABS = [
+  'home',
+  'prioritization',
+  'impact',
+  'reports',
+  'visualization',
+  'planning',
+  'citizen',
+  'coordinator',
+  'overview',
+];
+
+const TASK_TITLES = {
+  prioritization: 'Find Urgent Problems',
+  impact: 'Check Infrastructure Impact',
+  reports: 'Create Reports',
+  visualization: 'Create Reports',
+  planning: 'Plan a Repair',
+  citizen: 'Citizen Assistance',
+  coordinator: 'Multi-Agent Orchestrator',
+  overview: 'Technical Overview',
+};
 
 const getTabFromHash = () => {
   try {
-    const raw = window.location.hash;
+    const raw = window.location.hash || '';
     if (raw.includes('?tab=')) {
       const tab = raw.split('?tab=')[1].split('&')[0];
       if (VALID_TABS.includes(tab)) return tab;
     }
   } catch {}
-  return 'overview';
+  return 'home';
 };
 
 export default function AIAgentPage({ onNavigate }) {
@@ -50,30 +63,47 @@ export default function AIAgentPage({ onNavigate }) {
   const handleSelectTab = (tabId) => {
     if (!VALID_TABS.includes(tabId)) return;
     setActiveTab(tabId);
-    window.location.hash = `/ai-agent?tab=${tabId}`;
+    if (tabId === 'home') {
+      window.location.hash = '/ai-agent';
+    } else {
+      window.location.hash = `/ai-agent?tab=${tabId}`;
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const isHome = activeTab === 'home';
+
   return (
-    <div className="page-stack agent-page" style={{ maxWidth: 1200, margin: '0 auto' }}>
-      {/* Workspace Header */}
-      <PageIntro
-        eyebrow="Unified Municipal Decision Support"
-        title="GaunPulse AI Intelligence"
-        description="Understand problems. Compare impacts. Make informed decisions. An integrated workspace coordinating specialized rural infrastructure AI agents."
-        actions={
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#e3f3e3', color: '#176342', padding: '6px 12px', borderRadius: 8, fontSize: 11.5, fontWeight: 700 }}>
-            <Cpu size={14} /> NetworkX 3.x + MySQL ServBay
+    <div className="page-stack agent-page" style={{ maxWidth: 1120, margin: '0 auto' }}>
+      {/* Workflow Breadcrumb Header (when viewing a specific task) */}
+      {!isHome && (
+        <nav className="ai-workflow-topbar" aria-label="Task Navigation">
+          <div className="ai-breadcrumb">
+            <button
+              className="ai-back-btn"
+              type="button"
+              onClick={() => handleSelectTab('home')}
+            >
+              <ArrowLeft size={14} /> Back to AI Home
+            </button>
+            <ChevronRight size={14} color="#8fa097" />
+            <span style={{ fontWeight: 600, color: '#092d22' }}>
+              {TASK_TITLES[activeTab] || 'Task Workspace'}
+            </span>
           </div>
-        }
-      />
 
-      {/* Secondary Navigation Tabs */}
-      <AIWorkspaceNav activeTab={activeTab} onSelectTab={handleSelectTab} />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{ fontSize: 11, background: '#eaf5ee', color: '#176342', padding: '3px 10px', borderRadius: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <Globe size={12} /> Nepali & English
+            </span>
+          </div>
+        </nav>
+      )}
 
-      {/* Active Agent Workspace Section */}
-      <div role="tabpanel" id={`ai-tab-${activeTab}`} aria-labelledby={`tab-${activeTab}`}>
-        {activeTab === 'overview' && (
-          <AIOverviewSection onSelectTab={handleSelectTab} onNavigate={onNavigate} />
+      {/* Primary View: AI Home vs. Task-Oriented Workflow */}
+      <div role="region" aria-label="AI Intelligence Workspace">
+        {isHome && (
+          <AIHomeScreen onSelectTask={handleSelectTab} onNavigate={onNavigate} />
         )}
 
         {activeTab === 'prioritization' && (
@@ -84,7 +114,7 @@ export default function AIAgentPage({ onNavigate }) {
           <AIImpactSection onSelectTab={handleSelectTab} onNavigate={onNavigate} />
         )}
 
-        {activeTab === 'visualization' && (
+        {(activeTab === 'reports' || activeTab === 'visualization') && (
           <AIVisualizationSection onSelectTab={handleSelectTab} onNavigate={onNavigate} />
         )}
 
@@ -98,6 +128,10 @@ export default function AIAgentPage({ onNavigate }) {
 
         {activeTab === 'coordinator' && (
           <AICoordinatorSection onSelectTab={handleSelectTab} onNavigate={onNavigate} />
+        )}
+
+        {activeTab === 'overview' && (
+          <AIOverviewSection onSelectTab={handleSelectTab} onNavigate={onNavigate} />
         )}
       </div>
     </div>

@@ -100,31 +100,27 @@ export default function AIImpactSection({ onSelectTab, onNavigate }) {
   const activeEdge = edges.find((e) => String(e.id) === String(selectedEdgeId));
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Simulation Engine Banner */}
-      <div
-        style={{
-          background: '#f4f8f4',
-          border: '1px solid #c9dec9',
-          borderRadius: 10,
-          padding: '12px 18px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-          fontSize: 12,
-          color: '#274b39',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Network size={20} color="#176342" style={{ flexShrink: 0 }} />
-          <div>
-            <strong>NetworkX Graph-Theoretic Simulation Engine:</strong> Calculates real shortest-path connectivity changes on rural infrastructure graphs.
-            Baseline vs post-failure routes reveal exact isolated settlements, detour delays, and cut-off lifelines.
-          </div>
-        </div>
-        <StatusBadge tone="green">MultiGraph 3.x</StatusBadge>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Human-Centered Task Header (Phase 8) */}
+      <div>
+        <span className="eyebrow" style={{ color: '#176342', fontWeight: 700 }}>Infrastructure Impact</span>
+        <h2 style={{ margin: '4px 0', fontSize: 22, color: '#092d22', fontFamily: 'Georgia, serif' }}>
+          What happens if this road or bridge is blocked?
+        </h2>
+        <p style={{ margin: 0, fontSize: 13, color: '#556e62' }}>
+          Simulate real shortest-path connectivity and see which settlements are isolated from schools and health posts.
+        </p>
       </div>
+
+      {/* Expandable Technical Graph Information */}
+      <details className="ai-details-toggle">
+        <summary>
+          <Network size={14} /> View simulation engine details (NetworkX 3.x)
+        </summary>
+        <div style={{ marginTop: 8, fontSize: 12, color: '#274b39', lineHeight: 1.5 }}>
+          Calculates real shortest-path connectivity changes on rural infrastructure graphs. Baseline vs post-failure routes reveal exact isolated settlements, detour delays, and cut-off lifelines.
+        </div>
+      </details>
 
       {/* Simulator Control Card */}
       <Card style={{ padding: '16px 20px' }}>

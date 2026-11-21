@@ -214,47 +214,47 @@ export default function AIVisualizationSection() {
   const criticalCount = issues.filter((i) => (i.severity || '').toLowerCase() === 'critical').length;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Banner */}
-      <div
-        style={{
-          background: '#f4f8f4',
-          border: '1px solid #c9dec9',
-          borderRadius: 10,
-          padding: '12px 18px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-          fontSize: 12,
-          color: '#274b39',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <BarChart3 size={20} color="#176342" style={{ flexShrink: 0 }} />
-          <div>
-            <strong>Interactive Chart.js Analytics & Export Engine:</strong> Synthesizes real MySQL infrastructure incident metrics into spatial distributions, seasonal incidence trendlines, and exportable data digests.
-          </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Human-Centered Task Header (Phase 9) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <span className="eyebrow" style={{ color: '#176342', fontWeight: 700 }}>Village Evidence & Trends</span>
+          <h2 style={{ margin: '4px 0', fontSize: 22, color: '#092d22', fontFamily: 'Georgia, serif' }}>
+            Understand what's happening in your village
+          </h2>
+          <p style={{ margin: 0, fontSize: 13, color: '#556e62' }}>
+            Turn municipal records and community complaints into clear charts, trend analyses, and downloadable digests.
+          </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             type="button"
             className="button button--secondary"
             onClick={handleExportCSV}
-            style={{ fontSize: 11, padding: '4px 10px' }}
+            style={{ fontSize: 11, padding: '5px 12px' }}
           >
-            <Download size={12} /> Export CSV
+            <Download size={13} /> Export CSV
           </button>
           <button
             type="button"
             className="button button--secondary"
             onClick={handlePrint}
-            style={{ fontSize: 11, padding: '4px 10px' }}
+            style={{ fontSize: 11, padding: '5px 12px' }}
           >
-            <Printer size={12} /> Print PDF
+            <Printer size={13} /> Print PDF
           </button>
         </div>
       </div>
+
+      {/* Expandable Technical Information */}
+      <details className="ai-details-toggle">
+        <summary>
+          <BarChart3 size={14} /> View reporting engine details & database metrics
+        </summary>
+        <div style={{ marginTop: 8, fontSize: 12, color: '#274b39', lineHeight: 1.5 }}>
+          Synthesizes real MySQL infrastructure incident metrics into spatial distributions, seasonal incidence trendlines, and exportable data digests.
+        </div>
+      </details>
 
       {/* Filter and Control Bar */}
       <Card style={{ padding: '14px 18px' }}>
