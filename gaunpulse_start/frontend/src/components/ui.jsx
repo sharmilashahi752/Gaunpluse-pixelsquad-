@@ -1,4 +1,4 @@
-import { ArrowRight, FlaskConical } from 'lucide-react';
+import { ArrowRight, FlaskConical, AlertCircle, Inbox } from 'lucide-react';
 
 export function Card({ children, className = '', as: Element = 'section', style, ...props }) {
   return <Element className={`card ${className}`.trim()} style={style} {...props}>{children}</Element>;
@@ -20,20 +20,20 @@ export function CardHeader({ eyebrow, title, description, action }) {
 export function DemoLabel({ compact = false }) {
   return (
     <span className={`demo-label ${compact ? 'demo-label--compact' : ''}`.trim()}>
-      <FlaskConical size={13} aria-hidden="true" />
+      <FlaskConical size={12} aria-hidden="true" />
       Fictional demo data
     </span>
   );
 }
 
-export function LiveLabel({ text = 'Live Data', compact = false }) {
+export function LiveLabel({ text = 'Live System Active', compact = false }) {
   return (
     <span
       className={`demo-label ${compact ? 'demo-label--compact' : ''}`.trim()}
       style={{
-        background: '#eaf5ee',
-        color: '#176342',
-        borderColor: '#b8dfc2',
+        background: '#edf7f1',
+        color: '#1b7340',
+        borderColor: '#bce3cb',
         fontWeight: 600,
         display: 'inline-flex',
         alignItems: 'center',
@@ -42,11 +42,10 @@ export function LiveLabel({ text = 'Live Data', compact = false }) {
     >
       <span
         style={{
-          width: '7px',
-          height: '7px',
+          width: '6px',
+          height: '6px',
           borderRadius: '50%',
-          background: '#16a34a',
-          boxShadow: '0 0 0 2px rgba(22, 163, 74, 0.25)',
+          background: '#1b7340',
           display: 'inline-block',
         }}
       />
@@ -63,17 +62,17 @@ export function TextButton({ children, onClick, ariaLabel }) {
   return (
     <button className="text-button" type="button" onClick={onClick} aria-label={ariaLabel}>
       {children}
-      <ArrowRight size={15} aria-hidden="true" />
+      <ArrowRight size={14} aria-hidden="true" />
     </button>
   );
 }
 
-export function FeatureNotice({ title, children, icon: Icon }) {
+export function FeatureNotice({ title, children, icon: Icon = AlertCircle }) {
   return (
     <div className="feature-notice" role="note">
       {Icon && (
         <span className="feature-notice__icon">
-          <Icon size={19} aria-hidden="true" />
+          <Icon size={18} aria-hidden="true" />
         </span>
       )}
       <div>
@@ -88,11 +87,42 @@ export function PageIntro({ eyebrow, title, description, actions }) {
   return (
     <div className="page-intro">
       <div>
-        <span className="eyebrow">{eyebrow}</span>
+        {eyebrow && <span className="eyebrow">{eyebrow}</span>}
         <h1>{title}</h1>
-        <p>{description}</p>
+        {description && <p>{description}</p>}
       </div>
       {actions && <div className="page-intro__actions">{actions}</div>}
+    </div>
+  );
+}
+
+export function EmptyState({ title = 'No records found', description, action, icon: Icon = Inbox }) {
+  return (
+    <div className="empty-state">
+      <span>
+        <Icon size={22} aria-hidden="true" />
+      </span>
+      <h2>{title}</h2>
+      {description && <p>{description}</p>}
+      {action && <div style={{ marginTop: '12px' }}>{action}</div>}
+    </div>
+  );
+}
+
+export function LoadingSkeleton({ rows = 3, height = '48px' }) {
+  return (
+    <div style={{ display: 'grid', gap: '8px', width: '100%' }}>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div
+          key={i}
+          style={{
+            height,
+            background: '#f1f4ef',
+            borderRadius: '6px',
+            animation: 'pulse 1.5s ease-in-out infinite',
+          }}
+        />
+      ))}
     </div>
   );
 }

@@ -1,31 +1,33 @@
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight, Database, MapPin, Plus } from 'lucide-react';
 
-export default function WelcomeBanner({ onExplore }) {
+export default function WelcomeBanner({ userName = 'Asha', onExplore, onReportIssue }) {
   return (
     <section className="welcome-banner" aria-labelledby="welcome-title">
       <div className="welcome-banner__copy">
-        <span className="welcome-banner__eyebrow">
-          <Sparkles size={14} aria-hidden="true" />
-          Good morning, Asha
-        </span>
-        <h1 id="welcome-title">Listen to the village.<br />Act with confidence.</h1>
-        <p>See what communities are reporting, understand infrastructure impacts, and focus today’s response.</p>
-        <button className="button button--primary" type="button" onClick={onExplore}>
-          Explore village map
-          <ArrowRight size={17} aria-hidden="true" />
-        </button>
-      </div>
-
-      <div className="welcome-scene" aria-hidden="true">
-        <span className="welcome-scene__sun" />
-        <span className="welcome-scene__mountain welcome-scene__mountain--back" />
-        <span className="welcome-scene__mountain welcome-scene__mountain--front" />
-        <span className="welcome-scene__terrace welcome-scene__terrace--one" />
-        <span className="welcome-scene__terrace welcome-scene__terrace--two" />
-        <span className="welcome-scene__house welcome-scene__house--one" />
-        <span className="welcome-scene__house welcome-scene__house--two" />
-        <span className="welcome-scene__tree welcome-scene__tree--one" />
-        <span className="welcome-scene__tree welcome-scene__tree--two" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+          <span className="welcome-banner__eyebrow" style={{ margin: 0 }}>
+            Good morning, {userName}
+          </span>
+          <span style={{ fontSize: '12px', color: '#cad7cf' }}>·</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#66786d', background: '#f1f4ef', padding: '2px 8px', borderRadius: '4px', border: '1px solid #d9e3db' }}>
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#1b7340' }} />
+            MySQL 8.4 Connected
+          </span>
+        </div>
+        <h1 id="welcome-title">Here's what needs attention across your municipality.</h1>
+        <p>Active monitoring of rural lifelines, bridge health, and community disruption reports across municipal wards.</p>
+        <div className="welcome-banner__action">
+          <button className="button button--primary" type="button" onClick={onExplore}>
+            <MapPin size={15} aria-hidden="true" />
+            Explore Village Map
+          </button>
+          {onReportIssue && (
+            <button className="button button--secondary" type="button" onClick={onReportIssue}>
+              <Plus size={15} aria-hidden="true" />
+              Report Issue
+            </button>
+          )}
+        </div>
       </div>
     </section>
   );

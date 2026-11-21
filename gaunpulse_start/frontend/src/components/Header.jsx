@@ -87,33 +87,46 @@ export default function Header({ title, onMenuClick }) {
             right: '180px',
             width: '320px',
             background: '#ffffff',
-            borderRadius: '12px',
-            boxShadow: '0 12px 32px rgba(0,0,0,0.18)',
-            border: '1px solid #dfe6df',
+            borderRadius: '10px',
+            boxShadow: '0 6px 20px rgba(18, 61, 48, 0.12)',
+            border: '1px solid #d9e3db',
             zIndex: 2000,
             padding: '16px',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <strong style={{ fontSize: '13px', color: '#092d22' }}>Municipal Alerts ({unreadCount})</strong>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid #e6ece6', paddingBottom: '8px' }}>
+            <strong style={{ fontSize: '13px', color: '#172e25', fontWeight: 600 }}>Municipal Alerts ({unreadCount})</strong>
             <button
               type="button"
               onClick={() => setShowNotifications(false)}
-              style={{ border: 'none', background: 'transparent', cursor: 'pointer' }}
+              style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#66786d' }}
+              aria-label="Close alerts"
             >
               <X size={15} />
             </button>
           </div>
           <div style={{ display: 'grid', gap: '8px', maxHeight: '240px', overflowY: 'auto' }}>
-            {issues.slice(0, 4).map((iss) => (
-              <div
-                key={iss.id}
-                style={{ padding: '8px 10px', background: '#faf9f5', borderRadius: '6px', fontSize: '12px', borderLeft: `3px solid ${iss.severity === 'critical' ? '#c94b46' : '#248157'}` }}
-              >
-                <div style={{ fontWeight: 'bold', color: '#092d22' }}>{iss.title}</div>
-                <small style={{ color: '#687c73' }}>{iss.village?.name || 'Village'} · {iss.status}</small>
-              </div>
-            ))}
+            {issues.length === 0 ? (
+              <p style={{ margin: 0, fontSize: '12px', color: '#66786d', padding: '12px 0', textAlign: 'center' }}>No active alerts in queue.</p>
+            ) : (
+              issues.slice(0, 4).map((iss) => (
+                <div
+                  key={iss.id}
+                  style={{
+                    padding: '9px 12px',
+                    background: '#f7f7f3',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    borderLeft: `3px solid ${iss.severity === 'critical' ? '#c64f45' : '#267153'}`,
+                  }}
+                >
+                  <div style={{ fontWeight: 600, color: '#172e25' }}>{iss.title}</div>
+                  <small style={{ color: '#66786d', fontSize: '11px' }}>
+                    {iss.village?.name || 'Village'} · {iss.status}
+                  </small>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
@@ -127,27 +140,27 @@ export default function Header({ title, onMenuClick }) {
             right: '24px',
             width: '280px',
             background: '#ffffff',
-            borderRadius: '12px',
-            boxShadow: '0 12px 32px rgba(0,0,0,0.18)',
-            border: '1px solid #dfe6df',
+            borderRadius: '10px',
+            boxShadow: '0 6px 20px rgba(18, 61, 48, 0.12)',
+            border: '1px solid #d9e3db',
             zIndex: 2000,
             padding: '16px',
           }}
         >
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#176342', color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 'bold' }}>
+            <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: '#267153', color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: '12px' }}>
               AS
             </div>
             <div>
-              <div style={{ fontWeight: 'bold', color: '#092d22', fontSize: '14px' }}>Asha Shrestha</div>
-              <small style={{ color: '#687c73' }}>Municipal Technical Officer</small>
+              <div style={{ fontWeight: 600, color: '#172e25', fontSize: '13.5px' }}>Asha Shrestha</div>
+              <small style={{ color: '#66786d', fontSize: '11px' }}>Municipal Technical Officer</small>
             </div>
           </div>
-          <div style={{ fontSize: '11.5px', color: '#19392f', borderTop: '1px solid #dfe6df', paddingTop: '10px', display: 'grid', gap: '4px' }}>
-            <div><strong>Municipality:</strong> Helambu Gaunpalika</div>
-            <div><strong>Role:</strong> Administrator / Planner</div>
-            <div><strong>Database:</strong> ServBay MySQL 8.4 (Active)</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#176342', marginTop: '4px', fontWeight: 'bold' }}>
+          <div style={{ fontSize: '11.5px', color: '#172e25', borderTop: '1px solid #e6ece6', paddingTop: '10px', display: 'grid', gap: '5px' }}>
+            <div><strong style={{ color: '#66786d', fontWeight: 500 }}>Municipality:</strong> Helambu Gaunpalika</div>
+            <div><strong style={{ color: '#66786d', fontWeight: 500 }}>Role:</strong> Administrator / Planner</div>
+            <div><strong style={{ color: '#66786d', fontWeight: 500 }}>Database:</strong> MySQL 8.4 (Connected)</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#1b7340', marginTop: '6px', fontWeight: 600, fontSize: '11px' }}>
               <ShieldCheck size={14} /> Authorized Municipal Session
             </div>
           </div>

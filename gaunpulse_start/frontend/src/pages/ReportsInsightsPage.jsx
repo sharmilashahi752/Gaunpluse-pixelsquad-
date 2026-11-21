@@ -1151,10 +1151,11 @@ export default function ReportsInsightsPage({ onNavigate }) {
       {/* 4. AI Insights Banner / Drawer Trigger (Phase 9) */}
       <Card
         style={{
-          background: 'linear-gradient(135deg, #092d22 0%, #176342 100%)',
+          background: '#123d30',
+          border: '1px solid #1d4d3e',
           color: '#ffffff',
           padding: '20px 24px',
-          borderRadius: '16px',
+          borderRadius: '12px',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>

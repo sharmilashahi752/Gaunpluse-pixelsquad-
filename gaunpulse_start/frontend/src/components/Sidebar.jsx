@@ -14,14 +14,14 @@ export default function Sidebar({ activePage, isOpen, onNavigate, onClose }) {
       <aside className={`sidebar ${isOpen ? 'is-open' : ''}`} aria-label="Primary navigation">
         <div className="sidebar__brand">
           <span className="brand-mark" aria-hidden="true">
-            <Leaf size={24} strokeWidth={2.4} />
+            <Leaf size={22} strokeWidth={2.4} />
           </span>
           <div>
             <strong>GaunPulse</strong>
             <span>The Village That Speaks</span>
           </div>
           <button className="icon-button sidebar__close" type="button" onClick={onClose} aria-label="Close menu">
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
@@ -30,33 +30,39 @@ export default function Sidebar({ activePage, isOpen, onNavigate, onClose }) {
           <strong>Helambu Rural Municipality</strong>
         </div>
 
-        <nav className="sidebar__nav">
-          <span className="sidebar__label">Workspace</span>
-          {navigationItems.map(({ id, label, icon: Icon, badge }) => (
-            <button
-              key={id}
-              className={`nav-item ${activePage === id ? 'is-active' : ''}`}
-              type="button"
-              aria-current={activePage === id ? 'page' : undefined}
-              onClick={() => onNavigate(id)}
-            >
-              <Icon size={19} strokeWidth={2} aria-hidden="true" />
-              <span>{label}</span>
-              {badge && <span className="nav-item__badge" aria-label={`${badge} active items`}>{badge}</span>}
-            </button>
-          ))}
+        <nav className="sidebar__nav" aria-label="Main menu">
+          <span className="sidebar__label">Workspace Navigation</span>
+          {navigationItems.map(({ id, label, icon: Icon, badge }) => {
+            const isActive = activePage === id;
+            return (
+              <button
+                key={id}
+                className={`nav-item ${isActive ? 'is-active' : ''}`}
+                type="button"
+                aria-current={isActive ? 'page' : undefined}
+                onClick={() => onNavigate(id)}
+              >
+                <Icon size={18} strokeWidth={2} aria-hidden="true" />
+                <span>{label}</span>
+                {badge && (
+                  <span className="nav-item__badge" aria-label={`${badge} active items`}>
+                    {badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </nav>
 
         <div className="sidebar__footer">
-          <div className="sidebar__pulse" aria-hidden="true" style={{ background: 'rgba(74, 222, 128, 0.2)' }}>
-            <span style={{ background: '#4ade80' }} />
+          <div className="sidebar__pulse" aria-hidden="true">
+            <span />
           </div>
           <div>
-            <strong>Live System Active</strong>
-            <span>MySQL & NetworkX Connected</span>
+            <strong>System Operational</strong>
+            <span>MySQL & NetworkX Active</span>
           </div>
         </div>
-        <ChevronLeft className="sidebar__edge-icon" size={16} aria-hidden="true" />
       </aside>
     </>
   );
