@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
 import AppLayout from './layouts/AppLayout';
 import DashboardPage from './pages/DashboardPage';
+import SimulationsPage from './pages/SimulationsPage';
+import VillageMapPage from './pages/VillageMapPage';
 import {
   ActionPlansPage,
   AIAgentPage,
   CommunityVoicesPage,
   IssuesAlertsPage,
   ReportsInsightsPage,
-  SimulationsPage,
   VillageDataPage,
-  VillageMapPage,
 } from './pages/ModulePages';
 import { navigationItems } from './data/demoData';
 

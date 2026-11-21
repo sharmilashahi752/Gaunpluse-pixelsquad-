@@ -1,3 +1,6 @@
-fastapi
-uvicorn[standard]
-networkx
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+networkx>=3.3
+pydantic>=2.8.0
+httpx>=0.28.0
+pytest>=8.0.0

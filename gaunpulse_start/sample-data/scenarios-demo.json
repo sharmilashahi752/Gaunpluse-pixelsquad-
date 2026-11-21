@@ -1,0 +1,81 @@
+{
+  "metadata": {
+    "project": "GaunPulse — The Village That Speaks",
+    "village": "Bhotenamlang (Demo Village)",
+    "municipality": "Helambu Rural Municipality",
+    "district": "Sindhupalchok",
+    "province": "Bagmati Province",
+    "data_quality": "fictional_demo",
+    "note": "Deterministic demonstration scenarios designed for Part 4 verification and automated testing."
+  },
+  "scenarios": [
+    {
+      "code": "SCENARIO_A",
+      "title": "Suspension Bridge B Complete Failure",
+      "description": "Suspension Bridge B connecting Settlement B (Tallo Gaun, 20 households) over the river gorge is washed out during torrential monsoon flooding. Settlement B has no alternative vehicular or pedestrian connection.",
+      "tested_asset": "bridge_b",
+      "expected_outcome": {
+        "isolated_settlements_count": 1,
+        "affected_households": 20,
+        "newly_disconnected_households": 20,
+        "school_access": "unreachable",
+        "health_post_access": "unreachable",
+        "water_access": "unreachable"
+      }
+    },
+    {
+      "code": "SCENARIO_B",
+      "title": "Bridge Failure with Mountain Ridge Detour Active",
+      "description": "Bridge B is impassable, but an arduous high-elevation ridge footpath connecting Settlement B to Settlement A remains passable. Travel time increases significantly.",
+      "tested_asset": "bridge_b_with_detour",
+      "expected_outcome": {
+        "isolated_settlements_count": 0,
+        "detour_settlements_count": 1,
+        "affected_households": 20,
+        "newly_disconnected_households": 0,
+        "school_journey_baseline_minutes": 18,
+        "school_journey_post_failure_minutes": 58,
+        "travel_time_increase_minutes": 40
+      }
+    },
+    {
+      "code": "SCENARIO_C",
+      "title": "Parallel Road Failure with Redundant Route Intact",
+      "description": "A primary road segment between Settlement A and Central Junction is blocked by minor rockfall, but a parallel bypass connector exists with identical or similar travel time.",
+      "tested_asset": "road_1_primary",
+      "expected_outcome": {
+        "affected_households": 0,
+        "isolated_settlements_count": 0,
+        "detour_settlements_count": 0,
+        "status": "unchanged"
+      }
+    },
+    {
+      "code": "SCENARIO_D",
+      "title": "Already Disconnected Remote Settlement",
+      "description": "Remote Tol (15 households) was already unmapped or disconnected from the road network before the simulation. When another road fails, the algorithm must not falsely count Remote Tol as newly disconnected.",
+      "tested_asset": "road_1",
+      "expected_outcome": {
+        "already_disconnected_households": 15,
+        "newly_disconnected_households": 0,
+        "total_new_impact": 0
+      }
+    }
+  ],
+  "repair_comparison": {
+    "title": "What If We Fix This First?",
+    "scenario_a": {
+      "name": "Repair Suspension Bridge B First",
+      "repaired_edge": "bridge_b",
+      "expected_reconnected_households": 20,
+      "facilities_restored": ["Primary Health Post", "Community School"]
+    },
+    "scenario_b": {
+      "name": "Clear Road 1 Debris Slide First",
+      "repaired_edge": "road_1",
+      "expected_reconnected_households": 35,
+      "facilities_restored": ["Primary Health Post", "Community School", "Water Reservoir"]
+    },
+    "officer_decision_note": "A municipal official must make the final decision based on local priorities and seasonal monsoon flood risks rather than cost estimates alone."
+  }
+}

@@ -1,91 +1,183 @@
 # GaunPulse — The Village That Speaks
 
-**Developer blueprint + functional React UI demo + independently runnable Python network simulator.**
+**AI-ready rural infrastructure intelligence platform for Nepal.**
 
-This folder is NOT a complete installed Laravel project or a connected AI agent. The Laravel file examples need to be copied into a new application generated with Composer. The frontend is a UI reference with fictional sample data.
+GaunPulse models rural lifeline networks (roads, bridges, footpaths, schools, health posts, and water reservoirs) as mathematical graphs. Using NetworkX graph algorithms, it simulates the real human impact of seasonal monsoons, landslides, and bridge failures on rural communities, and helps municipal officials compare repair interventions ("What If We Fix This First?").
 
-## Install prerequisites on Windows
-- Node.js LTS (compatible with your Vite version)
-- PHP 8.2+ with required Laravel extensions and Composer
-- MySQL (e.g. ServBay)
-- Python 3.11+ and Git
-- VS Code
+---
 
-## 1. Test the React dashboard
+## Architecture Overview
 
-In PowerShell:
+1. **Frontend (React 19 + Vite + Leaflet + OpenStreetMap)**
+   - Port: `http://127.0.0.1:5173/`
+   - Interactive GIS map with Leaflet tiles, condition markers, and failure visualization.
+   - Live Failure Simulation and "What If We Fix This First?" Repair Comparison UI.
+
+2. **Backend API (Laravel 11 / PHP 8.3 + MySQL ServBay)**
+   - Port: `http://127.0.0.1:8000/api`
+   - Manages villages, infrastructure nodes, edges, facilities, and citizen issue reports.
+   - Internal authorized gateway proxying graph calculation requests to the private Python intelligence service.
+
+3. **Intelligence Engine (Python 3.13 + FastAPI + NetworkX)**
+   - Port: `http://127.0.0.1:8001/` (Interactive Docs: `http://127.0.0.1:8001/docs`)
+   - Pure graph-theoretic shortest-path calculations using NetworkX.
+   - Computes baseline vs post-disruption accessibility, newly disconnected households, detours, and repair trade-offs.
+
+---
+
+## How to Run All Services (Windows PowerShell)
+
+### 1. Python Intelligence Service
 
 ```powershell
-cd frontend
-npm install
-npm run dev
-```
-
-Open the local URL shown by Vite (normally http://127.0.0.1:5173). Do not assume this runs until `npm install` has completed successfully.
-
-## 2. Run the Python simulation API
-
-In a second PowerShell window:
-
-```powershell
-cd intelligence
-py -m venv .venv
-.\.venv\Scripts\Activate.ps1
+cd gaunpulse_start\intelligence
 python -m pip install -r requirements.txt
-uvicorn main:app --host 127.0.0.1 --port 8001 --reload
+python -m uvicorn main:app --host 127.0.0.1 --port 8001
 ```
 
-If PowerShell prevents activation, use `.\.venv\Scripts\python.exe -m pip install -r requirements.txt` and `.\.venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8001 --reload` instead.
+Run automated pytest test suite:
+```powershell
+python -m pytest -v
+```
 
-Go to http://127.0.0.1:8001/docs to test POST `/simulate` with the contents of `sample-data/demo-network.json` and `failed_edge_id` set to `bridge_b`.
-
-Expected sample result: 20 affected households see an access change; Settlement B retains a detour, but school and health-post journeys increase by 40 minutes. **This number is fictional.**
-
-## 3. Create the Laravel backend
-
-In another PowerShell window from the parent `gaunpulse` folder (with Composer installed):
+### 2. Laravel Backend API
 
 ```powershell
-composer create-project laravel/laravel backend
-cd backend
-php artisan install:api
-```
-
-Create an empty MySQL database named `gaunpulse` using your existing MySQL administration tool. Add database connection information to backend/.env (never commit passwords):
-
-```dotenv
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=gaunpulse
-DB_USERNAME=your_local_database_user
-DB_PASSWORD=your_private_database_password
-```
-
-Copy the sample migration from `backend-starter/database/migrations/` into `backend/database/migrations/`.
-Copy `backend-starter/routes/api.php` to `backend/routes/api.php`.
-Then:
-
-```powershell
+cd gaunpulse_start\backend
 php artisan migrate
 php artisan serve --host=127.0.0.1 --port=8000
 ```
 
-Check http://127.0.0.1:8000/api/health and http://127.0.0.1:8000/api/dashboard.
+Run automated PHPUnit test suite:
+```powershell
+php vendor/bin/phpunit
+```
 
-**Security:** Do not paste actual database passwords or AI keys into chat. Use least-privilege database credentials, Laravel authorization policies, private Python services, CSRF/session or secure token-based authentication, and server-side validation.
+### 3. React Frontend Dashboard
 
-## 4. Next integrations, in order
+```powershell
+cd gaunpulse_start\frontend
+npm install
+npm run dev
+```
 
-1. Add official village CRUD endpoints with authentication, validation and roles.
-2. Connect React to GET `/api/dashboard` and GET `/api/villages`.
-3. Add Leaflet/OpenStreetMap mapping with proper attribution.
-4. Store a georeferenced infrastructure network (nodes, edges, facilities) and support versioned imports.
-5. Have Laravel call private FastAPI `/simulate` after verifying permissions.
-6. Display computed before/after results, not fictional numbers.
-7. Add issue reporting, verification and repair comparisons.
-8. Add an AI agent that can use read-only tools; require human review for official actions.
+Build for production:
+```powershell
+npm run build
+```
 
-## INNEX originality restriction
+---
 
-If INNEX rules require all hackathon code to be created during the 48-hour event, use this package only as a design/study blueprint beforehand. Do not submit or reuse prebuilt code unless explicitly permitted by organizers.
+## Infrastructure Impact Simulation Algorithm
+
+When a failure is simulated on a road or bridge:
+
+1. **Graph Construction:** Builds an in-memory `networkx.MultiGraph` from validated village nodes and edges.
+2. **Baseline Journey Routing:** Calculates shortest travel paths from each settlement to all essential facilities (schools, health posts, water intake points).
+3. **Graph Copy Isolation:** Clones the graph in memory and removes the failed infrastructure connection. **The MySQL database records are never modified or deleted.**
+4. **Disruption Assessment:**
+   - **Newly Disconnected:** Settlements that lose all paths to one or more essential facilities (`status: unreachable`).
+   - **Detour Routes:** Settlements that retain access via longer mountain routes (`status: detour`), reporting exact extra travel minutes.
+   - **Already Disconnected:** Preserves settlements that were already cut off before the scenario, preventing false impact counts.
+5. **Household Aggregation:** Tallies unique households without double-counting when multiple facilities fail.
+
+---
+
+## "What If We Fix This First?" Repair Comparison Engine
+
+Allows municipal leadership to compare two competing repair options side-by-side:
+
+- **Scenario A:** e.g., Repair Suspension Bridge B First.
+- **Scenario B:** e.g., Clear Road 1 Debris Slide First.
+
+Calculates:
+- Unique households regaining mapped access.
+- Essential facilities restored.
+- Total travel time saved across journeys.
+- Remaining disruptions and unreachable routes.
+- **Cost Transparency:** Costs are marked as `unknown - do not rank on cost without verified estimates`. Final priority is decided by municipal officials based on community vulnerability and monsoon safety.
+
+---
+
+## API Request and Response Examples
+
+### POST `/api/simulations`
+
+Request:
+```json
+{
+  "village_id": 1,
+  "blocked_edge_ids": [2]
+}
+```
+
+Response:
+```json
+{
+  "id": 1,
+  "village_id": 1,
+  "blocked_edge_ids": [2],
+  "result": {
+    "failed_edge_id": 2,
+    "blocked_edge_ids": ["2"],
+    "affected_households": 20,
+    "newly_disconnected_households": 20,
+    "already_disconnected_households": 0,
+    "isolated_settlements": [
+      {
+        "settlement": "Settlement B (Tallo Gaun)",
+        "settlement_id": "2",
+        "households": 20,
+        "reason": "Complete isolation: no accessible path remaining to any essential facility."
+      }
+    ],
+    "access_comparisons": [
+      {
+        "settlement": "Settlement B (Tallo Gaun)",
+        "facility": "Bhotenamlang Primary Health Post",
+        "facility_type": "health_post",
+        "before_minutes": 18.0,
+        "after_minutes": null,
+        "status": "unreachable"
+      }
+    ],
+    "summary_explanation": "Simulated failure of Suspension Bridge B: 1 settlement(s) facing isolation: Settlement B (Tallo Gaun) (20 HH); A total of 20 unique households are impacted across the village network.",
+    "data_quality": "fictional_demo"
+  }
+}
+```
+
+### POST `/api/simulations/compare`
+
+Request:
+```json
+{
+  "village_id": 1,
+  "currently_blocked_edge_ids": [1, 2],
+  "scenario_a": {
+    "name": "Repair Suspension Bridge B First",
+    "repair_edge_ids": [2]
+  },
+  "scenario_b": {
+    "name": "Clear Road 1 Debris Slide First",
+    "repair_edge_ids": [1]
+  }
+}
+```
+
+---
+
+## Test Scenarios (sample-data/scenarios-demo.json)
+
+- **Scenario A:** Suspension Bridge B failure completely disconnects Settlement B (20 households isolated).
+- **Scenario B:** Bridge failure where a high mountain ridge detour remains (travel time +40 minutes).
+- **Scenario C:** Parallel road failure with redundant connector intact (0 households impacted).
+- **Scenario D:** Remote settlement already disconnected at baseline (properly categorized as already disconnected).
+
+---
+
+## Limitations and Data Quality
+
+- All current topological coordinates and numbers represent **demonstration data for Bhotenamlang Demo Village** in Helambu, Sindhupalchok.
+- Simulation travel times assume standard mountain pedestrian transit speeds (~50-65 meters/minute) adjusted for gradient and surface type.
+- Results must serve as decision-support guidance for municipal engineers, never replacing physical on-site geotechnical inspection.
