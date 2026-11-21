@@ -792,23 +792,11 @@ export default function VillageMapPage() {
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' }}>
             <button
               type="button"
+              className={`button ${isNationwideView ? 'button--primary' : 'button--secondary'}`}
               onClick={() => {
                 setIsNationwideView(true);
                 setSelectedLocationMarker(null);
                 showNotification('Showing all registered villages across Nepal.');
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '7px 12px',
-                borderRadius: '8px',
-                border: isNationwideView ? '2px solid #176342' : '1px solid #dfe6df',
-                background: isNationwideView ? '#e4f4e9' : '#fff',
-                color: isNationwideView ? '#124b35' : '#19392f',
-                fontSize: '13px',
-                fontWeight: '700',
-                cursor: 'pointer',
               }}
             >
               <Globe size={15} /> View All Nepal
@@ -825,12 +813,12 @@ export default function VillageMapPage() {
               }}
               style={{
                 padding: '7px 12px',
-                borderRadius: '8px',
-                border: '1px solid #dfe6df',
-                background: '#fff',
-                fontSize: '13px',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border)',
+                background: 'var(--surface)',
+                fontSize: '12.5px',
                 fontWeight: '600',
-                color: '#092d22',
+                color: 'var(--text-primary)',
               }}
             >
               <option value="" disabled>-- Select Saved Village --</option>
@@ -843,20 +831,8 @@ export default function VillageMapPage() {
 
             <button
               type="button"
+              className="button button--primary"
               onClick={() => setIsAddVillageModalOpen(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '7px 14px',
-                borderRadius: '8px',
-                border: 'none',
-                background: '#176342',
-                color: '#fff',
-                fontSize: '13px',
-                fontWeight: '700',
-                cursor: 'pointer',
-              }}
             >
               <Plus size={15} /> Add New Village
             </button>
@@ -872,16 +848,16 @@ export default function VillageMapPage() {
           gap: '12px',
           alignItems: 'center',
           justifyContent: 'space-between',
-          background: '#fff',
+          background: 'var(--surface)',
           padding: '12px 18px',
-          borderRadius: '12px',
-          border: '1px solid #dfe6df',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+          borderRadius: 'var(--radius-lg)',
+          border: '1px solid var(--border)',
+          boxShadow: 'var(--shadow-sm)',
         }}
       >
         <div style={{ position: 'relative', flex: '1 1 340px' }}>
           <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
-            <Search size={17} style={{ position: 'absolute', left: '12px', color: '#64748b' }} />
+            <Search size={16} style={{ position: 'absolute', left: '12px', color: 'var(--text-secondary)' }} />
             <input
               type="text"
               placeholder="Search any village, municipality or district in Nepal (e.g. Marpha, Mustang, Pokhara, Helambu)..."
@@ -891,15 +867,16 @@ export default function VillageMapPage() {
               style={{
                 width: '100%',
                 padding: '9px 12px 9px 38px',
-                borderRadius: '8px',
-                border: '1px solid #cbd5e1',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border)',
                 fontSize: '13px',
-                background: '#f8fafc',
+                background: 'var(--surface-subtle)',
+                color: 'var(--text-primary)',
                 outline: 'none',
               }}
             />
             {isSearching && (
-              <RefreshCw size={14} className="animate-spin" style={{ position: 'absolute', right: '12px', color: '#176342' }} />
+              <RefreshCw size={14} className="animate-spin" style={{ position: 'absolute', right: '12px', color: 'var(--primary-green)' }} />
             )}
           </div>
 
@@ -912,9 +889,9 @@ export default function VillageMapPage() {
                 right: 0,
                 marginTop: '4px',
                 background: '#ffffff',
-                border: '1px solid #cbd5e1',
-                borderRadius: '10px',
-                boxShadow: '0 10px 25px rgba(0,0,0,0.12)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+                boxShadow: 'var(--shadow-md)',
                 zIndex: 2000,
                 maxHeight: '320px',
                 overflowY: 'auto',
@@ -926,40 +903,40 @@ export default function VillageMapPage() {
                   onClick={() => handleSelectSearchResult(item)}
                   style={{
                     padding: '10px 14px',
-                    borderBottom: idx < searchResults.length - 1 ? '1px solid #f1f5f9' : 'none',
+                    borderBottom: idx < searchResults.length - 1 ? '1px solid var(--border-subtle)' : 'none',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'flex-start',
                     gap: '10px',
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = '#f8fafc')}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-subtle)')}
                   onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}
                 >
                   <MapPin
-                    size={18}
+                    size={17}
                     style={{
-                      color: item.type === 'saved_village' ? '#166534' : (item.type === 'municipality' ? '#0369a1' : '#ea580c'),
+                      color: item.type === 'saved_village' ? 'var(--primary-green)' : (item.type === 'municipality' ? '#2563eb' : '#b7792c'),
                       marginTop: '2px',
                     }}
                   />
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <strong style={{ fontSize: '13px', color: '#0f172a' }}>{item.title}</strong>
+                      <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }}>{item.title}</strong>
                       <span
                         style={{
                           fontSize: '10px',
-                          fontWeight: '700',
+                          fontWeight: '600',
                           textTransform: 'uppercase',
                           padding: '1px 6px',
                           borderRadius: '4px',
-                          background: item.type === 'saved_village' ? '#dcfce7' : '#f1f5f9',
-                          color: item.type === 'saved_village' ? '#166534' : '#475569',
+                          background: item.type === 'saved_village' ? 'var(--success-bg)' : 'var(--surface-subtle)',
+                          color: item.type === 'saved_village' ? 'var(--success)' : 'var(--text-secondary)',
                         }}
                       >
                         {item.type.replace('_', ' ')}
                       </span>
                     </div>
-                    <div style={{ fontSize: '11.5px', color: '#64748b' }}>{item.subtitle}</div>
+                    <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>{item.subtitle}</div>
                   </div>
                 </div>
               ))}
@@ -967,15 +944,16 @@ export default function VillageMapPage() {
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', color: '#334155' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', color: 'var(--text-secondary)' }}>
           {clickedCoords ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f1f8f2', padding: '5px 10px', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
-              <Compass size={15} color="#166534" />
-              <span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--surface-subtle)', padding: '5px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+              <Compass size={15} color="var(--primary-green)" />
+              <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>
                 <strong>Lat:</strong> {clickedCoords.lat}°N, <strong>Lng:</strong> {clickedCoords.lng}°E
               </span>
               <button
                 type="button"
+                className="button button--primary"
                 onClick={() => {
                   setVillageForm((prev) => ({
                     ...prev,
@@ -985,13 +963,7 @@ export default function VillageMapPage() {
                   setIsAddVillageModalOpen(true);
                 }}
                 style={{
-                  background: '#176342',
-                  color: '#fff',
-                  border: 'none',
                   padding: '3px 8px',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontWeight: '700',
                   fontSize: '11px',
                 }}
               >
@@ -999,7 +971,7 @@ export default function VillageMapPage() {
               </button>
             </div>
           ) : (
-            <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>
+            <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '11.5px' }}>
               💡 Click anywhere on map to inspect coordinates or set asset positions
             </span>
           )}
@@ -1017,11 +989,11 @@ export default function VillageMapPage() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#092d22' }}>
+          <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-primary)' }}>
             {isNationwideView ? 'Nepal Nationwide Exploration Mode' : `Active: ${village.name || 'Demonstration Village'}`}
           </span>
           {!isNationwideView && village.district && (
-            <span style={{ fontSize: '12px', color: '#64748b' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
               (Ward {village.ward_no || '1'}, {village.municipality}, {village.district})
             </span>
           )}
@@ -1032,21 +1004,8 @@ export default function VillageMapPage() {
             {/* Automatic Discovery Action Button (Phase 2 & 5) */}
             <button
               type="button"
+              className="button button--primary"
               onClick={() => triggerDiscovery(selectedVillageId, 2000)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '6px 14px',
-                borderRadius: '7px',
-                border: 'none',
-                background: '#047857',
-                color: '#fff',
-                fontSize: '12.5px',
-                fontWeight: '700',
-                cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(4,120,87,0.25)',
-              }}
             >
               <Sparkles size={14} /> Auto-Discover Infrastructure
             </button>
@@ -1054,20 +1013,8 @@ export default function VillageMapPage() {
             {/* + Add Infrastructure Button */}
             <button
               type="button"
+              className="button button--secondary"
               onClick={() => setIsAddAssetModalOpen(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '6px 12px',
-                borderRadius: '7px',
-                border: '1px solid #176342',
-                background: '#fff',
-                color: '#176342',
-                fontSize: '12.5px',
-                fontWeight: '700',
-                cursor: 'pointer',
-              }}
             >
               <Plus size={14} /> Add Manual Asset
             </button>
@@ -1075,20 +1022,8 @@ export default function VillageMapPage() {
             {/* Validate Network Button */}
             <button
               type="button"
+              className="button button--secondary"
               onClick={handleRunDiagnostic}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '6px 12px',
-                borderRadius: '7px',
-                border: '1px solid #dfe6df',
-                background: '#fff',
-                color: '#b45309',
-                fontSize: '12.5px',
-                fontWeight: '700',
-                cursor: 'pointer',
-              }}
             >
               <Zap size={14} /> Validate Topology
             </button>
@@ -1137,33 +1072,22 @@ export default function VillageMapPage() {
 
       {/* Selected Infrastructure Asset Inspector Box */}
       {selectedEdge && (
-        <Card style={{ background: '#f1f8f2', border: '1.5px solid #248157' }}>
+        <Card style={{ background: 'var(--surface-subtle)', border: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <span className="eyebrow" style={{ color: '#176342' }}>Selected Lifeline Road / Bridge Asset</span>
-              <h3 style={{ margin: '2px 0 6px', color: '#092d22' }}>{selectedEdge.name}</h3>
-              <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#19392f' }}>
-                <strong>Type:</strong> {selectedEdge.infrastructure_type || selectedEdge.type} · <strong>Surface:</strong> {selectedEdge.surface_type || 'Gravel'} · <strong>Length:</strong> {selectedEdge.length_meters || 0}m · <strong>Condition:</strong> <span style={{ fontWeight: 'bold' }}>{selectedEdge.status || 'operational'}</span> · <strong>Verification:</strong> <span style={{ color: '#166534', fontWeight: 'bold' }}>{selectedEdge.verification_status || 'unverified'}</span>
+              <span className="eyebrow">Selected Lifeline Road / Bridge Asset</span>
+              <h3 style={{ margin: '2px 0 6px', color: 'var(--text-primary)' }}>{selectedEdge.name}</h3>
+              <p style={{ margin: '0 0 6px', fontSize: '13px', color: 'var(--text-primary)' }}>
+                <strong>Type:</strong> {selectedEdge.infrastructure_type || selectedEdge.type} · <strong>Surface:</strong> {selectedEdge.surface_type || 'Gravel'} · <strong>Length:</strong> <span style={{ fontVariantNumeric: 'tabular-nums' }}>{selectedEdge.length_meters || 0}m</span> · <strong>Condition:</strong> <span style={{ fontWeight: '600' }}>{selectedEdge.status || 'operational'}</span> · <strong>Verification:</strong> <span style={{ color: 'var(--success)', fontWeight: '600' }}>{selectedEdge.verification_status || 'unverified'}</span>
               </p>
-              {selectedEdge.notes && <p style={{ margin: '0 0 6px', fontStyle: 'italic', color: '#475569', fontSize: '12.5px' }}>{selectedEdge.notes}</p>}
+              {selectedEdge.notes && <p style={{ margin: '0 0 6px', fontStyle: 'italic', color: 'var(--text-secondary)', fontSize: '12px' }}>{selectedEdge.notes}</p>}
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button
                 type="button"
+                className="button button--danger"
                 onClick={() => handleDeleteEdge(selectedEdge.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  background: '#fee2e2',
-                  color: '#991b1b',
-                  border: 'none',
-                  padding: '5px 10px',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontWeight: '700',
-                  fontSize: '12px',
-                }}
+                style={{ fontSize: '12px', padding: '5px 10px' }}
               >
                 <Trash2 size={13} /> Remove Edge
               </button>
@@ -1171,7 +1095,7 @@ export default function VillageMapPage() {
                 className="button button--secondary"
                 type="button"
                 onClick={() => setSelectedEdge(null)}
-                style={{ fontSize: '12px', padding: '4px 10px' }}
+                style={{ fontSize: '12px', padding: '5px 10px' }}
               >
                 Close
               </button>
@@ -1181,33 +1105,22 @@ export default function VillageMapPage() {
       )}
 
       {selectedNode && (
-        <Card style={{ background: '#eff6ff', border: '1.5px solid #3b82f6' }}>
+        <Card style={{ background: 'var(--surface-subtle)', border: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <span className="eyebrow" style={{ color: '#1d4ed8' }}>Selected Node Facility / Settlement</span>
-              <h3 style={{ margin: '2px 0 6px', color: '#1e3a8a' }}>{selectedNode.name}</h3>
-              <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#1e293b' }}>
-                <strong>Type:</strong> {(selectedNode.node_type || selectedNode.type || 'junction').toUpperCase()} · <strong>Coordinates:</strong> {parseFloat(selectedNode.latitude).toFixed(5)}, {parseFloat(selectedNode.longitude).toFixed(5)} · <strong>Verification:</strong> <span style={{ color: '#1e40af', fontWeight: 'bold' }}>{selectedNode.verification_status || 'unverified'}</span>
+              <span className="eyebrow">Selected Node Facility / Settlement</span>
+              <h3 style={{ margin: '2px 0 6px', color: 'var(--text-primary)' }}>{selectedNode.name}</h3>
+              <p style={{ margin: '0 0 6px', fontSize: '13px', color: 'var(--text-primary)' }}>
+                <strong>Type:</strong> {(selectedNode.node_type || selectedNode.type || 'junction').toUpperCase()} · <strong>Coordinates:</strong> <span style={{ fontVariantNumeric: 'tabular-nums' }}>{parseFloat(selectedNode.latitude).toFixed(5)}, {parseFloat(selectedNode.longitude).toFixed(5)}</span> · <strong>Verification:</strong> <span style={{ color: 'var(--primary-green)', fontWeight: '600' }}>{selectedNode.verification_status || 'unverified'}</span>
               </p>
-              {selectedNode.description && <p style={{ margin: '0 0 6px', color: '#475569', fontSize: '12.5px' }}>{selectedNode.description}</p>}
+              {selectedNode.description && <p style={{ margin: '0 0 6px', color: 'var(--text-secondary)', fontSize: '12px' }}>{selectedNode.description}</p>}
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button
                 type="button"
+                className="button button--danger"
                 onClick={() => handleDeleteNode(selectedNode.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  background: '#fee2e2',
-                  color: '#991b1b',
-                  border: 'none',
-                  padding: '5px 10px',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontWeight: '700',
-                  fontSize: '12px',
-                }}
+                style={{ fontSize: '12px', padding: '5px 10px' }}
               >
                 <Trash2 size={13} /> Remove Node
               </button>
@@ -1215,7 +1128,7 @@ export default function VillageMapPage() {
                 className="button button--secondary"
                 type="button"
                 onClick={() => setSelectedNode(null)}
-                style={{ fontSize: '12px', padding: '4px 10px' }}
+                style={{ fontSize: '12px', padding: '5px 10px' }}
               >
                 Close
               </button>
@@ -1227,60 +1140,60 @@ export default function VillageMapPage() {
       {/* Village Summary Counters */}
       {!isNationwideView && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
-          <Card style={{ padding: '14px', background: '#fff' }}>
+          <Card style={{ padding: '14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Home size={22} color="#176342" />
+              <Home size={20} color="var(--primary-green)" />
               <div>
-                <span style={{ fontSize: '11px', color: '#687c73', textTransform: 'uppercase', fontWeight: 'bold' }}>Settlements</span>
-                <div style={{ fontSize: '20px', fontWeight: '800', color: '#092d22' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '600', letterSpacing: '0.4px' }}>Settlements</span>
+                <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
                   {nodes.filter((n) => (n.node_type || n.type) === 'settlement' || n.settlement_group_id).length}
                 </div>
               </div>
             </div>
           </Card>
 
-          <Card style={{ padding: '14px', background: '#fff' }}>
+          <Card style={{ padding: '14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <HeartPulse size={22} color="#0f766e" />
+              <HeartPulse size={20} color="#0f766e" />
               <div>
-                <span style={{ fontSize: '11px', color: '#687c73', textTransform: 'uppercase', fontWeight: 'bold' }}>Health Facilities</span>
-                <div style={{ fontSize: '20px', fontWeight: '800', color: '#092d22' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '600', letterSpacing: '0.4px' }}>Health Facilities</span>
+                <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
                   {nodes.filter((n) => (n.node_type || n.type || '').includes('health')).length}
                 </div>
               </div>
             </div>
           </Card>
 
-          <Card style={{ padding: '14px', background: '#fff' }}>
+          <Card style={{ padding: '14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <GraduationCap size={22} color="#1d4ed8" />
+              <GraduationCap size={20} color="#2563eb" />
               <div>
-                <span style={{ fontSize: '11px', color: '#687c73', textTransform: 'uppercase', fontWeight: 'bold' }}>Schools & Colleges</span>
-                <div style={{ fontSize: '20px', fontWeight: '800', color: '#092d22' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '600', letterSpacing: '0.4px' }}>Schools & Colleges</span>
+                <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
                   {nodes.filter((n) => (n.node_type || n.type || '').includes('school')).length}
                 </div>
               </div>
             </div>
           </Card>
 
-          <Card style={{ padding: '14px', background: '#fff' }}>
+          <Card style={{ padding: '14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Waypoints size={22} color="#b45309" />
+              <Waypoints size={20} color="var(--warning)" />
               <div>
-                <span style={{ fontSize: '11px', color: '#687c73', textTransform: 'uppercase', fontWeight: 'bold' }}>Suspension Bridges</span>
-                <div style={{ fontSize: '20px', fontWeight: '800', color: '#092d22' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '600', letterSpacing: '0.4px' }}>Suspension Bridges</span>
+                <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
                   {edges.filter((e) => (e.infrastructure_type || e.type) === 'bridge').length}
                 </div>
               </div>
             </div>
           </Card>
 
-          <Card style={{ padding: '14px', background: '#fff' }}>
+          <Card style={{ padding: '14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Layers size={22} color="#248157" />
+              <Layers size={20} color="var(--primary-green)" />
               <div>
-                <span style={{ fontSize: '11px', color: '#687c73', textTransform: 'uppercase', fontWeight: 'bold' }}>Lifeline Road Segments</span>
-                <div style={{ fontSize: '20px', fontWeight: '800', color: '#092d22' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '600', letterSpacing: '0.4px' }}>Lifeline Road Segments</span>
+                <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
                   {edges.filter((e) => (e.infrastructure_type || e.type) !== 'bridge').length}
                 </div>
               </div>
@@ -1291,38 +1204,17 @@ export default function VillageMapPage() {
 
       {/* MODAL 1: ADD NEW VILLAGE */}
       {isAddVillageModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 3000,
-            padding: '16px',
-          }}
-        >
-          <div
-            style={{
-              background: '#fff',
-              borderRadius: '16px',
-              maxWidth: '560px',
-              width: '100%',
-              padding: '24px',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ margin: 0, color: '#092d22', fontSize: '18px' }}>+ Add New Nepal Village</h3>
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <div className="modal-header">
+              <h3>+ Add New Nepal Village</h3>
               <button
                 type="button"
+                className="modal-close-btn"
                 onClick={() => setIsAddVillageModalOpen(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+                aria-label="Close"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
@@ -1542,49 +1434,26 @@ export default function VillageMapPage() {
 
       {/* MODAL 2: AUTOMATIC INFRASTRUCTURE DISCOVERY PREVIEW DASHBOARD (Phase 2, 3, 5, 6) */}
       {isDiscoveryModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 3000,
-            padding: '16px',
-          }}
-        >
-          <div
-            style={{
-              background: '#fff',
-              borderRadius: '16px',
-              maxWidth: '820px',
-              width: '100%',
-              padding: '24px',
-              maxHeight: '92vh',
-              overflowY: 'auto',
-              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
-            }}
-          >
+        <div className="modal-backdrop">
+          <div className="modal-card modal-card--lg">
             {/* Modal Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+            <div className="modal-header">
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Sparkles size={20} color="#047857" />
-                  <h3 style={{ margin: 0, color: '#092d22', fontSize: '19px' }}>
-                    Automatic Infrastructure Discovery & Import
-                  </h3>
+                  <Sparkles size={18} color="var(--primary-green)" />
+                  <h3>Automatic Infrastructure Discovery & Import</h3>
                 </div>
-                <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: '#64748b' }}>
+                <p style={{ margin: '3px 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
                   Scanning OpenStreetMap geospatial entities for <strong>{village.name || 'Selected Village'}</strong>
                 </p>
               </div>
               <button
                 type="button"
+                className="modal-close-btn"
                 onClick={() => setIsDiscoveryModalOpen(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
+                aria-label="Close"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
@@ -2147,40 +2016,20 @@ export default function VillageMapPage() {
 
       {/* MODAL 3: MANUAL ADD INFRASTRUCTURE ASSET */}
       {isAddAssetModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 3000,
-            padding: '16px',
-          }}
-        >
-          <div
-            style={{
-              background: '#fff',
-              borderRadius: '16px',
-              maxWidth: '540px',
-              width: '100%',
-              padding: '24px',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <div className="modal-header">
               <div>
-                <h3 style={{ margin: 0, color: '#092d22', fontSize: '18px' }}>+ Add Infrastructure Asset</h3>
-                <span style={{ fontSize: '12px', color: '#64748b' }}>For {village.name || 'Active Village'}</span>
+                <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '16px' }}>+ Add Infrastructure Asset</h3>
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>For {village.name || 'Active Village'}</span>
               </div>
               <button
                 type="button"
+                className="modal-close-btn"
                 onClick={() => setIsAddAssetModalOpen(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+                aria-label="Close"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
@@ -2509,40 +2358,20 @@ export default function VillageMapPage() {
 
       {/* MODAL 4: NETWORKX GRAPH DIAGNOSTICS */}
       {isDiagnosticModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 3000,
-            padding: '16px',
-          }}
-        >
-          <div
-            style={{
-              background: '#fff',
-              borderRadius: '16px',
-              maxWidth: '560px',
-              width: '100%',
-              padding: '24px',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <div className="modal-header">
               <div>
-                <h3 style={{ margin: 0, color: '#092d22', fontSize: '18px' }}>NetworkX Graph Topology Health</h3>
-                <span style={{ fontSize: '12px', color: '#64748b' }}>Diagnostic Report for {village.name}</span>
+                <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '16px' }}>NetworkX Graph Topology Health</h3>
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Diagnostic Report for {village.name}</span>
               </div>
               <button
                 type="button"
+                className="modal-close-btn"
                 onClick={() => setIsDiagnosticModalOpen(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+                aria-label="Close"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 

@@ -309,7 +309,7 @@ export default function SimulationsPage({ onNavigate }) {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-            <select id="village-select" aria-label="Select village" value={selectedVillageId || ''} onChange={(event) => setSelectedVillageId(event.target.value)} style={{ padding: '9px 12px', border: '1px solid #cad7cf', borderRadius: 8, background: '#fff' }}>
+            <select id="village-select" aria-label="Select village" value={selectedVillageId || ''} onChange={(event) => setSelectedVillageId(event.target.value)} style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'var(--surface)', fontSize: '12.5px', color: 'var(--text-primary)', fontWeight: '600' }}>
               {deduplicateVillages(villages).map((village) => <option key={village.id} value={village.id}>{formatVillageLabel(village)}</option>)}
             </select>
             {readiness && <StatusBadge tone={readinessTone(readiness.status)}>{readinessLabel(readiness.status)}</StatusBadge>}
@@ -353,10 +353,10 @@ export default function SimulationsPage({ onNavigate }) {
                   {(villageData?.edges || []).map((edge) => <option key={edge.id} value={edge.id}>{edge.name} · {edge.infrastructure_type || edge.type}</option>)}
                 </select>
                 {selectedEdge && (
-                  <div style={{ padding: 11, background: '#f2f7f3', borderRadius: 9, fontSize: 12 }}>
+                  <div style={{ padding: 11, background: 'var(--surface-subtle)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', fontSize: 12 }}>
                     <div><strong>Status:</strong> {selectedEdge.status}</div>
                     <div><strong>Source:</strong> {selectedEdge.provenance_source || 'Not recorded'} · {selectedEdge.verification_status || 'unverified'}</div>
-                    <div><strong>Weight:</strong> {readiness.routing_metric === 'distance_meters' ? displayMetric(selectedEdge.length_meters, 'meters') : displayMetric(selectedEdge.travel_minutes, 'minutes')}</div>
+                    <div style={{ fontVariantNumeric: 'tabular-nums' }}><strong>Weight:</strong> {readiness.routing_metric === 'distance_meters' ? displayMetric(selectedEdge.length_meters, 'meters') : displayMetric(selectedEdge.travel_minutes, 'minutes')}</div>
                   </div>
                 )}
                 <label htmlFor="scenario-select"><strong>Failure scenario</strong></label>

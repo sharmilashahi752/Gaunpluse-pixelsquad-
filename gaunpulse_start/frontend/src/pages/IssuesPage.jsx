@@ -17,7 +17,7 @@ import {
   ShieldCheck,
   X,
 } from 'lucide-react';
-import { Card, CardHeader, FeatureNotice, LiveLabel, PageIntro, StatusBadge } from '../components/ui';
+import { Card, CardHeader, EmptyState, FeatureNotice, LiveLabel, PageIntro, StatusBadge } from '../components/ui';
 import { deduplicateVillages, formatVillageLabel } from '../utils/villageUtils';
 
 const CATEGORIES = [
@@ -266,21 +266,21 @@ export default function IssuesPage({ onNavigate }) {
       {/* Filter and Search Bar */}
       <Card>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
-          <div style={{ flex: 1, minWidth: '220px', display: 'flex', alignItems: 'center', background: '#f6f5ed', borderRadius: '8px', padding: '0 10px' }}>
-            <Search size={16} color="#687c73" />
+          <div style={{ flex: 1, minWidth: '220px', display: 'flex', alignItems: 'center', background: 'var(--surface-subtle)', borderRadius: 'var(--radius-md)', padding: '0 12px', border: '1px solid var(--border)' }}>
+            <Search size={15} color="var(--text-secondary)" />
             <input
               type="text"
               placeholder="Search by title, village, or tracking code..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              style={{ border: 'none', background: 'transparent', padding: '9px 10px', width: '100%', fontSize: '13px', outline: 'none' }}
+              style={{ border: 'none', background: 'transparent', padding: '9px 10px', width: '100%', fontSize: '13px', outline: 'none', color: 'var(--text-primary)' }}
             />
           </div>
 
           <select
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
-            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #dfe6df', background: '#fff', fontSize: '12.5px' }}
+            style={{ padding: '8px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--surface)', fontSize: '12.5px', color: 'var(--text-primary)' }}
           >
             <option value="">All Categories</option>
             {CATEGORIES.map((c) => (
@@ -293,7 +293,7 @@ export default function IssuesPage({ onNavigate }) {
           <select
             value={filterSeverity}
             onChange={(e) => setFilterSeverity(e.target.value)}
-            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #dfe6df', background: '#fff', fontSize: '12.5px' }}
+            style={{ padding: '8px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--surface)', fontSize: '12.5px', color: 'var(--text-primary)' }}
           >
             <option value="">All Severities</option>
             <option value="critical">Critical</option>
@@ -305,7 +305,7 @@ export default function IssuesPage({ onNavigate }) {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #dfe6df', background: '#fff', fontSize: '12.5px' }}
+            style={{ padding: '8px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--surface)', fontSize: '12.5px', color: 'var(--text-primary)' }}
           >
             <option value="">All Statuses</option>
             <option value="submitted">Submitted</option>
@@ -326,16 +326,30 @@ export default function IssuesPage({ onNavigate }) {
         />
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#687c73' }}>
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
             <Loader2 className="animate-spin" size={24} style={{ margin: '0 auto 8px' }} />
             Loading infrastructure issues from database...
           </div>
         ) : filteredIssues.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#687c73' }}>
-            <AlertTriangle size={32} color="#e98535" style={{ margin: '0 auto 8px' }} />
-            <p style={{ margin: 0, fontWeight: 'bold' }}>No issues found matching current criteria.</p>
-            <small>Try clearing filters or click "Report New Issue" to file a report.</small>
-          </div>
+          <EmptyState
+            icon={AlertTriangle}
+            title="No issues found matching current criteria"
+            description="Try clearing search filters or report a new issue to log municipal records."
+            action={
+              <button
+                type="button"
+                className="button button--secondary"
+                onClick={() => {
+                  setSearch('');
+                  setFilterCategory('');
+                  setFilterSeverity('');
+                  setFilterStatus('');
+                }}
+              >
+                Clear Filters
+              </button>
+            }
+          />
         ) : (
           <div className="table-scroll">
             <table className="data-table">
@@ -363,13 +377,13 @@ export default function IssuesPage({ onNavigate }) {
                   >
                     <td>
                       <strong>{item.title}</strong>
-                      <small style={{ display: 'block', color: '#687c73' }}>
+                      <small style={{ display: 'block', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
                         {item.tracking_code || `GP-ISSUE-${item.id}`} {item.edge ? `· Linked to ${item.edge.name}` : ''}
                       </small>
                     </td>
                     <td>
                       <strong>{item.village?.name || 'Municipal Area'}</strong>
-                      <small style={{ display: 'block', color: '#687c73' }}>
+                      <small style={{ display: 'block', color: 'var(--text-secondary)' }}>
                         {item.village?.municipality || 'Helambu'}
                       </small>
                     </td>
@@ -414,64 +428,41 @@ export default function IssuesPage({ onNavigate }) {
 
       {/* CREATE ISSUE MODAL */}
       {showCreateModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 9999,
-            background: 'rgba(9, 45, 34, 0.65)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px',
-          }}
-        >
-          <div
-            style={{
-              background: '#fff',
-              borderRadius: '16px',
-              maxWidth: '620px',
-              width: '100%',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
-              border: '1px solid #dfe6df',
-              padding: '28px',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #dfe6df', paddingBottom: '12px' }}>
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <div className="modal-header">
               <div>
-                <span className="eyebrow" style={{ color: '#176342' }}>Citizen & Field Reporting</span>
-                <h2 style={{ margin: '2px 0 0', color: '#092d22', fontSize: '18px' }}>Report New Infrastructure Issue</h2>
+                <span className="eyebrow">Citizen & Field Reporting</span>
+                <h2>Report New Infrastructure Issue</h2>
               </div>
               <button
                 type="button"
+                className="modal-close-btn"
                 onClick={() => setShowCreateModal(false)}
-                style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#687c73' }}
+                aria-label="Close"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
             {submitSuccess && (
-              <div style={{ padding: '12px 16px', background: '#e4f4e9', border: '1px solid #248157', borderRadius: '8px', color: '#124b35', fontSize: '13px', marginBottom: '16px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <CheckCircle2 size={18} color="#176342" />
+              <div style={{ padding: '12px 14px', background: 'var(--success-bg)', border: '1px solid var(--success-border)', borderRadius: 'var(--radius-md)', color: 'var(--success)', fontSize: '12.5px', marginBottom: '16px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <CheckCircle2 size={16} />
                 {submitSuccess}
               </div>
             )}
 
             {submitError && (
-              <div style={{ padding: '12px 16px', background: '#fde9e5', border: '1px solid #c94b46', borderRadius: '8px', color: '#c94b46', fontSize: '13px', marginBottom: '16px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <AlertCircle size={18} color="#c94b46" />
+              <div style={{ padding: '12px 14px', background: 'var(--danger-bg)', border: '1px solid rgba(198,79,69,0.3)', borderRadius: 'var(--radius-md)', color: 'var(--danger)', fontSize: '12.5px', marginBottom: '16px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <AlertCircle size={16} />
                 {submitError}
               </div>
             )}
 
             <form onSubmit={handleSubmit} className="form-stack">
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label htmlFor="create-village" style={{ fontWeight: 'bold' }}>Village *</label>
+                  <label htmlFor="create-village">Village *</label>
                   <select
                     id="create-village"
                     required
@@ -486,7 +477,6 @@ export default function IssuesPage({ onNavigate }) {
                         longitude: sel?.center_lng || prev.longitude,
                       }));
                     }}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #dfe6df' }}
                   >
                     {deduplicateVillages(villages).map((v) => (
                       <option key={v.id} value={v.id}>
@@ -497,13 +487,12 @@ export default function IssuesPage({ onNavigate }) {
                 </div>
 
                 <div>
-                  <label htmlFor="create-category" style={{ fontWeight: 'bold' }}>Issue Category *</label>
+                  <label htmlFor="create-category">Issue Category *</label>
                   <select
                     id="create-category"
                     required
                     value={formData.category}
                     onChange={(e) => setFormData((prev) => ({ ...prev, category: e.target.value }))}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #dfe6df' }}
                   >
                     {CATEGORIES.map((c) => (
                       <option key={c.value} value={c.value}>
@@ -515,12 +504,11 @@ export default function IssuesPage({ onNavigate }) {
               </div>
 
               <div>
-                <label htmlFor="create-edge" style={{ fontWeight: 'bold' }}>Linked Infrastructure Asset (Optional)</label>
+                <label htmlFor="create-edge">Linked Infrastructure Asset (Optional)</label>
                 <select
                   id="create-edge"
                   value={formData.edge_id}
                   onChange={(e) => setFormData((prev) => ({ ...prev, edge_id: e.target.value }))}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #dfe6df' }}
                 >
                   <option value="">-- No specific road or bridge linked --</option>
                   {villageEdges.map((e) => (
@@ -532,7 +520,7 @@ export default function IssuesPage({ onNavigate }) {
               </div>
 
               <div>
-                <label htmlFor="create-title" style={{ fontWeight: 'bold' }}>Issue Title *</label>
+                <label htmlFor="create-title">Issue Title *</label>
                 <input
                   id="create-title"
                   type="text"
@@ -540,12 +528,11 @@ export default function IssuesPage({ onNavigate }) {
                   placeholder="e.g. Bridge B main support cable sheared by flood torrent"
                   value={formData.title}
                   onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #dfe6df' }}
                 />
               </div>
 
               <div>
-                <label htmlFor="create-description" style={{ fontWeight: 'bold' }}>Description & Community Impact *</label>
+                <label htmlFor="create-description">Description & Community Impact *</label>
                 <textarea
                   id="create-description"
                   required
@@ -553,19 +540,17 @@ export default function IssuesPage({ onNavigate }) {
                   placeholder="Describe observed damage, impassable sections, and which settlements or facilities are cut off (min 15 characters)..."
                   value={formData.description}
                   onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #dfe6df' }}
                 />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label htmlFor="create-severity" style={{ fontWeight: 'bold' }}>Severity *</label>
+                  <label htmlFor="create-severity">Severity *</label>
                   <select
                     id="create-severity"
                     required
                     value={formData.severity}
                     onChange={(e) => setFormData((prev) => ({ ...prev, severity: e.target.value }))}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #dfe6df' }}
                   >
                     {SEVERITIES.map((s) => (
                       <option key={s.value} value={s.value}>
@@ -576,7 +561,7 @@ export default function IssuesPage({ onNavigate }) {
                 </div>
 
                 <div>
-                  <label htmlFor="create-lat" style={{ fontWeight: 'bold' }}>Latitude *</label>
+                  <label htmlFor="create-lat">Latitude *</label>
                   <input
                     id="create-lat"
                     type="number"
@@ -584,12 +569,11 @@ export default function IssuesPage({ onNavigate }) {
                     required
                     value={formData.latitude}
                     onChange={(e) => setFormData((prev) => ({ ...prev, latitude: parseFloat(e.target.value) }))}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #dfe6df' }}
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="create-lng" style={{ fontWeight: 'bold' }}>Longitude *</label>
+                  <label htmlFor="create-lng">Longitude *</label>
                   <input
                     id="create-lng"
                     type="number"
@@ -597,19 +581,18 @@ export default function IssuesPage({ onNavigate }) {
                     required
                     value={formData.longitude}
                     onChange={(e) => setFormData((prev) => ({ ...prev, longitude: parseFloat(e.target.value) }))}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #dfe6df' }}
                   />
                 </div>
               </div>
 
               <div>
-                <label htmlFor="create-photo" style={{ fontWeight: 'bold' }}>Attach Photo / Evidence (Optional)</label>
+                <label htmlFor="create-photo">Attach Photo / Evidence (Optional)</label>
                 <input
                   id="create-photo"
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   onChange={(e) => setPhotoFile(e.target.files[0] || null)}
-                  style={{ width: '100%', padding: '6px', fontSize: '12px' }}
+                  style={{ padding: '6px', fontSize: '12px' }}
                 />
               </div>
 
@@ -642,76 +625,55 @@ export default function IssuesPage({ onNavigate }) {
 
       {/* ISSUE DETAIL & STATUS MODAL */}
       {selectedIssue && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 9999,
-            background: 'rgba(9, 45, 34, 0.65)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px',
-          }}
-        >
-          <div
-            style={{
-              background: '#fff',
-              borderRadius: '16px',
-              maxWidth: '680px',
-              width: '100%',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
-              border: '1px solid #dfe6df',
-              padding: '28px',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', borderBottom: '1px solid #dfe6df', paddingBottom: '12px' }}>
+        <div className="modal-backdrop">
+          <div className="modal-card modal-card--lg">
+            <div className="modal-header">
               <div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px' }}>
                   <StatusBadge tone={severityTones[selectedIssue.severity]}>{selectedIssue.severity}</StatusBadge>
                   <StatusBadge tone={statusTones[selectedIssue.status]}>{selectedIssue.status}</StatusBadge>
-                  <span style={{ fontSize: '11px', color: '#687c73' }}>{selectedIssue.tracking_code || `GP-${selectedIssue.id}`}</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
+                    {selectedIssue.tracking_code || `GP-${selectedIssue.id}`}
+                  </span>
                 </div>
-                <h2 style={{ margin: 0, color: '#092d22', fontSize: '18px' }}>{selectedIssue.title}</h2>
+                <h2>{selectedIssue.title}</h2>
               </div>
               <button
                 type="button"
+                className="modal-close-btn"
                 onClick={() => setSelectedIssue(null)}
-                style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#687c73' }}
+                aria-label="Close"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
-            <div style={{ display: 'grid', gap: '14px', fontSize: '13px', color: '#19392f' }}>
-              <div style={{ padding: '12px', background: '#f8faf8', borderRadius: '8px', border: '1px solid #dfe6df' }}>
-                <p style={{ margin: '0 0 6px', lineHeight: '1.5' }}>{selectedIssue.description}</p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', fontSize: '11.5px', color: '#687c73', marginTop: '10px' }}>
-                  <span><strong>Village:</strong> {selectedIssue.village?.name || 'Demo Area'}</span>
+            <div style={{ display: 'grid', gap: '14px', fontSize: '13px', color: 'var(--text-primary)' }}>
+              <div style={{ padding: '14px', background: 'var(--surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+                <p style={{ margin: '0 0 8px', lineHeight: '1.5' }}>{selectedIssue.description}</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                  <span><strong>Village:</strong> {selectedIssue.village?.name || 'Municipal Area'}</span>
                   {selectedIssue.edge && <span><strong>Asset:</strong> {selectedIssue.edge.name}</span>}
-                  <span><strong>Coordinates:</strong> {selectedIssue.latitude}, {selectedIssue.longitude}</span>
+                  <span style={{ fontVariantNumeric: 'tabular-nums' }}><strong>Coordinates:</strong> {selectedIssue.latitude}, {selectedIssue.longitude}</span>
                   {selectedIssue.reporter_name && <span><strong>Reporter:</strong> {selectedIssue.reporter_name} ({selectedIssue.reporter_phone || 'Verified'})</span>}
                 </div>
               </div>
 
               {/* Status Update Action Box */}
-              <div style={{ padding: '16px', background: '#f1f8f2', borderRadius: '10px', border: '1.5px solid #248157' }}>
-                <h4 style={{ margin: '0 0 8px', color: '#092d22', fontSize: '14px' }}>Update Issue Status & Action History</h4>
+              <div style={{ padding: '16px', background: 'var(--surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+                <h4 style={{ margin: '0 0 10px', color: 'var(--text-primary)', fontSize: '13.5px', fontWeight: 600 }}>Update Issue Status & Action History</h4>
                 {statusMessage && (
-                  <div style={{ padding: '8px 12px', background: '#e4f4e9', borderRadius: '6px', fontSize: '12px', color: '#124b35', marginBottom: '10px' }}>
+                  <div style={{ padding: '8px 12px', background: 'var(--success-bg)', border: '1px solid var(--success-border)', borderRadius: 'var(--radius-sm)', fontSize: '12px', color: 'var(--success)', marginBottom: '10px' }}>
                     {statusMessage}
                   </div>
                 )}
                 <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr auto', gap: '10px', alignItems: 'end' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 'bold', marginBottom: '4px' }}>New Status:</label>
+                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>New Status:</label>
                     <select
                       value={newStatus}
                       onChange={(e) => setNewStatus(e.target.value)}
-                      style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #dfe6df', background: '#fff', fontSize: '12.5px' }}
+                      style={{ width: '100%', padding: '7px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: '#fff', fontSize: '12.5px' }}
                     >
                       <option value="submitted">Submitted</option>
                       <option value="under_review">Under Review</option>
@@ -722,13 +684,13 @@ export default function IssuesPage({ onNavigate }) {
                     </select>
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 'bold', marginBottom: '4px' }}>Log Comment / Notes:</label>
+                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Log Comment / Notes:</label>
                     <input
                       type="text"
                       placeholder="e.g. Inspection conducted by municipal technical officer"
                       value={statusComment}
                       onChange={(e) => setStatusComment(e.target.value)}
-                      style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #dfe6df', fontSize: '12.5px' }}
+                      style={{ width: '100%', padding: '7px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', fontSize: '12.5px' }}
                     />
                   </div>
                   <button
@@ -736,7 +698,7 @@ export default function IssuesPage({ onNavigate }) {
                     className="button button--primary"
                     onClick={handleUpdateStatus}
                     disabled={updatingStatus}
-                    style={{ height: '36px', fontSize: '12px' }}
+                    style={{ height: '35px', fontSize: '12px' }}
                   >
                     {updatingStatus ? <Loader2 className="animate-spin" size={14} /> : 'Save Update'}
                   </button>
@@ -746,15 +708,15 @@ export default function IssuesPage({ onNavigate }) {
               {/* Status Update History */}
               {selectedIssue.updates && selectedIssue.updates.length > 0 && (
                 <div>
-                  <h4 style={{ margin: '8px 0 6px', color: '#092d22', fontSize: '13px' }}>Audit & Update Trail</h4>
+                  <h4 style={{ margin: '8px 0 6px', color: 'var(--text-primary)', fontSize: '13px', fontWeight: 600 }}>Audit & Update Trail</h4>
                   <div style={{ display: 'grid', gap: '6px' }}>
                     {selectedIssue.updates.map((upd, i) => (
-                      <div key={i} style={{ padding: '8px 12px', background: '#faf9f5', border: '1px solid #dfe6df', borderRadius: '6px', fontSize: '11.5px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#687c73' }}>
+                      <div key={i} style={{ padding: '9px 12px', background: 'var(--surface-subtle)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', fontSize: '11.5px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
                           <span><strong>{upd.old_status} → {upd.new_status}</strong></span>
-                          <span>{new Date(upd.created_at).toLocaleString()}</span>
+                          <span style={{ fontVariantNumeric: 'tabular-nums' }}>{new Date(upd.created_at).toLocaleString()}</span>
                         </div>
-                        {upd.comment && <p style={{ margin: '3px 0 0', color: '#19392f' }}>{upd.comment}</p>}
+                        {upd.comment && <p style={{ margin: '3px 0 0', color: 'var(--text-primary)' }}>{upd.comment}</p>}
                       </div>
                     ))}
                   </div>
