@@ -1,0 +1,18 @@
+{
+  "nodes": [
+    {"id":"a","name":"Settlement A","type":"settlement","households":35},
+    {"id":"b","name":"Settlement B","type":"settlement","households":20},
+    {"id":"j1","name":"West Junction","type":"junction"},
+    {"id":"j2","name":"East Junction","type":"junction"},
+    {"id":"school","name":"Basic School","type":"school"},
+    {"id":"health","name":"Health Post","type":"health_post"}
+  ],
+  "edges": [
+    {"id":"road_a","from":"a","to":"j1","minutes":5},
+    {"id":"bridge_b","from":"j1","to":"j2","minutes":8},
+    {"id":"road_b","from":"b","to":"j2","minutes":4},
+    {"id":"school_link","from":"j1","to":"school","minutes":6},
+    {"id":"health_link","from":"j1","to":"health","minutes":7},
+    {"id":"detour","from":"a","to":"b","minutes":47}
+  ]
+}
