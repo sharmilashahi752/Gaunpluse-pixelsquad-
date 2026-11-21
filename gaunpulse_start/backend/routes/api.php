@@ -25,6 +25,7 @@ Route::get('/locations/provinces', [LocationController::class, 'provinces']);
 Route::get('/locations/districts', [LocationController::class, 'districts']);
 Route::get('/locations/municipalities', [LocationController::class, 'municipalities']);
 Route::get('/locations/wards', [LocationController::class, 'wards']);
+Route::get('/locations/search', [LocationController::class, 'search']);
 
 // Public / Demo Village & Network Routes
 Route::get('/villages', [VillageController::class, 'index']);
