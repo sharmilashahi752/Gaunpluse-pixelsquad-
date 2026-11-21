@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\SimulationController as AdminSimulationController
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CommunityFeedbackController;
 use App\Http\Controllers\IssueController;
+use App\Http\Controllers\LocationController;
 use App\Http\Controllers\SimulationController;
 use App\Http\Controllers\VillageController;
 use App\Models\ActionPlan;
@@ -18,24 +19,39 @@ use App\Models\SettlementGroup;
 use App\Models\Village;
 use Illuminate\Support\Facades\Route;
 
+// Nepal Administrative Location Directory (Phase 2)
+Route::get('/locations/hierarchy', [LocationController::class, 'hierarchy']);
+Route::get('/locations/provinces', [LocationController::class, 'provinces']);
+Route::get('/locations/districts', [LocationController::class, 'districts']);
+Route::get('/locations/municipalities', [LocationController::class, 'municipalities']);
+Route::get('/locations/wards', [LocationController::class, 'wards']);
+
 // Public / Demo Village & Network Routes
 Route::get('/villages', [VillageController::class, 'index']);
 Route::post('/villages', [VillageController::class, 'store']);
+Route::post('/villages/wizard-draft', [VillageController::class, 'storeWizardDraft']);
+Route::post('/villages/{village}/activate', [VillageController::class, 'activate']);
 Route::get('/villages/{village}', [VillageController::class, 'show']);
 Route::put('/villages/{village}', [VillageController::class, 'update']);
 Route::delete('/villages/{village}', [VillageController::class, 'destroy']);
 Route::get('/villages/{village}/network', [VillageController::class, 'network']);
 Route::get('/villages/{village}/export-geojson', [VillageController::class, 'exportGeoJson']);
 Route::post('/villages/{village}/import-geojson', [VillageController::class, 'importGeoJson']);
+Route::post('/villages/{village}/import-csv', [VillageController::class, 'importCsv']);
+Route::post('/villages/{village}/import-osm', [VillageController::class, 'importOsm']);
+Route::post('/villages/{village}/build-network', [VillageController::class, 'buildNetwork']);
 Route::get('/villages/{village}/integrity', [VillageController::class, 'integrity']);
+Route::get('/villages/{village}/audit-logs', [VillageController::class, 'auditLogs']);
 
-// Village Infrastructure Elements CRUD
+// Village Infrastructure Elements CRUD & Verification (Phase 7)
 Route::post('/villages/{village}/nodes', [VillageController::class, 'storeNode']);
 Route::put('/villages/{village}/nodes/{node}', [VillageController::class, 'updateNode']);
+Route::patch('/villages/{village}/nodes/{node}/verify', [VillageController::class, 'verifyNode']);
 Route::delete('/villages/{village}/nodes/{node}', [VillageController::class, 'destroyNode']);
 
 Route::post('/villages/{village}/edges', [VillageController::class, 'storeEdge']);
 Route::put('/villages/{village}/edges/{edge}', [VillageController::class, 'updateEdge']);
+Route::patch('/villages/{village}/edges/{edge}/verify', [VillageController::class, 'verifyEdge']);
 Route::delete('/villages/{village}/edges/{edge}', [VillageController::class, 'destroyEdge']);
 
 Route::post('/villages/{village}/facilities', [VillageController::class, 'storeFacility']);
