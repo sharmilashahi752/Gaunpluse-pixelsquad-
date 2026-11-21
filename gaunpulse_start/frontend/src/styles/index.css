@@ -834,29 +834,30 @@ h1, h2, h3, p { margin-top: 0; }
 }
 
 .ai-task-card {
-  background: #ffffff;
-  border: 1px solid #ddeadb;
-  border-radius: 16px;
-  padding: 22px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 14px;
   cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
   position: relative;
   text-align: left;
+  box-shadow: var(--shadow-sm);
 }
 
 .ai-task-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 12px 30px rgba(18, 62, 44, 0.08);
-  border-color: #176342;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--primary-green);
 }
 
 .ai-task-card__icon-wrap {
-  width: 46px;
-  height: 46px;
-  border-radius: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -864,23 +865,23 @@ h1, h2, h3, p { margin-top: 0; }
 }
 
 .ai-task-card__icon-wrap--red {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: var(--danger-bg);
+  color: var(--danger);
 }
 
 .ai-task-card__icon-wrap--green {
-  background: #eaf5ee;
-  color: #176342;
+  background: var(--success-bg);
+  color: var(--success);
 }
 
 .ai-task-card__icon-wrap--blue {
-  background: #e0f2fe;
-  color: #0369a1;
+  background: #eff6ff;
+  color: #2563eb;
 }
 
 .ai-task-card__icon-wrap--amber {
-  background: #fef3c7;
-  color: #b45309;
+  background: var(--warning-bg);
+  color: var(--warning);
 }
 
 .ai-task-card__content {
@@ -890,24 +891,24 @@ h1, h2, h3, p { margin-top: 0; }
 .ai-task-card__eyebrow {
   display: block;
   font-size: 10.5px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #687c73;
+  color: var(--text-secondary);
   margin-bottom: 4px;
 }
 
 .ai-task-card__title {
   margin: 0 0 6px;
-  font-size: 16.5px;
+  font-size: 15.5px;
   font-weight: 700;
-  color: #092d22;
+  color: var(--text-primary);
 }
 
 .ai-task-card__desc {
   margin: 0;
-  font-size: 12.5px;
-  color: #556e62;
+  font-size: 12px;
+  color: var(--text-secondary);
   line-height: 1.45;
 }
 
@@ -917,18 +918,18 @@ h1, h2, h3, p { margin-top: 0; }
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
-  padding: 8px 14px;
+  padding: 8px 12px;
 }
 
 /* AI Assistant Chat Card */
 .ai-chat-card {
-  background: #ffffff;
-  border: 1px solid #ddeadb;
-  border-radius: 20px;
-  box-shadow: 0 4px 24px rgba(18, 62, 44, 0.04);
-  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 16px;
