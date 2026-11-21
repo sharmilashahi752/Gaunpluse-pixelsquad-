@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CalendarDays, CheckCircle2, MoreHorizontal } from 'lucide-react';
 import { priorityActions as fallbackActions } from '../data/demoData';
-import { Card, CardHeader, StatusBadge, TextButton } from './ui';
+import { Card, CardHeader, LiveLabel, StatusBadge, TextButton } from './ui';
 
 const priorityTones = {
   Critical: 'red',
@@ -44,7 +44,12 @@ export default function PriorityActionQueue({ onViewAll }) {
         eyebrow="Municipal priorities"
         title="Priority action queue"
         description="Active repair and intervention plans stored in the municipal database."
-        action={<TextButton onClick={onViewAll}>View all plans</TextButton>}
+        action={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <LiveLabel text="Live Database" compact />
+            <TextButton onClick={onViewAll}>View all plans</TextButton>
+          </div>
+        }
       />
       <div className="action-list">
         {items.map((action) => (

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowRight, Route, TriangleAlert } from 'lucide-react';
 import { impactComparison as fallbackJourneys } from '../data/demoData';
-import { Card, CardHeader, DemoLabel, StatusBadge } from './ui';
+import { Card, CardHeader, LiveLabel, StatusBadge } from './ui';
 
 export default function ImpactSimulationPreview({ onOpenSimulation }) {
   const [latestSim, setLatestSim] = useState(null);
@@ -58,7 +58,7 @@ export default function ImpactSimulationPreview({ onOpenSimulation }) {
         eyebrow="What-if scenario"
         title="Impact simulation"
         description="Calculated live from NetworkX graph shortest-path engine."
-        action={<DemoLabel compact />}
+        action={<LiveLabel text="NetworkX Engine" compact />}
       />
       <div className="simulation-alert">
         <span><TriangleAlert size={18} aria-hidden="true" /></span>

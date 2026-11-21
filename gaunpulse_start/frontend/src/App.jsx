@@ -8,10 +8,9 @@ import IssuesPage from './pages/IssuesPage';
 import SimulationsPage from './pages/SimulationsPage';
 import VillageMapPage from './pages/VillageMapPage';
 import VillageDataPage from './pages/VillageDataPage';
-import {
-  ReportsInsightsPage,
-} from './pages/ModulePages';
+import ReportsInsightsPage from './pages/ReportsInsightsPage';
 import { navigationItems } from './data/demoData';
+import { VillageSelectionProvider } from './context/VillageSelectionContext';
 
 const pages = {
   dashboard: DashboardPage,
@@ -53,8 +52,10 @@ export default function App() {
   const ActivePage = pages[activePage] || DashboardPage;
 
   return (
-    <AppLayout activePage={activePage} onNavigate={navigate}>
-      <ActivePage onNavigate={navigate} />
-    </AppLayout>
+    <VillageSelectionProvider>
+      <AppLayout activePage={activePage} onNavigate={navigate}>
+        <ActivePage onNavigate={navigate} />
+      </AppLayout>
+    </VillageSelectionProvider>
   );
 }

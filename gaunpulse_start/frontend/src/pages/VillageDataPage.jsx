@@ -38,7 +38,8 @@ import {
   Wrench,
   X,
 } from 'lucide-react';
-import { Card, CardHeader, DemoLabel, FeatureNotice, PageIntro, StatusBadge } from '../components/ui';
+import { Card, CardHeader, FeatureNotice, LiveLabel, PageIntro, StatusBadge } from '../components/ui';
+import { useVillageSelection } from '../context/VillageSelectionContext';
 
 const API_BASE = 'http://127.0.0.1:8000/api';
 
@@ -104,7 +105,7 @@ School to Danda Gaun Path,edge_school_danda,janahit_school_pt,danda_gaun_ctr,tra
 
 export default function VillageDataPage() {
   const [villages, setVillages] = useState([]);
-  const [selectedVillageId, setSelectedVillageId] = useState(null);
+  const { selectedVillageId, setSelectedVillageId } = useVillageSelection();
   const [networkData, setNetworkData] = useState(null);
   const [integrityData, setIntegrityData] = useState(null);
   const [auditLogs, setAuditLogs] = useState([]);
@@ -935,7 +936,7 @@ export default function VillageDataPage() {
                     </option>
                   ))}
                 </select>
-                <DemoLabel compact />
+                <LiveLabel text="Active Location" compact />
               </div>
             </div>
           </div>
@@ -1633,7 +1634,7 @@ export default function VillageDataPage() {
               eyebrow="Demographic Baseline"
               title="Residential Settlement Groups"
               description="Populated village toles and hamlets whose access to lifelines is tracked."
-              action={<DemoLabel compact />}
+              action={<LiveLabel text="Demographic Registry" compact />}
             />
             <div className="table-scroll">
               <table className="data-table">

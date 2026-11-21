@@ -10,6 +10,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CommunityFeedbackController;
 use App\Http\Controllers\IssueController;
 use App\Http\Controllers\LocationController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SimulationController;
 use App\Http\Controllers\VillageController;
 use App\Models\ActionPlan;
@@ -38,6 +39,7 @@ Route::get('/villages/{village}', [VillageController::class, 'show']);
 Route::put('/villages/{village}', [VillageController::class, 'update']);
 Route::delete('/villages/{village}', [VillageController::class, 'destroy']);
 Route::get('/villages/{village}/network', [VillageController::class, 'network']);
+Route::get('/villages/{village}/network-readiness', [VillageController::class, 'networkReadiness']);
 Route::get('/villages/{village}/export-geojson', [VillageController::class, 'exportGeoJson']);
 Route::post('/villages/{village}/import-geojson', [VillageController::class, 'importGeoJson']);
 Route::post('/villages/{village}/import-csv', [VillageController::class, 'importCsv']);
@@ -95,6 +97,21 @@ Route::get('/priorities', PriorityController::class);
 // AI Agent Endpoints (proxied to Python Intelligence service)
 Route::post('/ai/chat', [AIController::class, 'chat']);
 Route::get('/ai/insights', [AIController::class, 'insights']);
+
+// Real-Time Municipal Reports & Insights API (Phase 2 & 3)
+Route::prefix('reports')->group(function () {
+    Route::get('/overview', [ReportController::class, 'overview']);
+    Route::get('/categories', [ReportController::class, 'categories']);
+    Route::get('/trends', [ReportController::class, 'trends']);
+    Route::get('/status-distribution', [ReportController::class, 'statusDistribution']);
+    Route::get('/priorities', [ReportController::class, 'priorities']);
+    Route::get('/ward-comparison', [ReportController::class, 'wardComparison']);
+    Route::get('/infrastructure-condition', [ReportController::class, 'infrastructureCondition']);
+    Route::get('/simulations', [ReportController::class, 'simulations']);
+    Route::get('/records', [ReportController::class, 'records']);
+    Route::get('/export', [ReportController::class, 'export']);
+    Route::post('/ai-insights', [ReportController::class, 'aiInsights']);
+});
 
 // Public Dashboard Real-Time Statistics
 Route::get('/dashboard/stats', function () {

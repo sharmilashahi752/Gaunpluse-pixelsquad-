@@ -17,7 +17,7 @@ import {
   ShieldCheck,
   X,
 } from 'lucide-react';
-import { Card, CardHeader, DemoLabel, FeatureNotice, PageIntro, StatusBadge } from '../components/ui';
+import { Card, CardHeader, FeatureNotice, LiveLabel, PageIntro, StatusBadge } from '../components/ui';
 
 const CATEGORIES = [
   { value: 'damaged_bridge', label: 'Damaged Bridge' },
@@ -316,7 +316,7 @@ export default function IssuesPage({ onNavigate }) {
           eyebrow="Triage queue"
           title={`Registered Infrastructure Issues (${filteredIssues.length})`}
           description="Click any issue row to view complete details, history timeline, and update municipal verification status."
-          action={<DemoLabel compact />}
+          action={<LiveLabel text="Live Triage Queue" compact />}
         />
 
         {loading ? (

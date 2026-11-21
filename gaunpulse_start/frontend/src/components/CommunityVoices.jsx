@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Check, MessageCircleMore, Quote } from 'lucide-react';
 import { voices as fallbackVoices } from '../data/demoData';
-import { Card, CardHeader, DemoLabel, StatusBadge, TextButton } from './ui';
+import { Card, CardHeader, LiveLabel, StatusBadge, TextButton } from './ui';
 
 export default function CommunityVoices({ onViewAll, full = false }) {
   const [voices, setVoices] = useState([]);
@@ -41,7 +41,16 @@ export default function CommunityVoices({ onViewAll, full = false }) {
         eyebrow="From the community"
         title="Community voices"
         description="Recent observations submitted by village residents and field volunteers."
-        action={full ? <DemoLabel compact /> : <TextButton onClick={onViewAll}>View all voices</TextButton>}
+        action={
+          full ? (
+            <LiveLabel text="Resident Stream" compact />
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <LiveLabel text="Community Submissions" compact />
+              <TextButton onClick={onViewAll}>View all voices</TextButton>
+            </div>
+          )
+        }
       />
       <div className="voice-list">
         {items.map((voice) => {

@@ -20,38 +20,44 @@ export default function DashboardPage({ onNavigate }) {
       .catch((err) => console.error('Failed to load dashboard stats:', err));
   }, []);
 
+  const isRealData = Boolean(stats);
   const villageCount = stats?.monitored_villages ?? 1;
-  const isRealData = villageCount > 1;
 
   const liveStats = [
     {
       label: 'Monitored Villages',
-      value: String(villageCount),
-      change: isRealData ? `${villageCount} municipal networks active` : '1 demo network active',
+      value: stats ? String(stats.monitored_villages) : '...',
+      change: stats
+        ? `${stats.monitored_villages} active municipal network${stats.monitored_villages === 1 ? '' : 's'}`
+        : 'Connecting to database...',
       tone: 'green',
       icon: MapPinned,
       isLive: isRealData,
     },
     {
       label: 'Active Issues',
-      value: String(stats?.active_issues ?? 4),
-      change: `${stats?.resolved_issues ?? 1} resolved`,
+      value: stats ? String(stats.active_issues) : '...',
+      change: stats
+        ? `${stats.resolved_issues ?? 0} resolved in database`
+        : 'Loading triage queue...',
       tone: 'orange',
       icon: Radio,
       isLive: isRealData,
     },
     {
       label: 'Critical Disruptions',
-      value: String(stats?.critical_disruptions ?? 1),
-      change: (stats?.critical_disruptions ?? 0) > 0 ? 'Needs immediate review' : 'All critical lifelines operational',
+      value: stats ? String(stats.critical_disruptions) : '...',
+      change: stats
+        ? ((stats.critical_disruptions ?? 0) > 0 ? `${stats.critical_disruptions} need immediate review` : 'All critical lifelines operational')
+        : 'Evaluating risk...',
       tone: 'red',
       icon: TriangleAlert,
       isLive: isRealData,
     },
     {
       label: 'Affected Households',
-      value: String(stats?.affected_households ?? 73),
-      change: 'Across active village wards',
+      value: stats ? String(stats.affected_households) : '...',
+      change: 'Across active settlement network',
       tone: 'mint',
       icon: Users,
       isLive: isRealData,

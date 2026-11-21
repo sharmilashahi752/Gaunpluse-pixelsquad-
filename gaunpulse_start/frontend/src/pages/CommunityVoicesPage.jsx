@@ -12,7 +12,7 @@ import {
   ShieldCheck,
   X,
 } from 'lucide-react';
-import { Card, CardHeader, DemoLabel, FeatureNotice, PageIntro, StatusBadge } from '../components/ui';
+import { Card, CardHeader, FeatureNotice, LiveLabel, PageIntro, StatusBadge } from '../components/ui';
 
 const TAGS = ['Safety', 'Water access', 'Roads', 'School access', 'Health', 'General'];
 
@@ -161,7 +161,7 @@ export default function CommunityVoicesPage() {
           eyebrow="Community Observation Stream"
           title={`Verified Resident Feedback (${filteredVoices.length})`}
           description="Local testimonies helping target municipal infrastructure priorities."
-          action={<DemoLabel compact />}
+          action={<LiveLabel text="Live Resident Feed" compact />}
         />
 
         {loading ? (

@@ -26,6 +26,35 @@ export function DemoLabel({ compact = false }) {
   );
 }
 
+export function LiveLabel({ text = 'Live Data', compact = false }) {
+  return (
+    <span
+      className={`demo-label ${compact ? 'demo-label--compact' : ''}`.trim()}
+      style={{
+        background: '#eaf5ee',
+        color: '#176342',
+        borderColor: '#b8dfc2',
+        fontWeight: 600,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '6px',
+      }}
+    >
+      <span
+        style={{
+          width: '7px',
+          height: '7px',
+          borderRadius: '50%',
+          background: '#16a34a',
+          boxShadow: '0 0 0 2px rgba(22, 163, 74, 0.25)',
+          display: 'inline-block',
+        }}
+      />
+      {text}
+    </span>
+  );
+}
+
 export function StatusBadge({ children, tone = 'neutral' }) {
   return <span className={`status-badge status-badge--${tone}`}>{children}</span>;
 }

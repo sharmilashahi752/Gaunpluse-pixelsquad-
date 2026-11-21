@@ -48,14 +48,13 @@ export default function Sidebar({ activePage, isOpen, onNavigate, onClose }) {
         </nav>
 
         <div className="sidebar__footer">
-          <div className="sidebar__pulse" aria-hidden="true">
-            <span />
+          <div className="sidebar__pulse" aria-hidden="true" style={{ background: 'rgba(74, 222, 128, 0.2)' }}>
+            <span style={{ background: '#4ade80' }} />
           </div>
           <div>
-            <strong>Demo workspace</strong>
-            <span>No live systems connected</span>
+            <strong>Live System Active</strong>
+            <span>MySQL & NetworkX Connected</span>
           </div>
-          <LogOut size={17} aria-hidden="true" />
         </div>
         <ChevronLeft className="sidebar__edge-icon" size={16} aria-hidden="true" />
       </aside>
