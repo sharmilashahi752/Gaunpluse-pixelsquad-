@@ -27,7 +27,7 @@ export default function Sidebar({ activePage, isOpen, onNavigate, onClose }) {
 
         <div className="sidebar__context">
           <span>Municipality workspace</span>
-          <strong>Namuna Gaunpalika</strong>
+          <strong>Helambu Rural Municipality</strong>
         </div>
 
         <nav className="sidebar__nav">

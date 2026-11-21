@@ -323,6 +323,67 @@ export default function ReportsInsightsPage({ onNavigate }) {
     window.print();
   };
 
+  // Dependent Filter Handlers
+  const handleMunicipalityChange = (e) => {
+    const newMuni = e.target.value;
+    setMunicipality(newMuni);
+    if (villageId) {
+      const v = villagesList.find((item) => String(item.id) === String(villageId));
+      if (v && newMuni && v.municipality !== newMuni) {
+        setVillageId('');
+      }
+    }
+  };
+
+  const handleVillageChange = (e) => {
+    const newVid = e.target.value;
+    setVillageId(newVid);
+    if (newVid) {
+      const v = villagesList.find((item) => String(item.id) === String(newVid));
+      if (v) {
+        if (v.municipality) setMunicipality(v.municipality);
+        if (v.district) setDistrict(v.district);
+        if (v.ward_no) setWard(String(v.ward_no));
+      }
+    }
+  };
+
+  // Active Filter Pills Calculation
+  const activeFilters = useMemo(() => {
+    const list = [];
+    if (municipality) list.push({ key: 'municipality', label: `Municipality: ${municipality}`, clear: () => setMunicipality('') });
+    if (villageId) {
+      const v = villagesList.find((item) => String(item.id) === String(villageId));
+      list.push({ key: 'village', label: `Village: ${v ? v.name : villageId}`, clear: () => setVillageId('') });
+    }
+    if (ward) list.push({ key: 'ward', label: `Ward: ${ward}`, clear: () => setWard('') });
+    if (category && category !== 'all') list.push({ key: 'category', label: `Category: ${category.replace(/_/g, ' ')}`, clear: () => setCategory('all') });
+    if (status && status !== 'all') list.push({ key: 'status', label: `Status: ${status.replace(/_/g, ' ')}`, clear: () => setStatus('all') });
+    if (severity && severity !== 'all') list.push({ key: 'severity', label: `Severity: ${severity}`, clear: () => setSeverity('all') });
+    if (verificationStatus && verificationStatus !== 'all') list.push({ key: 'verification', label: `Verification: ${verificationStatus.replace(/_/g, ' ')}`, clear: () => setVerificationStatus('all') });
+    if (dateRangePreset && dateRangePreset !== 'all') list.push({ key: 'dateRange', label: `Date: ${dateRangePreset}`, clear: () => setDateRangePreset('all') });
+    return list;
+  }, [municipality, villageId, ward, category, status, severity, verificationStatus, dateRangePreset, villagesList]);
+
+  // Chart Empty State Component
+  const renderChartEmptyState = (label = 'No Data Available', icon = <BarChart3 size={28} />) => (
+    <div className="chart-empty-state">
+      {icon}
+      <h4>{label}</h4>
+      <p>No records match the current filter selection.</p>
+      {activeFilters.length > 0 && (
+        <button
+          className="button button--secondary"
+          type="button"
+          onClick={handleResetFilters}
+          style={{ fontSize: '11px', padding: '4px 10px', marginTop: '6px' }}
+        >
+          Reset Filters
+        </button>
+      )}
+    </div>
+  );
+
   // Reset Filters
   const handleResetFilters = () => {
     setMunicipality('');
@@ -748,10 +809,7 @@ export default function ReportsInsightsPage({ onNavigate }) {
             <label style={filterLabelStyle}>Municipality</label>
             <select
               value={municipality}
-              onChange={(e) => {
-                setMunicipality(e.target.value);
-                setVillageId('');
-              }}
+              onChange={handleMunicipalityChange}
               style={filterSelectStyle}
             >
               <option value="">All Municipalities</option>
@@ -766,7 +824,7 @@ export default function ReportsInsightsPage({ onNavigate }) {
           {/* Village */}
           <div>
             <label style={filterLabelStyle}>Village</label>
-            <select value={villageId} onChange={(e) => setVillageId(e.target.value)} style={filterSelectStyle}>
+            <select value={villageId} onChange={handleVillageChange} style={filterSelectStyle}>
               <option value="">All Villages</option>
               {villagesList
                 .filter((v) => !municipality || v.municipality === municipality)
@@ -863,7 +921,7 @@ export default function ReportsInsightsPage({ onNavigate }) {
           </div>
         </div>
 
-        {/* Custom Date Pickers (if chosen) & Filter Controls */}
+        {/* Custom Date Pickers & Active Filters */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', flexWrap: 'wrap', gap: '10px' }}>
           {dateRangePreset === 'custom' && (
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -904,118 +962,188 @@ export default function ReportsInsightsPage({ onNavigate }) {
             </button>
           </div>
         </div>
+
+        {/* Active Filter Indicators (Pills) */}
+        {activeFilters.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #eef2ee' }}>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: '#687c73', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Active Filters:</span>
+            {activeFilters.map((f) => (
+              <span key={f.key} className="active-filter-pill">
+                {f.label}
+                <button type="button" onClick={f.clear} title="Remove filter">
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#dc2626',
+                fontSize: '11px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                padding: '2px 6px',
+                textDecoration: 'underline',
+                marginLeft: 'auto',
+              }}
+            >
+              Clear All Filters
+            </button>
+          </div>
+        )}
       </Card>
 
-      {/* 3. Executive KPI Metric Cards (Phase 3) */}
-      <div
-        className="kpi-grid"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-          gap: '12px',
-          marginTop: '6px',
-        }}
-      >
+      {/* Empty Results Alert Banner */}
+      {Boolean(overview && kpis.active_issues?.count === 0 && kpis.community_reports?.total === 0 && (infra.total_edges ?? 0) === 0) && (
+        <div
+          style={{
+            background: '#fef3c7',
+            border: '1px solid #fde68a',
+            borderRadius: '12px',
+            padding: '14px 18px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            marginTop: '10px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <AlertTriangle size={20} style={{ color: '#d97706', flexShrink: 0 }} />
+            <div>
+              <strong style={{ fontSize: '13px', color: '#92400e' }}>
+                {activeFilters.length > 0 ? 'No records match the selected filters.' : 'No reports or infrastructure recorded yet.'}
+              </strong>
+              <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#b45309' }}>
+                {activeFilters.length > 0 ? 'Try widening your filters or clearing geographic constraints.' : 'Import village infrastructure or report issues to populate reports.'}
+              </p>
+            </div>
+          </div>
+          {activeFilters.length > 0 && (
+            <button className="button button--secondary" type="button" onClick={handleResetFilters} style={{ fontSize: '12px', padding: '6px 12px' }}>
+              Clear Filters
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* 3. Executive KPI Metric Cards (Phase 3) - Responsive Flexbox */}
+      <div className="report-kpi-grid">
         {/* KPI 1: Resolution Rate */}
-        <Card style={kpiCardStyle}>
-          <div style={kpiToplineStyle}>
-            <span style={{ ...iconBadgeStyle, background: '#eaf5ee', color: '#176342' }}>
+        <Card className="report-kpi-card">
+          <div className="report-kpi-card__topline">
+            <span className="report-kpi-card__icon" style={{ background: '#eaf5ee', color: '#176342' }}>
               <CheckCircle2 size={16} />
             </span>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: '#176342' }}>Formula Verified</span>
+            <span className="report-kpi-card__badge" style={{ background: '#eaf5ee', color: '#176342' }}>Formula Verified</span>
           </div>
-          <span style={kpiLabelStyle}>Issues Resolved</span>
-          <strong style={{ fontSize: '24px', color: '#092d22', margin: '4px 0 2px' }}>
-            {kpis.resolution_rate?.formatted || 'No data'}
-          </strong>
-          <small style={{ fontSize: '11px', color: '#687c73' }}>
-            {kpis.resolution_rate?.resolved_count ?? 0} of {kpis.resolution_rate?.eligible_count ?? 0} eligible issues
-          </small>
+          <div className="report-kpi-card__body">
+            <span className="report-kpi-card__label">Issues Resolved</span>
+            <strong className="report-kpi-card__value">
+              {kpis.resolution_rate?.formatted || (kpis.resolution_rate?.eligible_count === 0 ? 'No data' : '0%')}
+            </strong>
+            <small className="report-kpi-card__desc">
+              {kpis.resolution_rate?.resolved_count ?? 0} of {kpis.resolution_rate?.eligible_count ?? 0} eligible issues
+            </small>
+          </div>
         </Card>
 
         {/* KPI 2: Median Verification Time */}
-        <Card style={kpiCardStyle}>
-          <div style={kpiToplineStyle}>
-            <span style={{ ...iconBadgeStyle, background: '#fef3c7', color: '#d97706' }}>
+        <Card className="report-kpi-card">
+          <div className="report-kpi-card__topline">
+            <span className="report-kpi-card__icon" style={{ background: '#fef3c7', color: '#d97706' }}>
               <Clock size={16} />
             </span>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: '#b45309' }}>Audit Trail</span>
+            <span className="report-kpi-card__badge" style={{ background: '#fef3c7', color: '#b45309' }}>Audit Trail</span>
           </div>
-          <span style={kpiLabelStyle}>Median Verification</span>
-          <strong style={{ fontSize: '24px', color: '#092d22', margin: '4px 0 2px' }}>
-            {kpis.median_verification?.formatted || 'Not available'}
-          </strong>
-          <small style={{ fontSize: '11px', color: '#687c73' }}>
-            {kpis.median_verification?.verified_issues_count ?? 0} verified ({kpis.median_verification?.unverified_issues_count ?? 0} pending)
-          </small>
+          <div className="report-kpi-card__body">
+            <span className="report-kpi-card__label">Median Verification</span>
+            <strong className="report-kpi-card__value">
+              {kpis.median_verification?.formatted || 'Not available'}
+            </strong>
+            <small className="report-kpi-card__desc">
+              {kpis.median_verification?.verified_issues_count ?? 0} verified · {kpis.median_verification?.unverified_issues_count ?? 0} pending
+            </small>
+          </div>
         </Card>
 
         {/* KPI 3: Community Reports */}
-        <Card style={kpiCardStyle}>
-          <div style={kpiToplineStyle}>
-            <span style={{ ...iconBadgeStyle, background: '#e0f2fe', color: '#0284c7' }}>
+        <Card className="report-kpi-card">
+          <div className="report-kpi-card__topline">
+            <span className="report-kpi-card__icon" style={{ background: '#e0f2fe', color: '#0284c7' }}>
               <Users size={16} />
             </span>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: '#0369a1' }}>Citizen Voices</span>
+            <span className="report-kpi-card__badge" style={{ background: '#e0f2fe', color: '#0369a1' }}>Citizen Voices</span>
           </div>
-          <span style={kpiLabelStyle}>Community Reports</span>
-          <strong style={{ fontSize: '24px', color: '#092d22', margin: '4px 0 2px' }}>
-            {kpis.community_reports?.total ?? 0}
-          </strong>
-          <small style={{ fontSize: '11px', color: '#687c73' }}>
-            {kpis.community_reports?.citizen_issue_reports ?? 0} citizen issues · {kpis.community_reports?.community_feedback_count ?? 0} voices
-          </small>
+          <div className="report-kpi-card__body">
+            <span className="report-kpi-card__label">Community Reports</span>
+            <strong className="report-kpi-card__value">
+              {kpis.community_reports?.total ?? 0}
+            </strong>
+            <small className="report-kpi-card__desc">
+              {kpis.community_reports?.citizen_issue_reports ?? 0} citizen issues · {kpis.community_reports?.community_feedback_count ?? 0} voices
+            </small>
+          </div>
         </Card>
 
         {/* KPI 4: Active & Critical Issues */}
-        <Card style={kpiCardStyle}>
-          <div style={kpiToplineStyle}>
-            <span style={{ ...iconBadgeStyle, background: '#fee2e2', color: '#dc2626' }}>
+        <Card className="report-kpi-card">
+          <div className="report-kpi-card__topline">
+            <span className="report-kpi-card__icon" style={{ background: '#fee2e2', color: '#dc2626' }}>
               <ShieldAlert size={16} />
             </span>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: '#b91c1c' }}>Live Workload</span>
+            <span className="report-kpi-card__badge" style={{ background: '#fee2e2', color: '#b91c1c' }}>Live Workload</span>
           </div>
-          <span style={kpiLabelStyle}>Active Issues</span>
-          <strong style={{ fontSize: '24px', color: '#092d22', margin: '4px 0 2px' }}>
-            {kpis.active_issues?.count ?? 0}
-          </strong>
-          <small style={{ fontSize: '11px', color: '#dc2626', fontWeight: 600 }}>
-            {kpis.active_issues?.critical_count ?? 0} critical severity
-          </small>
+          <div className="report-kpi-card__body">
+            <span className="report-kpi-card__label">Active Issues</span>
+            <strong className="report-kpi-card__value">
+              {kpis.active_issues?.count ?? 0}
+            </strong>
+            <small className="report-kpi-card__desc" style={{ color: '#dc2626', fontWeight: 600 }}>
+              {kpis.active_issues?.critical_count ?? 0} critical severity
+            </small>
+          </div>
         </Card>
 
         {/* KPI 5: Infrastructure Mapped */}
-        <Card style={kpiCardStyle}>
-          <div style={kpiToplineStyle}>
-            <span style={{ ...iconBadgeStyle, background: '#f0fdf4', color: '#16a34a' }}>
+        <Card className="report-kpi-card">
+          <div className="report-kpi-card__topline">
+            <span className="report-kpi-card__icon" style={{ background: '#f0fdf4', color: '#16a34a' }}>
               <Network size={16} />
             </span>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: '#15803d' }}>OSM + Field</span>
+            <span className="report-kpi-card__badge" style={{ background: '#f0fdf4', color: '#15803d' }}>OSM + Field</span>
           </div>
-          <span style={kpiLabelStyle}>Mapped Lifelines</span>
-          <strong style={{ fontSize: '24px', color: '#092d22', margin: '4px 0 2px' }}>
-            {infra.total_edges ? infra.total_edges.toLocaleString() : '0'}
-          </strong>
-          <small style={{ fontSize: '11px', color: '#687c73' }}>
-            {infra.roads ?? 0} roads · {infra.bridges ?? 0} bridges · {infra.schools ?? 0} schools
-          </small>
+          <div className="report-kpi-card__body">
+            <span className="report-kpi-card__label">Mapped Lifelines</span>
+            <strong className="report-kpi-card__value">
+              {(infra.total_edges ?? 0).toLocaleString()}
+            </strong>
+            <small className="report-kpi-card__desc">
+              {infra.roads ?? 0} roads · {infra.bridges ?? 0} bridges · {infra.schools ?? 0} schools
+            </small>
+          </div>
         </Card>
 
         {/* KPI 6: Action Plan Execution */}
-        <Card style={kpiCardStyle}>
-          <div style={kpiToplineStyle}>
-            <span style={{ ...iconBadgeStyle, background: '#f5f3ff', color: '#7c3aed' }}>
+        <Card className="report-kpi-card">
+          <div className="report-kpi-card__topline">
+            <span className="report-kpi-card__icon" style={{ background: '#f5f3ff', color: '#7c3aed' }}>
               <TrendingUp size={16} />
             </span>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: '#6d28d9' }}>Execution</span>
+            <span className="report-kpi-card__badge" style={{ background: '#f5f3ff', color: '#6d28d9' }}>Execution</span>
           </div>
-          <span style={kpiLabelStyle}>Action Plans</span>
-          <strong style={{ fontSize: '24px', color: '#092d22', margin: '4px 0 2px' }}>
-            {plans.total ?? 0} Plans
-          </strong>
-          <small style={{ fontSize: '11px', color: '#687c73' }}>
-            Avg {plans.average_progress ?? 0}% · {plans.overdue ?? 0} overdue
-          </small>
+          <div className="report-kpi-card__body">
+            <span className="report-kpi-card__label">Action Plans</span>
+            <strong className="report-kpi-card__value">
+              {plans.total ?? 0} Plans
+            </strong>
+            <small className="report-kpi-card__desc">
+              Avg {plans.average_progress ?? 0}% done · {plans.in_progress ?? 0} in progress
+            </small>
+          </div>
         </Card>
       </div>
 
@@ -1065,7 +1193,11 @@ export default function ReportsInsightsPage({ onNavigate }) {
             description="Categorization of reported disruptions across roads, water points, bridges, and facilities."
           />
           <div style={{ height: '240px', position: 'relative' }}>
-            <canvas ref={categoryChartRef} />
+            {categoryData?.categories?.length > 0 && categoryData.total > 0 ? (
+              <canvas ref={categoryChartRef} />
+            ) : (
+              renderChartEmptyState('No Categories Reported', <BarChart3 size={28} />)
+            )}
           </div>
         </Card>
 
@@ -1077,7 +1209,11 @@ export default function ReportsInsightsPage({ onNavigate }) {
             description="Historical trend of citizen reports submitted versus successfully resolved lifelines."
           />
           <div style={{ height: '240px', position: 'relative' }}>
-            <canvas ref={trendChartRef} />
+            {trendData?.timeline?.length > 0 && trendData.timeline.some((t) => (t.submitted || 0) > 0 || (t.resolved || 0) > 0) ? (
+              <canvas ref={trendChartRef} />
+            ) : (
+              renderChartEmptyState('No Timeline Activity', <LineChart size={28} />)
+            )}
           </div>
         </Card>
 
@@ -1089,7 +1225,11 @@ export default function ReportsInsightsPage({ onNavigate }) {
             description="Active distribution across reported, under review, verified, in progress, resolved, and rejected."
           />
           <div style={{ height: '230px', position: 'relative' }}>
-            <canvas ref={statusChartRef} />
+            {statusDistData?.distribution?.length > 0 && statusDistData.total > 0 ? (
+              <canvas ref={statusChartRef} />
+            ) : (
+              renderChartEmptyState('No Lifecycle Records', <PieChart size={28} />)
+            )}
           </div>
         </Card>
 
@@ -1101,7 +1241,11 @@ export default function ReportsInsightsPage({ onNavigate }) {
             description="Recorded severity classifications informing rapid municipal deployment and contractor prioritization."
           />
           <div style={{ height: '230px', position: 'relative' }}>
-            <canvas ref={priorityChartRef} />
+            {priorityData?.priorities?.length > 0 && priorityData.total > 0 ? (
+              <canvas ref={priorityChartRef} />
+            ) : (
+              renderChartEmptyState('No Disruption Classifications', <ShieldAlert size={28} />)
+            )}
           </div>
         </Card>
 
@@ -1113,7 +1257,11 @@ export default function ReportsInsightsPage({ onNavigate }) {
             description="Municipal ward report volumes contrasted with verified resolution counts."
           />
           <div style={{ height: '230px', position: 'relative' }}>
-            <canvas ref={wardChartRef} />
+            {wardCompData?.wards?.length > 0 && wardCompData.wards.some((w) => (w.total_issues || 0) > 0) ? (
+              <canvas ref={wardChartRef} />
+            ) : (
+              renderChartEmptyState('No Ward Issues Found', <MapPin size={28} />)
+            )}
           </div>
         </Card>
 
@@ -1125,7 +1273,11 @@ export default function ReportsInsightsPage({ onNavigate }) {
             description="Operational passability and verification status across registered road and bridge network edges."
           />
           <div style={{ height: '230px', position: 'relative' }}>
-            <canvas ref={conditionChartRef} />
+            {infraConditionData?.conditions?.length > 0 && infraConditionData.conditions.some((c) => (c.count || 0) > 0) ? (
+              <canvas ref={conditionChartRef} />
+            ) : (
+              renderChartEmptyState('No Lifelines Mapped', <Network size={28} />)
+            )}
           </div>
         </Card>
 
@@ -1137,7 +1289,11 @@ export default function ReportsInsightsPage({ onNavigate }) {
             description="Tracking active repair milestones and task execution across municipal teams."
           />
           <div style={{ height: '230px', position: 'relative' }}>
-            <canvas ref={actionPlanChartRef} />
+            {overview?.action_plans && (overview.action_plans.total > 0 || overview.action_plans.in_progress > 0) ? (
+              <canvas ref={actionPlanChartRef} />
+            ) : (
+              renderChartEmptyState('No Action Plans Active', <TrendingUp size={28} />)
+            )}
           </div>
         </Card>
 
@@ -1154,7 +1310,11 @@ export default function ReportsInsightsPage({ onNavigate }) {
             }
           />
           <div style={{ height: '230px', position: 'relative' }}>
-            <canvas ref={simulationChartRef} />
+            {simulationData?.scenarios?.length > 0 && simulationData.total_recorded_simulations > 0 ? (
+              <canvas ref={simulationChartRef} />
+            ) : (
+              renderChartEmptyState('No Simulations Recorded', <Cpu size={28} />)
+            )}
           </div>
         </Card>
       </div>

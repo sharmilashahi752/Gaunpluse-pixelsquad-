@@ -60,15 +60,21 @@ class ReportController extends Controller
         }
 
         if ($request->filled('category') && $request->query('category') !== 'all') {
-            $query->where('category', $request->query('category'));
+            $cat = strtolower(str_replace(' ', '_', trim($request->query('category'))));
+            $query->where(function ($sub) use ($cat) {
+                $sub->whereRaw("LOWER(REPLACE(category, ' ', '_')) = ?", [$cat])
+                    ->orWhereRaw("LOWER(REPLACE(category, '_', ' ')) = ?", [str_replace('_', ' ', $cat)]);
+            });
         }
 
         if ($request->filled('status') && $request->query('status') !== 'all') {
-            $query->where('status', $request->query('status'));
+            $st = strtolower(str_replace(' ', '_', trim($request->query('status'))));
+            $query->whereRaw("LOWER(REPLACE(status, ' ', '_')) = ?", [$st]);
         }
 
         if ($request->filled('severity') && $request->query('severity') !== 'all') {
-            $query->where('severity', $request->query('severity'));
+            $sev = strtolower(trim($request->query('severity')));
+            $query->whereRaw("LOWER(severity) = ?", [$sev]);
         }
 
         if ($request->filled('date_from')) {
@@ -255,7 +261,10 @@ class ReportController extends Controller
         }
 
         if ($request->filled('status') && $request->query('status') !== 'all') {
-            $query->where('status', $request->query('status'));
+            $st = strtolower(str_replace(' ', '_', trim($request->query('status'))));
+            if (in_array($st, ['draft', 'in_progress', 'completed', 'cancelled'])) {
+                $query->whereRaw("LOWER(REPLACE(status, ' ', '_')) = ?", [$st]);
+            }
         }
 
         if ($request->filled('date_from')) {
@@ -280,11 +289,11 @@ class ReportController extends Controller
         $issuesQuery = $this->applyIssueFilters(Issue::query(), $request);
 
         $totalIssues = (clone $issuesQuery)->count();
-        $rejectedCount = (clone $issuesQuery)->where('status', 'rejected')->count();
-        $eligibleCount = (clone $issuesQuery)->whereNotIn('status', ['rejected'])->count();
-        $resolvedCount = (clone $issuesQuery)->where('status', 'resolved')->count();
-        $activeCount = (clone $issuesQuery)->whereIn('status', ['submitted', 'under_review', 'verified', 'in_progress'])->count();
-        $criticalCount = (clone $issuesQuery)->where('severity', 'critical')->whereNotIn('status', ['resolved', 'rejected'])->count();
+        $rejectedCount = (clone $issuesQuery)->whereRaw("LOWER(status) = 'rejected'")->count();
+        $eligibleCount = (clone $issuesQuery)->whereRaw("LOWER(status) != 'rejected'")->count();
+        $resolvedCount = (clone $issuesQuery)->whereRaw("LOWER(status) = 'resolved'")->count();
+        $activeCount = (clone $issuesQuery)->whereRaw("LOWER(REPLACE(status, ' ', '_')) IN ('submitted', 'under_review', 'verified', 'in_progress')")->count();
+        $criticalCount = (clone $issuesQuery)->whereRaw("LOWER(severity) = 'critical' AND LOWER(status) NOT IN ('resolved', 'rejected')")->count();
 
         $resolutionRate = $eligibleCount > 0 ? round(($resolvedCount / $eligibleCount) * 100, 1) : null;
 
@@ -464,24 +473,43 @@ class ReportController extends Controller
     public function categories(Request $request): JsonResponse
     {
         $issuesQuery = $this->applyIssueFilters(Issue::query(), $request);
+        $results = (clone $issuesQuery)->get(['category']);
+        $total = $results->count();
 
-        $results = (clone $issuesQuery)
-            ->select('category', DB::raw('COUNT(*) as count'))
-            ->groupBy('category')
-            ->orderByDesc('count')
-            ->get();
+        $canonicalLabels = [
+            'damaged_bridge' => 'Damaged Bridge',
+            'damaged_road' => 'Damaged Road',
+            'water_supply' => 'Drinking Water Supply',
+            'school_access' => 'School Access',
+            'health_post_access' => 'Health Post Access',
+            'landslide' => 'Landslide / Trail Hazard',
+        ];
 
-        $total = $results->sum('count');
+        $counts = [];
+        foreach ($results as $row) {
+            $raw = trim($row->category ?? '');
+            $normalizedKey = strtolower(str_replace(' ', '_', $raw));
+            if (!$normalizedKey) {
+                $normalizedKey = 'general';
+            }
+            if (!isset($counts[$normalizedKey])) {
+                $counts[$normalizedKey] = 0;
+            }
+            $counts[$normalizedKey]++;
+        }
 
-        $categories = $results->map(function ($row) use ($total) {
-            $cat = $row->category ?: 'General';
-            return [
-                'category' => ucfirst($cat),
-                'key' => strtolower($cat),
-                'count' => (int) $row->count,
-                'percentage' => $total > 0 ? round(($row->count / $total) * 100, 1) : 0,
+        arsort($counts);
+
+        $categories = [];
+        foreach ($counts as $key => $count) {
+            $label = $canonicalLabels[$key] ?? ucwords(str_replace('_', ' ', $key));
+            $categories[] = [
+                'category' => $label,
+                'key' => $key,
+                'count' => (int) $count,
+                'percentage' => $total > 0 ? round(($count / $total) * 100, 1) : 0,
             ];
-        });
+        }
 
         return response()->json([
             'total' => $total,
@@ -494,17 +522,30 @@ class ReportController extends Controller
      */
     public function trends(Request $request): JsonResponse
     {
-        $monthsCount = $request->integer('months', 6);
+        $monthsCount = 6;
+        if ($request->has('range')) {
+            $r = (string) $request->query('range');
+            if ($r === '12m' || $r === 'year') $monthsCount = 12;
+            elseif ($r === '24m') $monthsCount = 24;
+            elseif ($r === '3m' || $r === '90days') $monthsCount = 3;
+            elseif ($r === '6m') $monthsCount = 6;
+        } elseif ($request->filled('months')) {
+            $monthsCount = $request->integer('months', 6);
+        }
         $monthsCount = max(3, min(24, $monthsCount));
 
         $startDate = now()->subMonths($monthsCount - 1)->startOfMonth();
 
         $issuesQuery = $this->applyIssueFilters(Issue::query(), $request);
 
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+        $formatCreated = $isSqlite ? "strftime('%Y-%m', created_at)" : "DATE_FORMAT(created_at, '%Y-%m')";
+        $formatUpdated = $isSqlite ? "strftime('%Y-%m', updated_at)" : "DATE_FORMAT(updated_at, '%Y-%m')";
+
         $submitted = (clone $issuesQuery)
             ->where('created_at', '>=', $startDate)
             ->select(
-                DB::raw("DATE_FORMAT(created_at, '%Y-%m') as month_key"),
+                DB::raw("{$formatCreated} as month_key"),
                 DB::raw('COUNT(*) as count')
             )
             ->groupBy('month_key')
@@ -513,10 +554,10 @@ class ReportController extends Controller
             ->toArray();
 
         $resolved = (clone $issuesQuery)
-            ->where('status', 'resolved')
+            ->whereRaw("LOWER(status) = 'resolved'")
             ->where('updated_at', '>=', $startDate)
             ->select(
-                DB::raw("DATE_FORMAT(updated_at, '%Y-%m') as month_key"),
+                DB::raw("{$formatUpdated} as month_key"),
                 DB::raw('COUNT(*) as count')
             )
             ->groupBy('month_key')
@@ -551,12 +592,7 @@ class ReportController extends Controller
     public function statusDistribution(Request $request): JsonResponse
     {
         $issuesQuery = $this->applyIssueFilters(Issue::query(), $request);
-
-        $results = (clone $issuesQuery)
-            ->select('status', DB::raw('COUNT(*) as count'))
-            ->groupBy('status')
-            ->pluck('count', 'status')
-            ->toArray();
+        $results = (clone $issuesQuery)->get(['status']);
 
         $canonicalStatuses = [
             'submitted' => 'Reported / New',
@@ -567,21 +603,35 @@ class ReportController extends Controller
             'rejected' => 'Rejected',
         ];
 
+        $counts = [
+            'submitted' => 0,
+            'under_review' => 0,
+            'verified' => 0,
+            'in_progress' => 0,
+            'resolved' => 0,
+            'rejected' => 0,
+        ];
+
+        foreach ($results as $row) {
+            $raw = strtolower(str_replace(' ', '_', trim($row->status ?? '')));
+            if (isset($counts[$raw])) {
+                $counts[$raw]++;
+            } else {
+                $counts['submitted']++;
+            }
+        }
+
+        $total = $results->count();
+
         $distribution = [];
-        $total = 0;
         foreach ($canonicalStatuses as $k => $label) {
-            $c = (int) ($results[$k] ?? 0);
-            $total += $c;
+            $c = $counts[$k] ?? 0;
             $distribution[] = [
                 'status' => $k,
                 'label' => $label,
                 'count' => $c,
+                'percentage' => $total > 0 ? round(($c / $total) * 100, 1) : 0,
             ];
-        }
-
-        // Add percentages
-        foreach ($distribution as &$item) {
-            $item['percentage'] = $total > 0 ? round(($item['count'] / $total) * 100, 1) : 0;
         }
 
         return response()->json([
@@ -596,23 +646,34 @@ class ReportController extends Controller
     public function priorities(Request $request): JsonResponse
     {
         $issuesQuery = $this->applyIssueFilters(Issue::query(), $request);
+        $results = (clone $issuesQuery)->get(['severity']);
 
-        $severityResults = (clone $issuesQuery)
-            ->select('severity', DB::raw('COUNT(*) as count'))
-            ->groupBy('severity')
-            ->pluck('count', 'severity')
-            ->toArray();
+        $counts = [
+            'critical' => 0,
+            'high' => 0,
+            'medium' => 0,
+            'low' => 0,
+        ];
+
+        foreach ($results as $row) {
+            $sev = strtolower(trim($row->severity ?? ''));
+            if (isset($counts[$sev])) {
+                $counts[$sev]++;
+            } else {
+                $counts['medium']++;
+            }
+        }
 
         $priorities = [
-            ['severity' => 'critical', 'label' => 'Critical Severity', 'count' => (int) ($severityResults['critical'] ?? 0), 'tone' => 'red'],
-            ['severity' => 'high', 'label' => 'High Severity', 'count' => (int) ($severityResults['high'] ?? 0), 'tone' => 'orange'],
-            ['severity' => 'medium', 'label' => 'Medium Severity', 'count' => (int) ($severityResults['medium'] ?? 0), 'tone' => 'yellow'],
-            ['severity' => 'low', 'label' => 'Low Severity', 'count' => (int) ($severityResults['low'] ?? 0), 'tone' => 'green'],
+            ['severity' => 'critical', 'label' => 'Critical Severity', 'count' => $counts['critical'], 'tone' => 'red'],
+            ['severity' => 'high', 'label' => 'High Severity', 'count' => $counts['high'], 'tone' => 'orange'],
+            ['severity' => 'medium', 'label' => 'Medium Severity', 'count' => $counts['medium'], 'tone' => 'yellow'],
+            ['severity' => 'low', 'label' => 'Low Severity', 'count' => $counts['low'], 'tone' => 'green'],
         ];
 
         return response()->json([
             'priorities' => $priorities,
-            'total' => array_sum(array_column($priorities, 'count')),
+            'total' => array_sum($counts),
         ]);
     }
 
@@ -627,16 +688,19 @@ class ReportController extends Controller
                 'villages.ward_no',
                 'villages.municipality',
                 DB::raw('COUNT(issues.id) as total_issues'),
-                DB::raw("COUNT(CASE WHEN issues.status = 'resolved' THEN 1 END) as resolved_issues"),
-                DB::raw("COUNT(CASE WHEN issues.severity = 'critical' AND issues.status != 'resolved' THEN 1 END) as critical_issues")
+                DB::raw("COUNT(CASE WHEN LOWER(issues.status) = 'resolved' THEN 1 END) as resolved_issues"),
+                DB::raw("COUNT(CASE WHEN LOWER(issues.severity) = 'critical' AND LOWER(issues.status) != 'resolved' THEN 1 END) as critical_issues")
             )
             ->groupBy('villages.ward_no', 'villages.municipality');
 
-        if ($request->filled('municipality')) {
+        if ($request->filled('municipality') && $request->query('municipality') !== 'all') {
             $query->where('villages.municipality', $request->query('municipality'));
         }
-        if ($request->filled('village_id')) {
+        if ($request->filled('village_id') && $request->query('village_id') !== 'all') {
             $query->where('villages.id', $request->query('village_id'));
+        }
+        if ($request->filled('district') && $request->query('district') !== 'all') {
+            $query->where('villages.district', $request->query('district'));
         }
 
         $rows = $query->orderBy('villages.ward_no')->get();

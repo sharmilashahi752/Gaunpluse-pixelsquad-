@@ -1,7 +1,7 @@
 import { ArrowRight, FlaskConical } from 'lucide-react';
 
-export function Card({ children, className = '', as: Element = 'section' }) {
-  return <Element className={`card ${className}`.trim()}>{children}</Element>;
+export function Card({ children, className = '', as: Element = 'section', style, ...props }) {
+  return <Element className={`card ${className}`.trim()} style={style} {...props}>{children}</Element>;
 }
 
 export function CardHeader({ eyebrow, title, description, action }) {
