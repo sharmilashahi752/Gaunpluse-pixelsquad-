@@ -8,13 +8,24 @@ class Village extends Model
 {
     protected $guarded = [];
     protected $appends = ['center_lat', 'center_lng', 'latitude', 'longitude'];
-    protected function casts(): array { return ['is_demo' => 'boolean', 'latitude' => 'float', 'longitude' => 'float']; }
+    protected function casts(): array
+    {
+        return [
+            'is_demo' => 'boolean',
+            'latitude' => 'float',
+            'longitude' => 'float',
+            'metadata' => 'array',
+            'reference_year' => 'integer',
+            'onboarding_step' => 'integer',
+        ];
+    }
 
     public function nodes() { return $this->hasMany(Node::class); }
     public function edges() { return $this->hasMany(Edge::class); }
     public function facilities() { return $this->hasMany(Facility::class); }
     public function settlements() { return $this->hasMany(SettlementGroup::class); }
     public function issues() { return $this->hasMany(Issue::class); }
+    public function auditLogs() { return $this->hasMany(AuditLog::class); }
 
     public function getCenterLatAttribute() {
         return (float) ($this->attributes['center_lat'] ?? $this->attributes['latitude'] ?? 27.8635);
