@@ -101,7 +101,52 @@ Calculates:
 
 ## API Request and Response Examples
 
-### POST `/api/simulations`
+### 1. GET `/api/dashboard/stats`
+Returns live municipal counts calculated directly from MySQL:
+```json
+{
+  "monitored_villages": 1,
+  "active_issues": 5,
+  "critical_disruptions": 2,
+  "affected_households": "73",
+  "resolved_issues": 1,
+  "total_action_plans": 5,
+  "action_plans_in_progress": 5,
+  "community_voices_count": 2
+}
+```
+
+### 2. POST `/api/issues`
+Report a new infrastructure disruption:
+```json
+{
+  "village_id": 1,
+  "edge_id": 2,
+  "title": "Bridge B suspension anchor crack detected",
+  "category": "damaged_bridge",
+  "severity": "critical",
+  "description": "Tension anchor has developed a 5mm hairline fracture after river debris impact.",
+  "latitude": 27.8615,
+  "longitude": 85.5860
+}
+```
+
+### 3. POST `/api/action-plans`
+Create an intervention plan linked to an issue:
+```json
+{
+  "village_id": 1,
+  "issue_id": 6,
+  "title": "Emergency epoxy grouting and anchor tensioning",
+  "ward": "Ward 4",
+  "priority": "Critical",
+  "responsible_team": "Rapid Response Bridge Unit",
+  "status": "in_progress",
+  "progress_percentage": 25
+}
+```
+
+### 4. POST `/api/simulations`
 
 Request:
 ```json
