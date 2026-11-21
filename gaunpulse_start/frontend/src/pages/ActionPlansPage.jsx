@@ -16,7 +16,7 @@ import {
   UserCheck,
   X,
 } from 'lucide-react';
-import { Card, CardHeader, DemoLabel, FeatureNotice, PageIntro, StatusBadge } from '../components/ui';
+import { Card, CardHeader, DemoLabel, EmptyState, FeatureNotice, PageIntro, StatusBadge } from '../components/ui';
 import { deduplicateVillages, formatVillageLabel } from '../utils/villageUtils';
 
 const PRIORITIES = ['Critical', 'High', 'Medium', 'Low'];
@@ -258,21 +258,21 @@ export default function ActionPlansPage() {
       {/* Filters */}
       <Card>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
-          <div style={{ flex: 1, minWidth: '220px', display: 'flex', alignItems: 'center', background: '#f6f5ed', borderRadius: '8px', padding: '0 10px' }}>
-            <Search size={16} color="#687c73" />
+          <div style={{ flex: 1, minWidth: '220px', display: 'flex', alignItems: 'center', background: 'var(--surface-subtle)', borderRadius: 'var(--radius-md)', padding: '0 12px', border: '1px solid var(--border)' }}>
+            <Search size={15} color="var(--text-secondary)" />
             <input
               type="text"
               placeholder="Search by action title, team, or ward..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              style={{ border: 'none', background: 'transparent', padding: '9px 10px', width: '100%', fontSize: '13px', outline: 'none' }}
+              style={{ border: 'none', background: 'transparent', padding: '9px 10px', width: '100%', fontSize: '13px', outline: 'none', color: 'var(--text-primary)' }}
             />
           </div>
 
           <select
             value={filterPriority}
             onChange={(e) => setFilterPriority(e.target.value)}
-            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #dfe6df', background: '#fff', fontSize: '12.5px' }}
+            style={{ padding: '8px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--surface)', fontSize: '12.5px', color: 'var(--text-primary)' }}
           >
             <option value="">All Priorities</option>
             {PRIORITIES.map((p) => (
@@ -285,7 +285,7 @@ export default function ActionPlansPage() {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #dfe6df', background: '#fff', fontSize: '12.5px' }}
+            style={{ padding: '8px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--surface)', fontSize: '12.5px', color: 'var(--text-primary)' }}
           >
             <option value="">All Statuses</option>
             {STATUSES.map((s) => (
@@ -299,15 +299,43 @@ export default function ActionPlansPage() {
 
       {/* Action Plans Grid */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#687c73' }}>
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
           <Loader2 className="animate-spin" size={24} style={{ margin: '0 auto 8px' }} />
           Loading action plans from MySQL...
         </div>
       ) : filteredPlans.length === 0 ? (
-        <Card style={{ textAlign: 'center', padding: '40px' }}>
-          <p style={{ margin: 0, fontWeight: 'bold', color: '#092d22' }}>No action plans found.</p>
-          <small style={{ color: '#687c73' }}>Click "Add New Action Plan" to schedule a municipal infrastructure repair.</small>
-        </Card>
+        <EmptyState
+          icon={CheckCircle2}
+          title="No action plans found"
+          description="Create a new municipal infrastructure action plan to schedule repair works and track progress."
+          action={
+            <button
+              className="button button--primary"
+              type="button"
+              onClick={() => {
+                setEditingPlan(null);
+                setFormData({
+                  village_id: villages[0]?.id || 1,
+                  issue_id: '',
+                  title: '',
+                  description: '',
+                  ward: 'Ward 4',
+                  priority: 'High',
+                  responsible_team: 'Municipal Infrastructure Unit',
+                  start_date: new Date().toISOString().slice(0, 10),
+                  target_completion_date: '',
+                  status: 'in_progress',
+                  progress_percentage: 10,
+                  notes: '',
+                });
+                setModalError(null);
+                setShowCreateModal(true);
+              }}
+            >
+              <Plus size={15} /> Add Action Plan
+            </button>
+          }
+        />
       ) : (
         <div className="plan-grid">
           {filteredPlans.map((plan) => (
@@ -401,46 +429,26 @@ export default function ActionPlansPage() {
 
       {/* QUICK PROGRESS SLIDER MODAL */}
       {updatingProgressPlan && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 9999,
-            background: 'rgba(9, 45, 34, 0.65)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px',
-          }}
-        >
-          <div
-            style={{
-              background: '#fff',
-              borderRadius: '16px',
-              maxWidth: '440px',
-              width: '100%',
-              padding: '24px',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-              <h3 style={{ margin: 0, fontSize: '16px', color: '#092d22' }}>Update Progress</h3>
+        <div className="modal-backdrop">
+          <div className="modal-card" style={{ maxWidth: '440px' }}>
+            <div className="modal-header">
+              <h3 style={{ margin: 0, fontSize: '15px', color: 'var(--text-primary)' }}>Update Progress</h3>
               <button
                 type="button"
+                className="modal-close-btn"
                 onClick={() => setUpdatingProgressPlan(null)}
-                style={{ border: 'none', background: 'transparent', cursor: 'pointer' }}
+                aria-label="Close"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
-            <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#687c73' }}>
+            <p style={{ margin: '0 0 16px', fontSize: '13px', color: 'var(--text-secondary)' }}>
               {updatingProgressPlan.title}
             </p>
 
             <div style={{ marginBottom: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 'bold' }}>Progress: {progressVal}%</span>
+                <span style={{ fontSize: '13px', fontWeight: '600', fontVariantNumeric: 'tabular-nums' }}>Progress: {progressVal}%</span>
                 {progressVal === 100 && <StatusBadge tone="green">Will Mark Completed</StatusBadge>}
               </div>
               <input
@@ -450,7 +458,7 @@ export default function ActionPlansPage() {
                 step="5"
                 value={progressVal}
                 onChange={(e) => setProgressVal(Number(e.target.value))}
-                style={{ width: '100%', cursor: 'pointer' }}
+                style={{ width: '100%', cursor: 'pointer', accentColor: 'var(--primary-green)' }}
               />
             </div>
 
@@ -476,51 +484,26 @@ export default function ActionPlansPage() {
 
       {/* CREATE / EDIT ACTION PLAN MODAL */}
       {showCreateModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 9999,
-            background: 'rgba(9, 45, 34, 0.65)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px',
-          }}
-        >
-          <div
-            style={{
-              background: '#fff',
-              borderRadius: '16px',
-              maxWidth: '620px',
-              width: '100%',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
-              border: '1px solid #dfe6df',
-              padding: '28px',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #dfe6df', paddingBottom: '12px' }}>
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <div className="modal-header">
               <div>
-                <span className="eyebrow" style={{ color: '#176342' }}>Municipal Intervention</span>
-                <h2 style={{ margin: '2px 0 0', color: '#092d22', fontSize: '18px' }}>
-                  {editingPlan ? 'Edit Action Plan' : 'Add New Action Plan'}
-                </h2>
+                <span className="eyebrow">Municipal Intervention</span>
+                <h2>{editingPlan ? 'Edit Action Plan' : 'Add New Action Plan'}</h2>
               </div>
               <button
                 type="button"
+                className="modal-close-btn"
                 onClick={() => setShowCreateModal(false)}
-                style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#687c73' }}
+                aria-label="Close"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
             {modalError && (
-              <div style={{ padding: '12px 16px', background: '#fde9e5', border: '1px solid #c94b46', borderRadius: '8px', color: '#c94b46', fontSize: '13px', marginBottom: '16px' }}>
-                <AlertCircle size={18} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
+              <div style={{ padding: '12px 14px', background: 'var(--danger-bg)', border: '1px solid rgba(198,79,69,0.3)', borderRadius: 'var(--radius-md)', color: 'var(--danger)', fontSize: '12.5px', marginBottom: '16px' }}>
+                <AlertCircle size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
                 {modalError}
               </div>
             )}

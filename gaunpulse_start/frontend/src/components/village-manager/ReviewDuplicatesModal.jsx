@@ -117,7 +117,7 @@ export default function ReviewDuplicatesModal({ isOpen, onClose, onConsolidation
         position: 'fixed',
         inset: 0,
         zIndex: 9999,
-        background: 'rgba(9, 45, 34, 0.65)',
+        background: 'rgba(18, 61, 48, 0.65)',
         backdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: 'center',
@@ -128,13 +128,14 @@ export default function ReviewDuplicatesModal({ isOpen, onClose, onConsolidation
       <div
         style={{
           background: '#ffffff',
-          borderRadius: '16px',
+          borderRadius: '12px',
+          border: '1px solid var(--border)',
           width: '100%',
           maxWidth: '840px',
           maxHeight: '92vh',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '0 20px 48px rgba(9, 45, 34, 0.28)',
+          boxShadow: '0 8px 32px rgba(18, 61, 48, 0.16)',
           overflow: 'hidden',
         }}
       >
