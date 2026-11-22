@@ -5,6 +5,8 @@ import {
   Camera,
   CheckCircle,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Clock,
   Download,
   ExternalLink,
@@ -101,12 +103,16 @@ export default function IssuesPage({ onNavigate }) {
   const [submitError, setSubmitError] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
 
-  // Status update state
-  const [updatingStatus, setUpdatingStatus] = useState(false);
-  const [newStatus, setNewStatus] = useState('');
-  const [statusComment, setStatusComment] = useState('');
-  const [statusMessage, setStatusMessage] = useState(null);
+  // Complaint Review & Verification Modal states
+  const [actionNotes, setActionNotes] = useState('');
+  const [actionError, setActionError] = useState(null);
+  const [actionSuccess, setActionSuccess] = useState(null);
+  const [isActionLoading, setIsActionLoading] = useState(false);
+  const [showRejectConfirm, setShowRejectConfirm] = useState(false);
   const [linkVillageId, setLinkVillageId] = useState('');
+  const [isSavingVillage, setIsSavingVillage] = useState(false);
+  const [villageSaveMessage, setVillageSaveMessage] = useState(null);
+  const [isAuditTrailOpen, setIsAuditTrailOpen] = useState(true);
 
   // Form fields
   const [formData, setFormData] = useState({
@@ -394,23 +400,30 @@ export default function IssuesPage({ onNavigate }) {
     }
   };
 
-  // Handle Status Update & Verification Actions
-  const handleUpdateStatus = async (overrideStatus, overrideComment) => {
-    const targetStatus = overrideStatus || newStatus;
-    const targetComment = overrideComment !== undefined ? overrideComment : statusComment;
-    if (!selectedIssue || !targetStatus) return;
+  // Open complaint review modal and reset action states
+  const handleOpenIssueModal = (item) => {
+    setSelectedIssue(item);
+    setActionNotes('');
+    setActionError(null);
+    setActionSuccess(null);
+    setShowRejectConfirm(false);
+    setLinkVillageId(item.village_id ? String(item.village_id) : '');
+    setIsSavingVillage(false);
+    setVillageSaveMessage(null);
+    setIsAuditTrailOpen(true);
+  };
 
-    if (targetStatus === 'rejected' && !targetComment.trim()) {
-      setStatusMessage('Error: Please provide a reason for rejecting this report.');
-      return;
-    }
-    if (targetStatus === 'more_information_needed' && !targetComment.trim()) {
-      setStatusMessage('Error: Please provide notes explaining what additional information is required from the resident.');
-      return;
-    }
+  // Village Assignment Handler: links village WITHOUT modifying report status
+  const handleSaveVillageLink = async () => {
+    if (!selectedIssue) return;
+    setIsSavingVillage(true);
+    setVillageSaveMessage(null);
+    setActionError(null);
 
-    setUpdatingStatus(true);
-    setStatusMessage(null);
+    const targetVillageId = linkVillageId ? Number(linkVillageId) : null;
+    const villageName = targetVillageId
+      ? (villages.find((v) => Number(v.id) === targetVillageId)?.name || 'Selected Village')
+      : 'Unregistered Settlement';
 
     const authToken = token || localStorage.getItem('gaunpulse_auth_token');
     const headers = {
@@ -420,10 +433,102 @@ export default function IssuesPage({ onNavigate }) {
     };
 
     const payload = {
+      status: selectedIssue.status, // Keep current status intact!
+      village_id: targetVillageId,
+      comment: targetVillageId
+        ? `Linked report to village registry: ${villageName}`
+        : 'Set settlement to unregistered (awaiting municipal survey)',
+    };
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/issues/${selectedIssue.id}/status`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(payload),
+      });
+
+      const updated = await res.json();
+      if (!res.ok) {
+        throw new Error(updated.message || 'Failed to update village linkage.');
+      }
+
+      const updatedData = updated.data || updated;
+      setSelectedIssue(updatedData);
+      setVillageSaveMessage(`Village assignment saved: ${villageName}. Status remains unchanged.`);
+      invalidateApiCache('api/issues');
+      invalidateApiCache('api/dashboard');
+      invalidateApiCache('api/reports');
+      loadData(true);
+    } catch (err) {
+      setActionError(`Village Assignment Error: ${err.message}`);
+    } finally {
+      setIsSavingVillage(false);
+    }
+  };
+
+  // Main reviewer action dispatch: validates eligibility and requirements
+  const handleReviewAction = (targetStatus) => {
+    setActionError(null);
+    setActionSuccess(null);
+    setVillageSaveMessage(null);
+
+    // 1. Eligibility validation for Verification
+    if (targetStatus === 'verified') {
+      const eligible = ['submitted', 'pending_verification', 'under_review', 'more_information_needed'];
+      if (!eligible.includes(norm(selectedIssue.status))) {
+        setActionError(`This report cannot be verified in its current status (${selectedIssue.status}).`);
+        return;
+      }
+      // Verification does not require rejection reason. Notes are optional.
+      executeStatusUpdate('verified');
+      return;
+    }
+
+    // 2. Validation for Request More Info
+    if (targetStatus === 'more_information_needed') {
+      if (!actionNotes.trim()) {
+        setActionError('Please provide notes explaining what additional information or documentation is required from the resident.');
+        return;
+      }
+      executeStatusUpdate('more_information_needed');
+      return;
+    }
+
+    // 3. Validation for Reject Report
+    if (targetStatus === 'rejected') {
+      if (!actionNotes.trim()) {
+        setActionError('Please provide a reason for rejecting this report.');
+        return;
+      }
+      // Require confirmation dialog before submitting rejection!
+      setShowRejectConfirm(true);
+      return;
+    }
+
+    // 4. Lifecycle updates (in_progress, resolved)
+    executeStatusUpdate(targetStatus);
+  };
+
+  // Submit status update to backend
+  const executeStatusUpdate = async (targetStatus) => {
+    if (!selectedIssue) return;
+    setIsActionLoading(true);
+    setActionError(null);
+    setActionSuccess(null);
+
+    const authToken = token || localStorage.getItem('gaunpulse_auth_token');
+    const headers = {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    };
+
+    const notesTrimmed = actionNotes.trim();
+    const payload = {
       status: targetStatus,
-      comment: targetComment.trim() || `Status updated to ${targetStatus.replace(/_/g, ' ')}`,
-      verification_notes: targetStatus === 'verified' ? (targetComment.trim() || 'Verified on-site by municipal technical officer.') : undefined,
-      rejection_reason: targetStatus === 'rejected' ? targetComment.trim() : undefined,
+      comment: notesTrimmed || (targetStatus === 'verified' ? 'Verified on-site by municipal technical staff.' : `Status updated to ${targetStatus.replace(/_/g, ' ')}`),
+      verification_notes: targetStatus === 'verified' ? (notesTrimmed || 'Verified on-site by municipal technical staff.') : undefined,
+      rejection_reason: targetStatus === 'rejected' ? notesTrimmed : undefined,
     };
     if (linkVillageId) {
       payload.village_id = Number(linkVillageId);
@@ -438,21 +543,40 @@ export default function IssuesPage({ onNavigate }) {
 
       const updated = await res.json();
       if (!res.ok) {
-        throw new Error(updated.message || 'Failed to update status.');
+        throw new Error(updated.message || 'Failed to update report status.');
       }
 
       const updatedData = updated.data || updated;
-      setStatusMessage(`Report status updated to ${targetStatus.replace(/_/g, ' ').toUpperCase()}. Resident notification created.`);
+      const successText = matchSuccessMessage(targetStatus);
+      setActionSuccess(successText);
       setSelectedIssue(updatedData);
-      setNewStatus(updatedData.status);
+      setActionNotes('');
+      setShowRejectConfirm(false);
       invalidateApiCache('api/issues');
       invalidateApiCache('api/dashboard');
       invalidateApiCache('api/reports');
       loadData(true);
     } catch (err) {
-      setStatusMessage(`Error: ${err.message}`);
+      setActionError(err.message || 'An error occurred while updating the report.');
     } finally {
-      setUpdatingStatus(false);
+      setIsActionLoading(false);
+    }
+  };
+
+  const matchSuccessMessage = (status) => {
+    switch (status) {
+      case 'verified':
+        return 'Report verified successfully. Disruption confirmed and queued for municipal repair planning.';
+      case 'more_information_needed':
+        return 'Request sent to resident. Report status set to action needed and notification dispatched.';
+      case 'rejected':
+        return 'Report rejected and closed. Decision and remarks recorded in the municipal audit trail.';
+      case 'in_progress':
+        return 'Status updated to In Progress. Repair work has commenced.';
+      case 'resolved':
+        return 'Report marked as Resolved. Infrastructure repair recorded as complete.';
+      default:
+        return `Report status updated to ${status.replace(/_/g, ' ')}.`;
     }
   };
 
@@ -673,13 +797,7 @@ export default function IssuesPage({ onNavigate }) {
                   <tr
                     key={item.id}
                     style={{ cursor: 'pointer' }}
-                    onClick={() => {
-                      setSelectedIssue(item);
-                      setNewStatus(item.status);
-                      setStatusComment('');
-                      setStatusMessage(null);
-                      setLinkVillageId(item.village_id ? String(item.village_id) : '');
-                    }}
+                    onClick={() => handleOpenIssueModal(item)}
                   >
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -1089,178 +1207,154 @@ export default function IssuesPage({ onNavigate }) {
         </div>
       )}
 
-      {/* ISSUE DETAIL & STATUS MODAL */}
+      {/* COMPLAINT DETAILS & REVIEW MODAL */}
       {selectedIssue && (
-        <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && setSelectedIssue(null)}>
-          <div className="modal-card modal-card--lg" style={{ maxWidth: '680px' }}>
-            <div className="modal-header">
+        <div
+          className="modal-backdrop"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isActionLoading) {
+              setSelectedIssue(null);
+            }
+          }}
+        >
+          <div className="modal-card modal-card--lg" style={{ maxWidth: '720px', maxHeight: '90vh', overflowY: 'auto', padding: '24px', background: '#FFFFFF' }}>
+            
+            {/* 1. HEADER */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
               <div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px' }}>
-                  <StatusBadge tone={severityTones[selectedIssue.severity]}>{selectedIssue.severity}</StatusBadge>
-                  <StatusBadge tone={statusTones[selectedIssue.status]}>{selectedIssue.status}</StatusBadge>
-                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 700, fontFamily: 'monospace', color: '#64748B' }}>
                     {selectedIssue.tracking_code || `GP-${selectedIssue.id}`}
                   </span>
+                  <StatusBadge tone={getSeverityTone(selectedIssue.severity)}>
+                    {selectedIssue.severity}
+                  </StatusBadge>
+                  <StatusBadge tone={getStatusTone(selectedIssue.status)}>
+                    {selectedIssue.status ? selectedIssue.status.replace(/_/g, ' ') : 'Submitted'}
+                  </StatusBadge>
                 </div>
-                <h2>{selectedIssue.title}</h2>
+                <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#123D30', lineHeight: 1.3 }}>
+                  {selectedIssue.title}
+                </h2>
               </div>
               <button
                 type="button"
                 className="modal-close-btn"
-                onClick={() => setSelectedIssue(null)}
+                onClick={() => !isActionLoading && setSelectedIssue(null)}
                 aria-label="Close"
+                disabled={isActionLoading}
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div style={{ display: 'grid', gap: '14px', fontSize: '13px', color: 'var(--text-primary)' }}>
-              <div style={{ padding: '14px', background: 'var(--surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-                <p style={{ margin: '0 0 8px', lineHeight: '1.5' }}>{selectedIssue.description}</p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '8px' }}>
-                  <span><strong>Village / Settlement:</strong> {selectedIssue.settlement_name || selectedIssue.complaint?.settlement_name || selectedIssue.village?.name || 'Municipal Area'}</span>
-                  <span><strong>Ward:</strong> Ward {selectedIssue.ward_no || selectedIssue.village?.ward_no || selectedIssue.complaint?.ward_number || 'N/A'}</span>
-                  {selectedIssue.edge && <span><strong>Asset:</strong> {selectedIssue.edge.name}</span>}
-                  <span style={{ fontVariantNumeric: 'tabular-nums' }}><strong>Coordinates:</strong> {selectedIssue.latitude}, {selectedIssue.longitude}</span>
-                  {selectedIssue.reporter_name && <span><strong>Reporter:</strong> {selectedIssue.reporter_name} ({selectedIssue.reporter_phone || 'Resident'})</span>}
+            <div style={{ display: 'grid', gap: '16px', marginTop: '16px' }}>
+
+              {/* 2. COMPLAINT DETAILS */}
+              <div style={{ padding: '16px', background: '#FFFFFF', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                <h3 style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: 700, color: '#123D30', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Complaint Details
+                </h3>
+                <p style={{ margin: '0 0 14px', fontSize: '13.5px', color: 'var(--text-primary)', lineHeight: 1.6 }}>
+                  {selectedIssue.description}
+                </p>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', fontSize: '12px', paddingTop: '12px', borderTop: '1px solid #F1F5F9' }}>
+                  <div>
+                    <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '11px', fontWeight: 600 }}>Reporter</span>
+                    <strong style={{ color: 'var(--text-primary)' }}>
+                      {selectedIssue.reporter_name || 'Community Resident'}
+                    </strong>
+                    {selectedIssue.reporter_phone && (
+                      <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '11px' }}>
+                        {selectedIssue.reporter_phone}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '11px', fontWeight: 600 }}>Village / Settlement</span>
+                    <strong style={{ color: 'var(--text-primary)' }}>
+                      {selectedIssue.settlement_name || selectedIssue.village?.name || 'Unregistered Settlement'}
+                    </strong>
+                    <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '11px' }}>
+                      Ward {selectedIssue.ward_no || selectedIssue.village?.ward_no || selectedIssue.complaint?.ward_number || 'N/A'}
+                    </span>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '11px', fontWeight: 600 }}>Location</span>
+                    <span style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums', display: 'block' }}>
+                      {selectedIssue.latitude?.toFixed(4)}, {selectedIssue.longitude?.toFixed(4)}
+                    </span>
+                    {selectedIssue.edge && (
+                      <span style={{ color: '#123D30', fontSize: '11px', fontWeight: 600 }}>
+                        Asset: {selectedIssue.edge.name}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                {/* Settlement Linkage to Official Village (if unregistered) */}
-                {(!selectedIssue.village_id || selectedIssue.settlement_name || selectedIssue.complaint?.settlement_name) && (
-                  <div style={{ marginTop: '12px', padding: '10px 12px', background: '#fefce8', border: '1px solid #fde047', borderRadius: 'var(--radius-sm)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                      <label style={{ fontSize: '12px', fontWeight: 700, color: '#854d0e', margin: 0 }}>
-                        Unregistered Settlement — Link to Registered Village:
-                      </label>
-                      <span style={{ fontSize: '11px', background: '#fef08a', color: '#713f12', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
-                        Citizen-reported: {selectedIssue.settlement_name || selectedIssue.complaint?.settlement_name || 'Unregistered'}
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <select
-                        value={linkVillageId}
-                        onChange={(e) => setLinkVillageId(e.target.value)}
-                        style={{ flex: 1, padding: '6px 10px', fontSize: '12px', borderRadius: '4px', border: '1px solid #d9e3db', background: '#fff' }}
-                      >
-                        <option value="">-- Keep Unregistered (Awaiting Survey) --</option>
-                        {dedupedVillages.map((v) => (
-                          <option key={v.id} value={v.id}>
-                            {v.name} ({v.municipality || 'Municipal Area'}, Ward {v.ward_no || 1})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <small style={{ color: '#a16207', fontSize: '11px', display: 'block', marginTop: '4px' }}>
-                      Linking an official village associates this report with graph simulations, network routes, and priority scoring.
-                    </small>
-                  </div>
-                )}
-
-                {/* Speech-to-Text Transcription Box */}
-                {(selectedIssue.speech_transcript || selectedIssue.complaint?.speech_transcript) && (
-                  <div style={{ marginTop: '12px', padding: '12px 14px', background: '#f8fafc', borderLeft: '4px solid #123d30', borderRadius: '4px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '6px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#123d30', fontSize: '12px', fontWeight: 700 }}>
-                        <FileText size={14} /> Citizen Speech Transcription
-                        <span style={{ fontSize: '10.5px', background: '#eef5f1', color: '#267153', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
-                          {selectedIssue.transcript_language === 'en-US' || selectedIssue.complaint?.transcript_language === 'en-US' ? 'English (en-US)' : 'नेपाली (ne-NP)'}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        className="button button--secondary"
-                        style={{ padding: '3px 8px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                        onClick={() => {
-                          const text = selectedIssue.speech_transcript || selectedIssue.complaint?.speech_transcript || '';
-                          const blob = new Blob(['\uFEFF' + text], { type: 'text/plain;charset=utf-8' });
-                          const url = URL.createObjectURL(blob);
-                          const a = document.createElement('a');
-                          a.href = url;
-                          a.download = `gaunpulse-transcript-issue-${selectedIssue.id}.txt`;
-                          document.body.appendChild(a);
-                          a.click();
-                          document.body.removeChild(a);
-                          URL.revokeObjectURL(url);
-                        }}
-                      >
-                        <Download size={12} /> Download Transcript (.txt)
-                      </button>
-                    </div>
-                    <p style={{ margin: 0, fontStyle: 'italic', fontSize: '13px', color: '#1e293b', lineHeight: 1.6 }}>
-                      "{selectedIssue.speech_transcript || selectedIssue.complaint?.speech_transcript}"
-                    </p>
-                  </div>
-                )}
-
-                {/* Attached Audio Evidence (Voice Recording) */}
+                {/* Evidence Attachments: Audio & Voice Recording */}
                 {selectedIssue.complaint?.media && selectedIssue.complaint.media.some((m) => m.media_type === 'audio') && (
-                  <div style={{ marginTop: '12px', padding: '12px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 'var(--radius-md)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#166534', fontSize: '12.5px', fontWeight: 700, marginBottom: '8px' }}>
-                      <Volume2 size={16} /> Attached Citizen Voice Recording
+                  <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid #F1F5F9' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#123D30', fontSize: '12px', fontWeight: 700, marginBottom: '8px' }}>
+                      <Volume2 size={15} /> Citizen Voice Recording
                     </div>
                     {selectedIssue.complaint.media.filter((m) => m.media_type === 'audio').map((audioItem) => (
-                      <div key={audioItem.id} style={{ marginBottom: '8px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                          <small style={{ color: 'var(--text-secondary)' }}>
-                            {audioItem.original_name} {audioItem.file_size ? `(${Math.round(audioItem.file_size / 1024)} KB)` : ''}
-                          </small>
-                          <a
-                            href={audioItem.url}
-                            download={audioItem.original_name || `gaunpulse-voice-report-${selectedIssue.id}.webm`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="button button--secondary"
-                            style={{ padding: '3px 8px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
-                          >
-                            <Download size={12} /> Download Audio
-                          </a>
-                        </div>
-                        <audio controls src={audioItem.url} style={{ width: '100%', height: '36px' }} />
+                      <div key={audioItem.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        <audio controls src={audioItem.url} style={{ height: '36px', flex: 1, minWidth: '220px' }} />
+                        <a
+                          href={audioItem.url}
+                          download={audioItem.original_name || `gaunpulse-voice-${selectedIssue.id}.webm`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="button button--secondary"
+                          style={{ padding: '4px 10px', fontSize: '11.5px', textDecoration: 'none' }}
+                        >
+                          <Download size={13} /> Download
+                        </a>
                       </div>
                     ))}
                   </div>
                 )}
 
-                {/* Multi-Photo Evidence Gallery */}
+                {/* Evidence Attachments: Speech Transcript */}
+                {(selectedIssue.speech_transcript || selectedIssue.complaint?.speech_transcript) && (
+                  <div style={{ marginTop: '12px', padding: '10px 14px', background: '#F8FAFC', borderLeft: '3px solid #123D30', borderRadius: '4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#123D30' }}>Speech Transcription</span>
+                      <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>
+                        {selectedIssue.transcript_language === 'en-US' || selectedIssue.complaint?.transcript_language === 'en-US' ? 'English' : 'Nepali'}
+                      </span>
+                    </div>
+                    <p style={{ margin: 0, fontStyle: 'italic', fontSize: '12.5px', color: '#334155', lineHeight: 1.5 }}>
+                      "{selectedIssue.speech_transcript || selectedIssue.complaint?.speech_transcript}"
+                    </p>
+                  </div>
+                )}
+
+                {/* Evidence Attachments: Photo Gallery */}
                 {((selectedIssue.complaint?.media && selectedIssue.complaint.media.some((m) => m.media_type === 'image')) || selectedIssue.photo_url) && (
-                  <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
-                    <strong style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>
+                  <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid #F1F5F9' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>
                       Attached Photographic Evidence:
-                    </strong>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px' }}>
+                    </span>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                       {selectedIssue.complaint?.media && selectedIssue.complaint.media.filter((m) => m.media_type === 'image').length > 0 ? (
                         selectedIssue.complaint.media.filter((m) => m.media_type === 'image').map((mediaItem) => (
-                          <a key={mediaItem.id} href={mediaItem.url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', textAlign: 'center' }}>
+                          <a key={mediaItem.id} href={mediaItem.url} target="_blank" rel="noopener noreferrer" style={{ display: 'block' }}>
                             <img
                               src={mediaItem.url}
                               alt={mediaItem.original_name}
-                              style={{
-                                width: '100%',
-                                height: '90px',
-                                borderRadius: 'var(--radius-md)',
-                                border: '1px solid var(--border)',
-                                objectFit: 'cover',
-                                boxShadow: '0 2px 4px rgba(0,0,0,0.06)',
-                              }}
+                              style={{ width: '84px', height: '84px', borderRadius: '6px', border: '1px solid var(--border)', objectFit: 'cover' }}
                             />
-                            <small style={{ display: 'block', fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {mediaItem.original_name}
-                            </small>
                           </a>
                         ))
                       ) : selectedIssue.photo_url ? (
-                        <a href={selectedIssue.photo_url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block' }}>
+                        <a href={selectedIssue.photo_url} target="_blank" rel="noopener noreferrer">
                           <img
                             src={selectedIssue.photo_url}
                             alt={selectedIssue.title}
-                            style={{
-                              maxHeight: '160px',
-                              maxWidth: '100%',
-                              borderRadius: 'var(--radius-md)',
-                              border: '1px solid var(--border)',
-                              objectFit: 'cover',
-                              boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
-                            }}
+                            style={{ maxHeight: '110px', borderRadius: '6px', border: '1px solid var(--border)', objectFit: 'cover' }}
                           />
                         </a>
                       ) : null}
@@ -1269,151 +1363,277 @@ export default function IssuesPage({ onNavigate }) {
                 )}
               </div>
 
-              {/* Status Update & Municipal Verification Panel */}
-              <div style={{ padding: '16px', background: 'var(--surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <h4 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '13.5px', fontWeight: 600 }}>
-                    Municipal Verification & Lifecycle Actions
-                  </h4>
-                  <StatusBadge tone={statusTones[selectedIssue.status]}>
-                    {(selectedIssue.status || '').replace(/_/g, ' ')}
-                  </StatusBadge>
+              {/* 3. VILLAGE ASSIGNMENT */}
+              <div style={{ padding: '14px 16px', background: '#F8FAFC', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                <h3 style={{ margin: '0 0 6px', fontSize: '13px', fontWeight: 700, color: '#123D30', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Village Assignment
+                </h3>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <select
+                    value={linkVillageId}
+                    onChange={(e) => {
+                      setLinkVillageId(e.target.value);
+                      setVillageSaveMessage(null);
+                      setActionError(null);
+                    }}
+                    disabled={isSavingVillage || isActionLoading}
+                    style={{ flex: 1, minWidth: '220px', padding: '8px 12px', fontSize: '12.5px', borderRadius: '6px', border: '1px solid var(--border)', background: '#FFFFFF' }}
+                  >
+                    <option value="">-- Unregistered Settlement (Awaiting Survey) --</option>
+                    {dedupedVillages.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.name} ({v.municipality || 'Municipal Area'}, Ward {v.ward_no || 1})
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="button button--secondary"
+                    onClick={handleSaveVillageLink}
+                    disabled={isSavingVillage || isActionLoading || linkVillageId === String(selectedIssue.village_id || '')}
+                    style={{ height: '36px', fontSize: '12px' }}
+                  >
+                    {isSavingVillage ? <Loader2 className="animate-spin" size={14} /> : 'Save Assignment'}
+                  </button>
                 </div>
-
-                {statusMessage && (
-                  <div style={{ padding: '8px 12px', background: statusMessage.startsWith('Error') ? 'var(--danger-bg)' : 'var(--success-bg)', border: `1px solid ${statusMessage.startsWith('Error') ? 'rgba(198,79,69,0.3)' : 'var(--success-border)'}`, borderRadius: 'var(--radius-sm)', fontSize: '12px', color: statusMessage.startsWith('Error') ? 'var(--danger)' : 'var(--success)', marginBottom: '10px' }}>
-                    {statusMessage}
+                {villageSaveMessage && (
+                  <div style={{ marginTop: '6px', fontSize: '12px', color: '#15803D', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <CheckCircle2 size={13} /> {villageSaveMessage}
                   </div>
                 )}
+              </div>
 
-                {/* Existing Verification Metadata if already verified or rejected */}
+              {/* 4. REVIEW COMPLAINT */}
+              <div style={{ padding: '16px', background: '#FFFFFF', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#123D30', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Review Complaint
+                  </h3>
+                  <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                    Current status: <strong style={{ color: '#123D30' }}>{selectedIssue.status?.replace(/_/g, ' ')}</strong>
+                  </span>
+                </div>
+
+                {/* Inspection metadata banner if already verified or rejected */}
                 {(selectedIssue.verified_at || selectedIssue.rejection_reason) && (
-                  <div style={{ padding: '10px 12px', background: 'var(--surface-subtle)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', fontSize: '12px', marginBottom: '12px' }}>
+                  <div style={{ padding: '10px 12px', background: selectedIssue.verified_at ? '#F0FDF4' : '#FEF2F2', border: `1px solid ${selectedIssue.verified_at ? '#BBF7D0' : '#FECACA'}`, borderRadius: '6px', fontSize: '12px', marginBottom: '12px' }}>
                     {selectedIssue.verified_at && (
-                      <div style={{ color: '#166534', marginBottom: selectedIssue.verification_notes ? '4px' : 0 }}>
-                        <strong>✓ Verified On:</strong> {new Date(selectedIssue.verified_at).toLocaleString()}
+                      <div style={{ color: '#166534' }}>
+                        <strong>✓ Verified by:</strong> {selectedIssue.verifier_name || 'Municipal Engineering Staff'} on {new Date(selectedIssue.verified_at).toLocaleString()}
                         {selectedIssue.verification_notes && (
-                          <div style={{ color: 'var(--text-primary)', marginTop: '2px' }}>
-                            <strong>Notes:</strong> {selectedIssue.verification_notes}
+                          <div style={{ marginTop: '2px', color: 'var(--text-primary)' }}>
+                            <strong>Inspection Notes:</strong> {selectedIssue.verification_notes}
                           </div>
                         )}
                       </div>
                     )}
                     {selectedIssue.rejection_reason && (
-                      <div style={{ color: '#991b1b' }}>
-                        <strong>✕ Closed / Rejection Reason:</strong> {selectedIssue.rejection_reason}
+                      <div style={{ color: '#991B1B' }}>
+                        <strong>✕ Rejection Reason:</strong> {selectedIssue.rejection_reason}
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* Quick Verification Actions for Pending Reports */}
-                {['pending_verification', 'submitted', 'more_information_needed'].includes(norm(selectedIssue.status)) && (
-                  <div style={{ marginBottom: '14px', padding: '12px', background: '#f8fafc', borderRadius: 'var(--radius-sm)', border: '1px dashed #cbd5e1' }}>
-                    <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>
-                      ON-SITE VERIFICATION ACTION (WARD & MUNICIPAL ENGINEERS):
-                    </span>
-                    <p style={{ margin: '0 0 10px', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                      Unverified reports remain isolated from confirmed incident models. Confirming this report promotes it to active status across Simulation, Prioritization, and Action Plan modules.
-                    </p>
-                    <div style={{ marginBottom: '10px' }}>
-                      <input
-                        type="text"
-                        placeholder="Verification inspection notes, requested resident details, or rejection reason..."
-                        value={statusComment}
-                        onChange={(e) => setStatusComment(e.target.value)}
-                        style={{ width: '100%', padding: '7px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', fontSize: '12px' }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      <button
-                        type="button"
-                        className="button"
-                        onClick={() => handleUpdateStatus('verified')}
-                        disabled={updatingStatus}
-                        style={{ background: '#166534', color: '#fff', fontSize: '12px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                      >
-                        <CheckCircle2 size={14} /> Verify Report (Confirm Disruption)
-                      </button>
-                      <button
-                        type="button"
-                        className="button"
-                        onClick={() => handleUpdateStatus('more_information_needed')}
-                        disabled={updatingStatus}
-                        style={{ background: '#ca8a04', color: '#fff', fontSize: '12px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                      >
-                        <HelpCircle size={14} /> Request More Info
-                      </button>
-                      <button
-                        type="button"
-                        className="button"
-                        onClick={() => handleUpdateStatus('rejected')}
-                        disabled={updatingStatus}
-                        style={{ background: '#b91c1c', color: '#fff', fontSize: '12px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                      >
-                        <XCircle size={14} /> Reject Report
-                      </button>
-                    </div>
+                {/* Feedback Banners */}
+                {actionSuccess && (
+                  <div style={{ padding: '10px 14px', background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: '6px', fontSize: '12.5px', color: '#166534', fontWeight: 500, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <CheckCircle2 size={16} /> {actionSuccess}
                   </div>
                 )}
 
-                {/* Standard Status Dropdown for Full Lifecycle */}
-                <div>
-                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-secondary)' }}>
-                    Update Lifecycle Status:
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '170px 1fr auto', gap: '10px', alignItems: 'end' }}>
-                    <select
-                      value={newStatus}
-                      onChange={(e) => setNewStatus(e.target.value)}
-                      style={{ width: '100%', padding: '7px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: '#fff', fontSize: '12.5px' }}
-                    >
-                      <option value="pending_verification">Pending Verification</option>
-                      <option value="submitted">Submitted</option>
-                      <option value="under_review">Under Review</option>
-                      <option value="verified">Verified (Confirmed On-Site)</option>
-                      <option value="more_information_needed">More Information Needed</option>
-                      <option value="in_progress">In Progress (Work Underway)</option>
-                      <option value="resolved">Resolved (Repairs Completed)</option>
-                      <option value="rejected">Rejected (Not Actionable)</option>
-                    </select>
-                    <input
-                      type="text"
-                      placeholder="Audit log comment or engineer remarks..."
-                      value={statusComment}
-                      onChange={(e) => setStatusComment(e.target.value)}
-                      style={{ width: '100%', padding: '7px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', fontSize: '12.5px' }}
-                    />
+                {/* Review Notes Textarea */}
+                <div style={{ marginBottom: '12px' }}>
+                  <textarea
+                    rows={2}
+                    placeholder="Enter inspection remarks, information requested from resident, or reason for decision..."
+                    value={actionNotes}
+                    onChange={(e) => {
+                      setActionNotes(e.target.value);
+                      setActionError(null);
+                    }}
+                    disabled={isActionLoading}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: actionError ? '1px solid #DC2626' : '1px solid var(--border)', fontSize: '12.5px', resize: 'vertical', fontFamily: 'inherit' }}
+                  />
+                  {actionError && (
+                    <div style={{ color: '#DC2626', fontSize: '12px', marginTop: '4px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <AlertCircle size={13} /> {actionError}
+                    </div>
+                  )}
+                </div>
+
+                {/* Actions: If Report is Unverified/Pending */}
+                {['submitted', 'pending_verification', 'under_review', 'more_information_needed'].includes(norm(selectedIssue.status)) ? (
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     <button
                       type="button"
                       className="button button--primary"
-                      onClick={() => handleUpdateStatus()}
-                      disabled={updatingStatus}
-                      style={{ height: '35px', fontSize: '12px' }}
+                      onClick={() => handleReviewAction('verified')}
+                      disabled={isActionLoading}
+                      style={{ height: '36px', fontSize: '12px' }}
                     >
-                      {updatingStatus ? <Loader2 className="animate-spin" size={14} /> : 'Save Update'}
+                      {isActionLoading ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle2 size={14} />}
+                      Verify Report
+                    </button>
+                    <button
+                      type="button"
+                      className="button"
+                      onClick={() => handleReviewAction('more_information_needed')}
+                      disabled={isActionLoading}
+                      style={{ height: '36px', fontSize: '12px', background: '#D97706', color: '#FFFFFF', border: '1px solid #D97706' }}
+                    >
+                      <HelpCircle size={14} />
+                      Request More Info
+                    </button>
+                    <button
+                      type="button"
+                      className="button"
+                      onClick={() => handleReviewAction('rejected')}
+                      disabled={isActionLoading}
+                      style={{ height: '36px', fontSize: '12px', background: '#DC2626', color: '#FFFFFF', border: '1px solid #DC2626' }}
+                    >
+                      <XCircle size={14} />
+                      Reject Report
                     </button>
                   </div>
-                </div>
+                ) : (
+                  /* Actions: If Report is Already Verified / In Progress / Resolved / Rejected */
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    {norm(selectedIssue.status) === 'verified' && (
+                      <>
+                        <button
+                          type="button"
+                          className="button button--secondary"
+                          onClick={() => handleReviewAction('in_progress')}
+                          disabled={isActionLoading}
+                          style={{ height: '36px', fontSize: '12px' }}
+                        >
+                          <Clock size={14} />
+                          Begin Repairs (In Progress)
+                        </button>
+                        <button
+                          type="button"
+                          className="button button--primary"
+                          onClick={() => handleReviewAction('resolved')}
+                          disabled={isActionLoading}
+                          style={{ height: '36px', fontSize: '12px' }}
+                        >
+                          <CheckCircle2 size={14} />
+                          Mark Resolved
+                        </button>
+                      </>
+                    )}
+                    {norm(selectedIssue.status) === 'in_progress' && (
+                      <button
+                        type="button"
+                        className="button button--primary"
+                        onClick={() => handleReviewAction('resolved')}
+                        disabled={isActionLoading}
+                        style={{ height: '36px', fontSize: '12px' }}
+                      >
+                        <CheckCircle2 size={14} />
+                        Mark Repairs Resolved
+                      </button>
+                    )}
+                    {norm(selectedIssue.status) === 'resolved' && (
+                      <span style={{ fontSize: '12.5px', color: '#166534', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        <CheckCircle2 size={15} /> All repairs completed and verified.
+                      </span>
+                    )}
+                    {norm(selectedIssue.status) === 'rejected' && (
+                      <span style={{ fontSize: '12.5px', color: '#991B1B', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        <XCircle size={15} /> Report has been rejected and closed.
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {/* Status Update History */}
-              {selectedIssue.updates && selectedIssue.updates.length > 0 && (
-                <div>
-                  <h4 style={{ margin: '8px 0 6px', color: 'var(--text-primary)', fontSize: '13px', fontWeight: 600 }}>Audit & Update Trail</h4>
-                  <div style={{ display: 'grid', gap: '6px' }}>
-                    {selectedIssue.updates.map((upd, i) => (
-                      <div key={i} style={{ padding: '9px 12px', background: 'var(--surface-subtle)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', fontSize: '11.5px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                          <span><strong>{upd.old_status} → {upd.new_status}</strong></span>
-                          <span style={{ fontVariantNumeric: 'tabular-nums' }}>{new Date(upd.created_at).toLocaleString()}</span>
+              {/* 5. ACTIVITY HISTORY */}
+              <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden', background: '#FFFFFF' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsAuditTrailOpen(!isAuditTrailOpen)}
+                  style={{ width: '100%', padding: '12px 16px', background: '#F8FAFC', border: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', textAlign: 'left' }}
+                >
+                  <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#123D30' }}>
+                    Activity History & Audit Trail ({selectedIssue.updates?.length || 0})
+                  </span>
+                  {isAuditTrailOpen ? <ChevronUp size={16} color="#64748B" /> : <ChevronDown size={16} color="#64748B" />}
+                </button>
+
+                {isAuditTrailOpen && (
+                  <div style={{ padding: '14px 16px', display: 'grid', gap: '8px' }}>
+                    {selectedIssue.updates && selectedIssue.updates.length > 0 ? (
+                      selectedIssue.updates.map((upd, i) => (
+                        <div key={upd.id || i} style={{ padding: '10px 12px', background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '6px', fontSize: '12px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                            <span style={{ fontWeight: 700, color: '#123D30' }}>
+                              {upd.old_status ? `${upd.old_status} → ${upd.new_status}` : (upd.new_status || upd.status)}
+                            </span>
+                            <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--text-secondary)', fontSize: '11px' }}>
+                              {new Date(upd.created_at).toLocaleString()}
+                            </span>
+                          </div>
+                          <div style={{ color: 'var(--text-secondary)', fontSize: '11.5px', marginBottom: '3px' }}>
+                            Official: <strong>{upd.user_name || 'Municipal Officer'}</strong>
+                          </div>
+                          {upd.comment && (
+                            <p style={{ margin: 0, color: 'var(--text-primary)', fontStyle: 'italic', fontSize: '12px' }}>
+                              "{upd.comment}"
+                            </p>
+                          )}
                         </div>
-                        {upd.comment && <p style={{ margin: '3px 0 0', color: 'var(--text-primary)' }}>{upd.comment}</p>}
+                      ))
+                    ) : (
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontStyle: 'italic' }}>
+                        No audit history recorded yet.
                       </div>
-                    ))}
+                    )}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMATION DIALOG FOR REJECTION */}
+      {showRejectConfirm && (
+        <div
+          className="modal-backdrop"
+          style={{ zIndex: 1100, backgroundColor: 'rgba(0, 0, 0, 0.45)' }}
+          onClick={(e) => e.target === e.currentTarget && !isActionLoading && setShowRejectConfirm(false)}
+        >
+          <div className="modal-card" style={{ maxWidth: '440px', padding: '24px', background: '#FFFFFF' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#B91C1C', marginBottom: '12px' }}>
+              <AlertTriangle size={22} />
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>Confirm Report Rejection</h3>
+            </div>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5, margin: '0 0 14px' }}>
+              Are you sure you want to reject this complaint? This will close the report and dispatch a rejection notice with your remarks to the resident.
+            </p>
+            <div style={{ padding: '10px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '6px', fontSize: '12.5px', color: '#991B1B', marginBottom: '18px' }}>
+              <strong>Rejection Reason:</strong> "{actionNotes.trim()}"
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                className="button button--secondary"
+                disabled={isActionLoading}
+                onClick={() => setShowRejectConfirm(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="button"
+                style={{ background: '#B91C1C', color: '#FFFFFF' }}
+                disabled={isActionLoading}
+                onClick={() => executeStatusUpdate('rejected')}
+              >
+                {isActionLoading ? <Loader2 className="animate-spin" size={14} /> : 'Confirm Rejection'}
+              </button>
             </div>
           </div>
         </div>

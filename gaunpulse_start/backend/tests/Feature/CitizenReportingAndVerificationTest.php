@@ -657,4 +657,209 @@ class CitizenReportingAndVerificationTest extends TestCase
         $res->assertOk()
             ->assertJsonStructure(['success', 'message']);
     }
+
+    public function test_citizen_cannot_verify_or_reject_issue(): void
+    {
+        $citizen = User::create([
+            'name' => 'Ordinary Resident',
+            'email' => 'resident_unauth@gaunpulse.test',
+            'password' => Hash::make('Nepal@1234'),
+            'role' => 'citizen',
+        ]);
+        $token = $citizen->createToken('citizen-token')->plainTextToken;
+
+        $issue = Issue::create([
+            'village_id' => $this->village1->id,
+            'title' => 'Broken irrigation pipe',
+            'description' => 'Water leaking onto crops',
+            'category' => 'water_supply',
+            'severity' => 'low',
+            'status' => 'pending_verification',
+            'municipality_id' => $this->muni1->id,
+            'latitude' => 28.9,
+            'longitude' => 81.7,
+        ]);
+
+        $res = $this->withHeader('Authorization', "Bearer {$token}")
+            ->patchJson("/api/issues/{$issue->id}/status", [
+                'status' => 'verified',
+                'comment' => 'Resident trying to self-verify',
+            ]);
+
+        $res->assertStatus(403);
+    }
+
+    public function test_reject_fails_without_rejection_reason(): void
+    {
+        $admin = User::create([
+            'name' => 'Admin Test',
+            'email' => 'admintest_reject@gaunpulse.test',
+            'password' => Hash::make('Nepal@1234'),
+            'role' => 'system_admin',
+        ]);
+        $token = $admin->createToken('admin-token')->plainTextToken;
+
+        $issue = Issue::create([
+            'village_id' => $this->village1->id,
+            'title' => 'Fallen electric pole',
+            'description' => 'High voltage wire down',
+            'category' => 'electricity',
+            'severity' => 'critical',
+            'status' => 'submitted',
+            'municipality_id' => $this->muni1->id,
+            'latitude' => 28.9,
+            'longitude' => 81.7,
+        ]);
+
+        $res = $this->withHeader('Authorization', "Bearer {$token}")
+            ->patchJson("/api/issues/{$issue->id}/status", [
+                'status' => 'rejected',
+                'rejection_reason' => '',
+                'comment' => '',
+            ]);
+
+        $res->assertStatus(422);
+    }
+
+    public function test_request_info_fails_without_notes(): void
+    {
+        $admin = User::create([
+            'name' => 'Admin Test 2',
+            'email' => 'admintest_info@gaunpulse.test',
+            'password' => Hash::make('Nepal@1234'),
+            'role' => 'system_admin',
+        ]);
+        $token = $admin->createToken('admin-token')->plainTextToken;
+
+        $issue = Issue::create([
+            'village_id' => $this->village1->id,
+            'title' => 'Pothole on access road',
+            'description' => 'Deep pothole',
+            'category' => 'damaged_road',
+            'severity' => 'low',
+            'status' => 'submitted',
+            'municipality_id' => $this->muni1->id,
+            'latitude' => 28.9,
+            'longitude' => 81.7,
+        ]);
+
+        $res = $this->withHeader('Authorization', "Bearer {$token}")
+            ->patchJson("/api/issues/{$issue->id}/status", [
+                'status' => 'more_information_needed',
+                'comment' => '',
+            ]);
+
+        $res->assertStatus(422);
+    }
+
+    public function test_linking_village_does_not_automatically_verify_report(): void
+    {
+        $admin = User::create([
+            'name' => 'Admin Test 3',
+            'email' => 'admintest_link@gaunpulse.test',
+            'password' => Hash::make('Nepal@1234'),
+            'role' => 'system_admin',
+        ]);
+        $token = $admin->createToken('admin-token')->plainTextToken;
+
+        $issue = Issue::create([
+            'village_id' => null,
+            'settlement_name' => 'Chaur Tol',
+            'title' => 'Trail washaway',
+            'description' => 'Trail washed away',
+            'category' => 'damaged_road',
+            'severity' => 'high',
+            'status' => 'pending_verification',
+            'municipality_id' => $this->muni1->id,
+            'latitude' => 28.9,
+            'longitude' => 81.7,
+        ]);
+
+        $res = $this->withHeader('Authorization', "Bearer {$token}")
+            ->patchJson("/api/issues/{$issue->id}/status", [
+                'status' => 'pending_verification',
+                'village_id' => $this->village1->id,
+                'comment' => 'Assigned village registry without verification',
+            ]);
+
+        $res->assertOk();
+        $issue->refresh();
+        $this->assertEquals($this->village1->id, $issue->village_id);
+        $this->assertEquals('pending_verification', $issue->status);
+    }
+
+    public function test_unverified_issue_cannot_skip_to_in_progress_or_resolved(): void
+    {
+        $admin = User::create([
+            'name' => 'Admin Test 4',
+            'email' => 'admintest_skip@gaunpulse.test',
+            'password' => Hash::make('Nepal@1234'),
+            'role' => 'system_admin',
+        ]);
+        $token = $admin->createToken('admin-token')->plainTextToken;
+
+        $issue = Issue::create([
+            'village_id' => $this->village1->id,
+            'title' => 'Bridge tremor',
+            'description' => 'Bridge tremor reported',
+            'category' => 'damaged_bridge',
+            'severity' => 'high',
+            'status' => 'submitted',
+            'municipality_id' => $this->muni1->id,
+            'latitude' => 28.9,
+            'longitude' => 81.7,
+        ]);
+
+        // Cannot skip directly from submitted to in_progress
+        $res = $this->withHeader('Authorization', "Bearer {$token}")
+            ->patchJson("/api/issues/{$issue->id}/status", [
+                'status' => 'in_progress',
+                'comment' => 'Starting work before verification',
+            ]);
+
+        $res->assertStatus(422);
+
+        // Cannot skip directly from submitted to resolved
+        $res2 = $this->withHeader('Authorization', "Bearer {$token}")
+            ->patchJson("/api/issues/{$issue->id}/status", [
+                'status' => 'resolved',
+                'comment' => 'Marking resolved before verification',
+            ]);
+
+        $res2->assertStatus(422);
+    }
+
+    public function test_cross_municipality_staff_cannot_modify_issue(): void
+    {
+        // Admin belongs to muni2
+        $muni2Admin = User::create([
+            'name' => 'Helambu Officer',
+            'email' => 'helambu_admin@gaunpulse.test',
+            'password' => Hash::make('Nepal@1234'),
+            'role' => 'municipality_admin',
+            'municipality_id' => $this->muni2->id,
+        ]);
+        $token = $muni2Admin->createToken('muni2-token')->plainTextToken;
+
+        // Issue belongs to muni1
+        $issueMuni1 = Issue::create([
+            'village_id' => $this->village1->id,
+            'title' => 'Dailekh issue',
+            'description' => 'Dailekh issue details',
+            'category' => 'water_supply',
+            'severity' => 'low',
+            'status' => 'submitted',
+            'municipality_id' => $this->muni1->id,
+            'latitude' => 28.9,
+            'longitude' => 81.7,
+        ]);
+
+        $res = $this->withHeader('Authorization', "Bearer {$token}")
+            ->patchJson("/api/issues/{$issueMuni1->id}/status", [
+                'status' => 'verified',
+                'comment' => 'Cross muni attempt',
+            ]);
+
+        $res->assertStatus(403);
+    }
 }

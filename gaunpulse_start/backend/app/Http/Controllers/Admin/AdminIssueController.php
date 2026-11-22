@@ -103,40 +103,88 @@ class AdminIssueController extends Controller
             }
         }
 
-        DB::transaction(function () use ($request, $issue, $user, $issueMuniId) {
-            $old = $issue->status;
-            $newStatus = $request->status;
+        $currentStatus = $issue->status;
+        $newStatus = $request->status;
 
+        // 1. Prevent invalid verification attempts
+        if ($newStatus === 'verified') {
+            if (!in_array($currentStatus, ['submitted', 'pending_verification', 'under_review', 'more_information_needed'], true)) {
+                if ($currentStatus === 'verified') {
+                    abort(422, 'This report has already been verified on-site.');
+                }
+                if ($currentStatus === 'rejected') {
+                    abort(422, 'A rejected report cannot be verified directly.');
+                }
+                if ($currentStatus === 'resolved') {
+                    abort(422, 'This issue has already been resolved.');
+                }
+                abort(422, "Cannot verify issue with status: {$currentStatus}");
+            }
+        }
+
+        // 2. Prevent skipping straight to repair lifecycle without verification
+        if (in_array($newStatus, ['in_progress', 'resolved'], true)) {
+            if (in_array($currentStatus, ['submitted', 'pending_verification', 'more_information_needed'], true)) {
+                abort(422, 'Initial complaint verification is required before initiating repairs or marking the issue resolved.');
+            }
+        }
+
+        // 3. Prevent reopening terminal rejected state without under_review
+        if ($currentStatus === 'rejected' && !in_array($newStatus, ['rejected', 'under_review'], true)) {
+            abort(422, 'A closed/rejected report must be moved to under review before transitioning to other statuses.');
+        }
+
+        // 4. Validate rejection reason
+        $rejectionReason = trim($request->input('rejection_reason', $request->input('comment', '')));
+        if ($newStatus === 'rejected' && empty($rejectionReason)) {
+            abort(422, 'Please provide a reason for rejecting this report.');
+        }
+
+        // 5. Validate more information needed explanation
+        $infoNotes = trim($request->input('comment', $request->input('verification_notes', '')));
+        if ($newStatus === 'more_information_needed' && empty($infoNotes)) {
+            abort(422, 'Please provide notes explaining what additional information is required from the resident.');
+        }
+
+        DB::transaction(function () use ($request, $issue, $user, $issueMuniId, $currentStatus, $newStatus, $rejectionReason, $infoNotes) {
             $updatePayload = ['status' => $newStatus];
             if ($newStatus === 'verified') {
                 $updatePayload['verified_by'] = $user?->id;
                 $updatePayload['verified_at'] = now();
-                $updatePayload['verification_notes'] = $request->input('verification_notes', $request->comment);
+                $updatePayload['verification_notes'] = $request->input('verification_notes', $request->comment ?? 'Verified on-site by municipal technical staff.');
             } elseif ($newStatus === 'rejected') {
-                $updatePayload['rejection_reason'] = $request->input('rejection_reason', $request->comment);
+                $updatePayload['rejection_reason'] = $rejectionReason;
             }
-            if ($request->filled('village_id')) {
-                $updatePayload['village_id'] = (int) $request->input('village_id');
+
+            if ($request->has('village_id')) {
+                $updatePayload['village_id'] = $request->input('village_id') ? (int) $request->input('village_id') : null;
             }
             $issue->update($updatePayload);
 
-            if ($request->filled('village_id') && $issue->complaint) {
-                $issue->complaint->village_id = (int) $request->input('village_id');
+            if ($request->has('village_id') && $issue->complaint) {
+                $issue->complaint->village_id = $updatePayload['village_id'];
                 $issue->complaint->save();
             }
+
+            $commentOrNotes = match ($newStatus) {
+                'verified' => $request->input('verification_notes', $request->comment ?? 'Verified on-site by municipal technical staff.'),
+                'rejected' => $rejectionReason,
+                'more_information_needed' => $infoNotes,
+                default => $request->comment ?? "Status updated from {$currentStatus} to {$newStatus}",
+            };
 
             $updateData = ['issue_id' => $issue->id];
             if (\Illuminate\Support\Facades\Schema::hasColumn('issue_updates', 'status')) {
                 $updateData['status'] = $newStatus;
             }
             if (\Illuminate\Support\Facades\Schema::hasColumn('issue_updates', 'comment')) {
-                $updateData['comment'] = $request->comment ?? $request->verification_notes ?? $request->rejection_reason;
+                $updateData['comment'] = $commentOrNotes;
             }
             if (\Illuminate\Support\Facades\Schema::hasColumn('issue_updates', 'updated_by')) {
                 $updateData['updated_by'] = $user?->name ?? 'Municipal Officer';
             }
             if (\Illuminate\Support\Facades\Schema::hasColumn('issue_updates', 'old_status')) {
-                $updateData['old_status'] = $old;
+                $updateData['old_status'] = $currentStatus;
             }
             if (\Illuminate\Support\Facades\Schema::hasColumn('issue_updates', 'new_status')) {
                 $updateData['new_status'] = $newStatus;
@@ -149,6 +197,7 @@ class AdminIssueController extends Controller
             $actionType = match ($newStatus) {
                 'verified' => 'issue_verified',
                 'rejected' => 'issue_rejected',
+                'more_information_needed' => 'issue_info_requested',
                 default => 'issue_status_updated',
             };
 
@@ -158,11 +207,12 @@ class AdminIssueController extends Controller
                 entityId: $issue->id,
                 summary: "Staff {$user?->name} marked issue #{$issue->id} as {$newStatus}.",
                 details: [
-                    'old_status' => $old,
+                    'old_status' => $currentStatus,
                     'new_status' => $newStatus,
-                    'comment' => $request->comment,
+                    'comment' => $commentOrNotes,
                     'verification_notes' => $request->verification_notes,
-                    'rejection_reason' => $request->rejection_reason,
+                    'rejection_reason' => $rejectionReason,
+                    'village_id' => $issue->village_id,
                 ],
                 villageId: $issue->village_id,
                 municipalityId: $issueMuniId ? (int) $issueMuniId : null,
@@ -172,11 +222,11 @@ class AdminIssueController extends Controller
             CitizenPortalController::syncIssueStatusToComplaint(
                 $issue,
                 $newStatus,
-                $request->comment ?? $request->verification_notes ?? $request->rejection_reason,
+                $commentOrNotes,
                 $user?->id
             );
         });
 
-        return new IssueResource($issue->fresh()->load(['village', 'edge', 'updates.user', 'complaint.media']));
+        return new IssueResource($issue->fresh()->load(['village', 'edge', 'verifier', 'updates.user', 'complaint.media']));
     }
 }

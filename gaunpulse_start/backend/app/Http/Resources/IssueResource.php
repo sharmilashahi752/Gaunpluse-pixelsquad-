@@ -22,6 +22,7 @@ class IssueResource extends JsonResource
             'status' => $this->status,
             'verified_at' => $this->verified_at,
             'verified_by' => $this->verified_by,
+            'verifier_name' => $this->relationLoaded('verifier') ? $this->verifier?->name : ($this->verifier?->name ?? null),
             'verification_notes' => $this->verification_notes,
             'rejection_reason' => $this->rejection_reason,
             'ward_no' => $this->ward_no ?? $this->village?->ward_no,
@@ -68,7 +69,20 @@ class IssueResource extends JsonResource
                     ]) : [],
                 ];
             }),
-            'updates' => $this->whenLoaded('updates'),
+            'updates' => $this->whenLoaded('updates', function () {
+                return $this->updates->map(function ($u) {
+                    return [
+                        'id' => $u->id,
+                        'old_status' => $u->old_status,
+                        'new_status' => $u->new_status,
+                        'status' => $u->status ?? $u->new_status,
+                        'comment' => $u->comment,
+                        'user_id' => $u->user_id,
+                        'user_name' => $u->relationLoaded('user') && $u->user ? $u->user->name : ($u->updated_by ?? 'Municipal Officer'),
+                        'created_at' => $u->created_at,
+                    ];
+                });
+            }),
             'priority_score' => $this->whenLoaded('priorityScore'),
         ];
     }
