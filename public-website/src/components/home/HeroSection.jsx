@@ -51,7 +51,7 @@ export function HeroSection() {
   return (
     <section
       aria-label="GaunPulse Hero Introduction"
-      className="relative w-full min-h-[calc(100vh-80px)] min-h-[calc(100dvh-80px)] flex items-center justify-center overflow-hidden bg-[#111111]"
+      className="relative w-full min-h-[calc(100vh-80px)] min-h-[calc(100dvh-80px)] flex items-center justify-center overflow-hidden bg-transparent"
     >
       {/* 1. Background Video Layer (Confined INSIDE hero container, never overlaps navigation) */}
       <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none select-none">
@@ -66,7 +66,7 @@ export function HeroSection() {
             controls={false}
             preload="auto"
             onError={() => setHasVideoError(true)}
-            className="w-full h-full object-cover"
+            className="absolute inset-0 w-full h-full min-w-full min-h-full object-cover object-center block scale-105"
           />
         ) : (
           /* Solid neutral backdrop if video asset cannot be loaded */

@@ -1,7 +1,4 @@
 import React from 'react';
-import {
-  ArrowRight,
-} from 'lucide-react';
 import Container from '../components/ui/Container';
 import ScrollReveal from '../components/ui/ScrollReveal';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -352,18 +349,6 @@ export function AboutPage() {
               intelligence, and community-centered design can help address infrastructure challenges
               in Nepal.
             </p>
-
-            <div className="pt-2">
-              <a
-                href="https://github.com/sharmilashahi752/Gaunpluse-pixelsquad-"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group inline-flex items-center gap-1.5 text-xs sm:text-[13px] font-semibold tracking-wider uppercase text-[#173D32] hover:text-[#42866A] transition-colors focus-visible:outline-2 focus-visible:outline-[#173D32] focus-visible:outline-offset-2 py-1 border-b border-transparent hover:border-[#42866A]"
-              >
-                <span>Explore Our GitHub Repository</span>
-                <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
-              </a>
-            </div>
           </ScrollReveal>
         </Container>
       </section>
