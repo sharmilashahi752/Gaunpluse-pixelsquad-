@@ -3,9 +3,12 @@
 use App\Http\Controllers\ActionPlanController;
 use App\Http\Controllers\AIController;
 use App\Http\Controllers\Admin\AdminIssueController;
+use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\PriorityController;
 use App\Http\Controllers\Admin\SimulationController as AdminSimulationController;
+use App\Http\Controllers\Admin\UserManagementController;
+use App\Http\Controllers\Admin\WorkspaceController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\Citizen\CitizenPortalController;
 use App\Http\Controllers\CommunityFeedbackController;
@@ -139,19 +142,44 @@ Route::get('/dashboard/stats', function () {
 });
 
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:5,1');
 
-Route::middleware(['auth:sanctum', 'admin'])->group(function () {
+// Authenticated User Profile & Workspace
+Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
-    Route::prefix('admin')->group(function () {
-        Route::get('/dashboard', DashboardController::class);
-        Route::get('/issues', [AdminIssueController::class, 'index']);
-        Route::get('/issues/{issue}', [AdminIssueController::class, 'show']);
-        Route::patch('/issues/{issue}/status', [AdminIssueController::class, 'updateStatus']);
-        Route::post('/simulations', [SimulationController::class, 'store']);
-        Route::post('/simulations/compare', [SimulationController::class, 'compare']);
-        Route::get('/priorities', PriorityController::class);
-    });
+    Route::put('/user/profile', [AuthController::class, 'updateProfile']);
+    Route::post('/user/change-password', [AuthController::class, 'changePassword']);
+    Route::get('/workspace/current', [WorkspaceController::class, 'current']);
+    Route::get('/municipalities', [WorkspaceController::class, 'index']);
+});
+
+// Admin & Staff Workspace Routes
+Route::middleware(['auth:sanctum', 'active', 'admin'])->prefix('admin')->group(function () {
+    Route::get('/dashboard', DashboardController::class);
+    Route::get('/issues', [AdminIssueController::class, 'index']);
+    Route::get('/issues/{issue}', [AdminIssueController::class, 'show']);
+    Route::patch('/issues/{issue}/status', [AdminIssueController::class, 'updateStatus']);
+    Route::post('/simulations', [SimulationController::class, 'store']);
+    Route::post('/simulations/compare', [SimulationController::class, 'compare']);
+    Route::get('/priorities', PriorityController::class);
+
+    // User Management (Phase 5)
+    Route::get('/users', [UserManagementController::class, 'index']);
+    Route::get('/users/{user}', [UserManagementController::class, 'show']);
+    Route::patch('/users/{user}/role', [UserManagementController::class, 'assignRole']);
+    Route::post('/users/{user}/assign-ward', [UserManagementController::class, 'assignWard']);
+    Route::delete('/users/{user}/remove-ward', [UserManagementController::class, 'removeWard']);
+    Route::patch('/users/{user}/municipality', [UserManagementController::class, 'assignMunicipality']);
+    Route::patch('/users/{user}/toggle-active', [UserManagementController::class, 'toggleActive']);
+    Route::get('/wards/officers', [UserManagementController::class, 'wardOfficers']);
+
+    // Municipalities Management
+    Route::post('/municipalities', [WorkspaceController::class, 'store']);
+    Route::put('/municipalities/{municipality}', [WorkspaceController::class, 'update']);
+
+    // Audit Logs (Phase 7)
+    Route::get('/audit-logs', [AuditLogController::class, 'index']);
 });
 
 // Citizen Portal Endpoints (Phase 4 & Citizen Integration)

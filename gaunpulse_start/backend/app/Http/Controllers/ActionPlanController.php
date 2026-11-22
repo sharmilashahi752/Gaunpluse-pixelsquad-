@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\ActionPlan;
+use App\Models\AuditLog;
+use App\Models\Village;
 use Illuminate\Http\Request;
 
 class ActionPlanController extends Controller
@@ -10,6 +12,13 @@ class ActionPlanController extends Controller
     public function index(Request $request)
     {
         $query = ActionPlan::with(['village', 'issue'])->latest();
+        $user = $request->user('sanctum') ?? $request->user();
+
+        if ($user && $user->isStaff() && !$user->isSystemAdmin()) {
+            $query->whereHas('village', fn($q) => $q->where('municipality_id', (string) $user->municipality_id));
+        } elseif ($request->filled('municipality_id')) {
+            $query->whereHas('village', fn($q) => $q->where('municipality_id', (string) $request->input('municipality_id')));
+        }
 
         if ($request->filled('village_id')) {
             $query->where('village_id', $request->input('village_id'));
@@ -46,7 +55,24 @@ class ActionPlanController extends Controller
             'notes' => 'nullable|string|max:2000',
         ]);
 
+        $user = $request->user('sanctum') ?? $request->user();
+        $village = Village::find($validated['village_id']);
+        if ($user && $user->isStaff() && !$user->isSystemAdmin()) {
+            abort_unless((string) $village?->municipality_id === (string) $user->municipality_id, 403, 'Cross-municipality action plan creation denied.');
+        }
+
         $actionPlan = ActionPlan::create($validated);
+
+        AuditLog::record(
+            actionType: 'action_plan_created',
+            entityType: 'action_plan',
+            entityId: $actionPlan->id,
+            summary: "Action plan '{$actionPlan->title}' created.",
+            details: ['priority' => $actionPlan->priority, 'responsible_team' => $actionPlan->responsible_team],
+            villageId: $actionPlan->village_id,
+            municipalityId: $village?->municipality_id ? (int) $village->municipality_id : null,
+            actor: $user
+        );
 
         return response()->json($actionPlan->load(['village', 'issue']), 201);
     }

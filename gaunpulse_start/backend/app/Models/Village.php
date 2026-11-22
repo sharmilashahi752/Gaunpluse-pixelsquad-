@@ -30,6 +30,15 @@ class Village extends Model
     public function settlements() { return $this->hasMany(SettlementGroup::class); }
     public function issues() { return $this->hasMany(Issue::class); }
     public function auditLogs() { return $this->hasMany(AuditLog::class); }
+    public function municipalityRel() { return $this->belongsTo(Municipality::class, 'municipality_id'); }
+
+    public function scopeForMunicipality($query, $municipalityId)
+    {
+        if ($municipalityId) {
+            return $query->where('municipality_id', (string) $municipalityId);
+        }
+        return $query;
+    }
 
     public function getCenterLatAttribute(): ?float
     {

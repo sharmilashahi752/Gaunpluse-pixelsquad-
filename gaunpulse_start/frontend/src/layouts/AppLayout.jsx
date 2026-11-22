@@ -30,7 +30,7 @@ export default function AppLayout({ activePage, onNavigate, children }) {
         onClose={() => setMobileNavOpen(false)}
       />
       <div className="app-shell__body">
-        <Header title={pageMeta[activePage]?.title || 'Dashboard'} onMenuClick={() => setMobileNavOpen(true)} />
+        <Header title={pageMeta[activePage]?.title || 'Dashboard'} onMenuClick={() => setMobileNavOpen(true)} onNavigate={navigate} />
         <main className="main-content" id="main-content" tabIndex="-1">
           {children}
           <footer className="app-footer">

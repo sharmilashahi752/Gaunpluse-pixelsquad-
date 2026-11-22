@@ -25,10 +25,17 @@ export async function cachedFetchJson(
   { ttlMs = 60000, force = false, onBackgroundUpdate = null } = {}
 ) {
   const method = (options.method || 'GET').toUpperCase();
+  const token = typeof window !== 'undefined' ? window.localStorage?.getItem('gaunpulse_auth_token') : null;
+  const effectiveHeaders = {
+    Accept: 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options.headers || {}),
+  };
+  const effectiveOptions = { ...options, headers: effectiveHeaders };
 
   // Mutations (POST, PUT, PATCH, DELETE) bypass cache
   if (method !== 'GET') {
-    const res = await fetch(url, options);
+    const res = await fetch(url, effectiveOptions);
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));
       const err = new Error(errBody.message || `HTTP ${res.status}: ${res.statusText}`);
@@ -61,7 +68,7 @@ export async function cachedFetchJson(
   // 4. Fresh network fetch
   const fetchPromise = (async () => {
     try {
-      const res = await fetch(url, options);
+      const res = await fetch(url, effectiveOptions);
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
         const err = new Error(errBody.message || `HTTP ${res.status}: ${res.statusText}`);

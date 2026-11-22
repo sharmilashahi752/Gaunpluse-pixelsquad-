@@ -24,7 +24,7 @@ export default function VillageMapPreview({ onOpenMap, expanded = false }) {
         const list = Array.isArray(data) ? data : (data.data || []);
         if (list.length > 0) {
           const v = list[0];
-          setVillageName(`${v.name} (${v.municipality || 'Helambu'})`);
+          setVillageName(`${v.name} (${v.municipality || 'Municipal Workspace'})`);
           return fetch(`http://127.0.0.1:8000/api/villages/${v.id}/network`);
         }
         return fetch('http://127.0.0.1:8000/api/villages/1/network');

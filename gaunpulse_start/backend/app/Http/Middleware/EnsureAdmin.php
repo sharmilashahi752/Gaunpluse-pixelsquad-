@@ -10,7 +10,22 @@ class EnsureAdmin
 {
     public function handle(Request $request, Closure $next): Response
     {
-        abort_unless($request->user()?->isAdmin(), 403, 'Municipal administrator access is required.');
+        $user = $request->user();
+
+        if (!$user) {
+            abort(401, 'Unauthenticated.');
+        }
+
+        if (isset($user->is_active) && !$user->is_active) {
+            abort(403, 'Your account has been deactivated.');
+        }
+
+        abort_unless(
+            $user->isAdmin(),
+            403,
+            'Municipal administrator access is required.'
+        );
+
         return $next($request);
     }
 }

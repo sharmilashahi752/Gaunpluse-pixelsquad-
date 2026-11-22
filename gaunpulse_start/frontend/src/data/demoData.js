@@ -1,4 +1,5 @@
 import {
+  Activity,
   Bot,
   Building2,
   ChartNoAxesColumn,
@@ -9,6 +10,8 @@ import {
   MessageSquareText,
   Network,
   Radio,
+  Settings,
+  ShieldCheck,
   TriangleAlert,
   Users,
 } from 'lucide-react';
@@ -23,6 +26,9 @@ export const navigationItems = [
   { id: 'reports-insights', label: 'Reports & Insights', icon: ChartNoAxesColumn },
   { id: 'ai-agent', label: 'AI Agent', icon: Bot },
   { id: 'village-data', label: 'Village Data Manager', icon: Building2 },
+  { id: 'user-management', label: 'User Management', icon: ShieldCheck, adminOnly: true },
+  { id: 'audit-logs', label: 'Audit Logs', icon: Activity, adminOnly: true },
+  { id: 'profile-settings', label: 'Profile & Settings', icon: Settings },
   { id: 'citizen', label: 'Citizen Portal', icon: Users, badge: 'Live' },
 ];
 

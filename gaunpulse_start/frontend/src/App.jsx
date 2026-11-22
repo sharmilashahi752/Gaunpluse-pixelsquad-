@@ -9,9 +9,13 @@ import SimulationsPage from './pages/SimulationsPage';
 import VillageMapPage from './pages/VillageMapPage';
 import VillageDataPage from './pages/VillageDataPage';
 import ReportsInsightsPage from './pages/ReportsInsightsPage';
+import UserManagementPage from './pages/UserManagementPage';
+import ProfileSettingsPage from './pages/ProfileSettingsPage';
+import AuditLogsPage from './pages/AuditLogsPage';
 import CitizenPortal from './citizen/CitizenPortal';
 import { navigationItems } from './data/demoData';
 import { VillageSelectionProvider } from './context/VillageSelectionContext';
+import { AuthProvider } from './context/AuthContext';
 
 const pages = {
   dashboard: DashboardPage,
@@ -23,6 +27,9 @@ const pages = {
   'reports-insights': ReportsInsightsPage,
   'ai-agent': AIAgentPage,
   'village-data': VillageDataPage,
+  'user-management': UserManagementPage,
+  'profile-settings': ProfileSettingsPage,
+  'audit-logs': AuditLogsPage,
   citizen: CitizenPortal,
 };
 
@@ -58,10 +65,12 @@ export default function App() {
   const ActivePage = pages[activePage] || DashboardPage;
 
   return (
-    <VillageSelectionProvider>
-      <AppLayout activePage={activePage} onNavigate={navigate}>
-        <ActivePage onNavigate={navigate} />
-      </AppLayout>
-    </VillageSelectionProvider>
+    <AuthProvider>
+      <VillageSelectionProvider>
+        <AppLayout activePage={activePage} onNavigate={navigate}>
+          <ActivePage onNavigate={navigate} />
+        </AppLayout>
+      </VillageSelectionProvider>
+    </AuthProvider>
   );
 }

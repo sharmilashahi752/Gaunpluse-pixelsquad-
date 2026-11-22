@@ -24,12 +24,28 @@ class AIController extends Controller
 
         $villageId = $validated['village_id'] ?? 1;
 
-        // Enforce user village authorization if restricted
-        $user = $request->user();
-        if ($user && isset($user->village_id) && $user->village_id && $user->village_id != $villageId) {
-            return response()->json([
-                'message' => 'Unauthorized access to the requested village data.',
-            ], 403);
+        // Enforce user village & municipality authorization
+        $user = $request->user('sanctum') ?? $request->user();
+        if ($user && $user->isStaff() && !$user->isSystemAdmin()) {
+            $checkVillage = Village::find($villageId);
+            if ($user->isMunicipalityAdmin() && $checkVillage && (string) $checkVillage->municipality_id !== (string) $user->municipality_id) {
+                return response()->json(['message' => 'Cross-municipality AI insights access denied.'], 403);
+            }
+            if ($user->isWardOfficer() && $checkVillage && ((string) $checkVillage->municipality_id !== (string) $user->municipality_id || (string) $checkVillage->ward_no !== (string) $user->ward_number)) {
+                return response()->json(['message' => 'Cross-ward AI insights access denied.'], 403);
+            }
+        }
+
+        // Enforce user village & municipality authorization
+        $user = $request->user('sanctum') ?? $request->user();
+        if ($user && $user->isStaff() && !$user->isSystemAdmin()) {
+            $checkVillage = Village::find($villageId);
+            if ($user->isMunicipalityAdmin() && $checkVillage && (string) $checkVillage->municipality_id !== (string) $user->municipality_id) {
+                return response()->json(['message' => 'Cross-municipality AI access denied.'], 403);
+            }
+            if ($user->isWardOfficer() && $checkVillage && ((string) $checkVillage->municipality_id !== (string) $user->municipality_id || (string) $checkVillage->ward_no !== (string) $user->ward_number)) {
+                return response()->json(['message' => 'Cross-ward AI access denied.'], 403);
+            }
         }
 
         // Fetch village infrastructure network records from MySQL
@@ -108,6 +124,18 @@ class AIController extends Controller
         ]);
 
         $villageId = $validated['village_id'] ?? 1;
+
+        // Enforce user village & municipality authorization
+        $user = $request->user('sanctum') ?? $request->user();
+        if ($user && $user->isStaff() && !$user->isSystemAdmin()) {
+            $checkVillage = Village::find($villageId);
+            if ($user->isMunicipalityAdmin() && $checkVillage && (string) $checkVillage->municipality_id !== (string) $user->municipality_id) {
+                return response()->json(['message' => 'Cross-municipality AI insights access denied.'], 403);
+            }
+            if ($user->isWardOfficer() && $checkVillage && ((string) $checkVillage->municipality_id !== (string) $user->municipality_id || (string) $checkVillage->ward_no !== (string) $user->ward_number)) {
+                return response()->json(['message' => 'Cross-ward AI insights access denied.'], 403);
+            }
+        }
 
         // Fetch registered issues from MySQL
         $issues = Issue::where('village_id', $villageId)->get()->map(function ($issue) {

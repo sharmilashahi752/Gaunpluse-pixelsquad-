@@ -594,7 +594,7 @@ export default function IssuesPage({ onNavigate }) {
                     <td>
                       <strong>{item.village?.name || 'Municipal Area'}</strong>
                       <small style={{ display: 'block', color: 'var(--text-secondary)' }}>
-                        {item.village?.municipality || 'Helambu'}
+                        {item.village?.municipality || 'Municipal Workspace'}
                       </small>
                     </td>
                     <td>

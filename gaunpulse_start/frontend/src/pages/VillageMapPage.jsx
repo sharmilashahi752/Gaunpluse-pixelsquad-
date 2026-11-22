@@ -96,9 +96,9 @@ export default function VillageMapPage() {
   const [villageForm, setVillageForm] = useState({
     name: '',
     local_name: '',
-    province: 'Bagmati Province',
-    district: 'Sindhupalchok',
-    municipality: 'Helambu Rural Municipality',
+    province: 'Karnali Province',
+    district: 'Dailekh',
+    municipality: 'Mahabu Rural Municipality',
     ward_no: '1',
     center_lat: '',
     center_lng: '',

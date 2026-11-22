@@ -26,8 +26,16 @@ class VillageController extends Controller
         $query = Village::query()
             ->withCount(['settlements', 'issues', 'nodes', 'edges', 'facilities']);
 
-        // Multi-municipality scoping
-        if ($request->filled('municipality')) {
+        // Multi-municipality & ward scoping
+        $user = $request->user('sanctum') ?? $request->user();
+        if ($user && $user->isStaff() && !$user->isSystemAdmin()) {
+            $query->where('municipality_id', (string) $user->municipality_id);
+            if ($user->isWardOfficer() && $user->ward_number) {
+                $query->where('ward_no', (string) $user->ward_number);
+            }
+        } elseif ($request->filled('municipality_id')) {
+            $query->where('municipality_id', (string) $request->input('municipality_id'));
+        } elseif ($request->filled('municipality')) {
             $muni = $request->query('municipality');
             $query->where(function ($q) use ($muni) {
                 $q->where('municipality', $muni)
@@ -49,8 +57,22 @@ class VillageController extends Controller
     /**
      * Retrieve single village record.
      */
-    public function show(Village $village)
+    public function show(Request $request, Village $village)
     {
+        $user = $request->user('sanctum') ?? $request->user();
+        if ($user && $user->isStaff() && !$user->isSystemAdmin()) {
+            if ($user->isMunicipalityAdmin()) {
+                abort_unless((string) $village->municipality_id === (string) $user->municipality_id, 403, 'Cross-municipality access denied.');
+            } elseif ($user->isWardOfficer()) {
+                abort_unless(
+                    (string) $village->municipality_id === (string) $user->municipality_id &&
+                    (string) $village->ward_no === (string) $user->ward_number,
+                    403,
+                    'Cross-ward access denied.'
+                );
+            }
+        }
+
         return response()->json($village->loadCount(['settlements', 'issues', 'nodes', 'edges', 'facilities']));
     }
 

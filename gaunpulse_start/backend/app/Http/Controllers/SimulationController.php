@@ -26,6 +26,12 @@ class SimulationController extends Controller
         ]);
 
         $query = Simulation::query()->latest('id');
+
+        $user = $request->user('sanctum') ?? $request->user();
+        if ($user && $user->isStaff() && !$user->isSystemAdmin()) {
+            $query->whereHas('village', fn($q) => $q->where('municipality_id', (string) $user->municipality_id));
+        }
+
         if (isset($validated['village_id'])) {
             $query->where('village_id', $validated['village_id']);
         }
@@ -51,6 +57,11 @@ class SimulationController extends Controller
     {
         $village = Village::with(['nodes', 'edges'])->findOrFail($simulation->village_id);
 
+        $user = request()->user('sanctum') ?? request()->user();
+        if ($user && $user->isStaff() && !$user->isSystemAdmin()) {
+            abort_unless((string) $village->municipality_id === (string) $user->municipality_id, 403, 'Cross-municipality simulation access denied.');
+        }
+
         return response()->json($this->historyResponse(
             $simulation,
             $this->networks->graphVersion($village),
@@ -71,6 +82,12 @@ class SimulationController extends Controller
         ]);
 
         $village = $this->loadVillage((int) $validated['village_id']);
+
+        $user = $request->user('sanctum') ?? $request->user();
+        if ($user && $user->isStaff() && !$user->isSystemAdmin()) {
+            abort_unless((string) $village->municipality_id === (string) $user->municipality_id, 403, 'Cross-municipality simulation denied.');
+        }
+
         $readiness = $this->networks->readiness($village);
         if (! $readiness['can_simulate']) {
             return response()->json([
@@ -150,6 +167,12 @@ class SimulationController extends Controller
         ]);
 
         $village = $this->loadVillage((int) $validated['village_id']);
+
+        $user = $request->user('sanctum') ?? $request->user();
+        if ($user && $user->isStaff() && !$user->isSystemAdmin()) {
+            abort_unless((string) $village->municipality_id === (string) $user->municipality_id, 403, 'Cross-municipality simulation denied.');
+        }
+
         $readiness = $this->networks->readiness($village);
         if (! $readiness['can_simulate']) {
             return response()->json([

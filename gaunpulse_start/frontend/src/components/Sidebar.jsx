@@ -1,19 +1,28 @@
 import { Building2, ChevronRight, MapPin, X } from 'lucide-react';
 import { navigationItems } from '../data/demoData';
 import { useVillageSelection } from '../context/VillageSelectionContext';
+import { useAuth } from '../context/AuthContext';
 import gaunpulseLogo from '../assets/gaunpulse-logo.png';
 
 export default function Sidebar({ activePage, isOpen, onNavigate, onClose }) {
   const { selectedVillage } = useVillageSelection();
+  const { activeMunicipality, isAdmin, user } = useAuth();
 
   const municipalityName =
+    activeMunicipality?.name ||
     selectedVillage?.municipality ||
     (selectedVillage ? `${selectedVillage.name} (${selectedVillage.district || ''})`.trim() : null) ||
     'Select a municipality';
 
-  const locationDetail = selectedVillage
+  const locationDetail = user?.ward_number
+    ? `Ward ${user.ward_number} Officer Scope`
+    : selectedVillage
     ? `Ward ${selectedVillage.ward_no || '1'} · ${selectedVillage.name}`
     : 'Click to select active village';
+
+  const visibleNavItems = navigationItems.filter(
+    (item) => !item.adminOnly || isAdmin
+  );
 
   return (
     <>
@@ -83,7 +92,7 @@ export default function Sidebar({ activePage, isOpen, onNavigate, onClose }) {
         {/* Main Workspace Navigation */}
         <nav className="sidebar__nav" aria-label="Main menu">
           <span className="sidebar__label">Workspace Navigation</span>
-          {navigationItems.map(({ id, label, icon: Icon, badge }) => {
+          {visibleNavItems.map(({ id, label, icon: Icon, badge }) => {
             const isActive = activePage === id;
             return (
               <button

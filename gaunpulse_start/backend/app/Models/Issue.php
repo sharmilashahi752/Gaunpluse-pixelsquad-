@@ -49,3 +49,4 @@ class Issue extends Model
         return $this->hasOne(Complaint::class);
     }
 }
+
