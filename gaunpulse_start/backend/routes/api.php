@@ -189,6 +189,7 @@ Route::prefix('citizen')->group(function () {
     Route::post('/register', [CitizenPortalController::class, 'register'])->middleware('throttle:10,1');
     Route::post('/login', [CitizenPortalController::class, 'login'])->middleware('throttle:15,1');
     Route::get('/locations', [CitizenPortalController::class, 'locations']);
+    Route::post('/transcribe', [CitizenPortalController::class, 'transcribe'])->middleware('throttle:30,1');
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout', [CitizenPortalController::class, 'logout']);
@@ -214,6 +215,7 @@ Route::prefix('citizen')->group(function () {
 Route::post('/auth/register', [CitizenPortalController::class, 'register'])->middleware('throttle:10,1');
 Route::post('/auth/login', [CitizenPortalController::class, 'login'])->middleware('throttle:15,1');
 Route::get('/complaint-locations', [CitizenPortalController::class, 'locations']);
+Route::post('/transcribe', [CitizenPortalController::class, 'transcribe'])->middleware('throttle:30,1');
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [CitizenPortalController::class, 'logout']);

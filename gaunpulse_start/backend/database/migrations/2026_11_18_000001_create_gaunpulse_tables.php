@@ -86,7 +86,7 @@ return new class extends Migration
         if (!Schema::hasTable('issues')) {
             Schema::create('issues', function (Blueprint $table) {
                 $table->id();
-                $table->foreignId('village_id')->constrained()->restrictOnDelete();
+                $table->foreignId('village_id')->nullable()->constrained()->nullOnDelete();
                 $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
                 $table->foreignId('edge_id')->nullable()->constrained('edges')->nullOnDelete();
                 $table->string('title');
@@ -117,7 +117,7 @@ return new class extends Migration
         if (!Schema::hasTable('simulations')) {
             Schema::create('simulations', function (Blueprint $table) {
                 $table->id();
-                $table->foreignId('village_id')->constrained()->restrictOnDelete();
+                $table->foreignId('village_id')->nullable()->constrained()->nullOnDelete();
                 $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
                 $table->json('blocked_edge_ids');
                 $table->json('result');

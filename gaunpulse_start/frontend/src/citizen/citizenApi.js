@@ -104,6 +104,16 @@ export const citizenService = {
     return res.data;
   },
 
+  async transcribeAudio(formData) {
+    const res = await citizenClient.post('/api/citizen/transcribe', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      timeout: 45000,
+    });
+    return res.data;
+  },
+
   async getComplaints(params = {}) {
     const res = await citizenClient.get('/api/citizen/complaints', { params });
     return res.data;

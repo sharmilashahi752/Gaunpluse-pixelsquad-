@@ -197,8 +197,17 @@ export default function SubmitComplaint({ onNavigate, onViewComplaint }) {
   // Handle Submit
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
+
+    // Require settlement name if village is not selected
+    if (!form.village_id || form.village_id === 'other') {
+      if (!form.settlement_name || form.settlement_name.trim().length < 2) {
+        setError('Please provide your settlement, tole, or village name (कम्तीमा २ अक्षरको बस्ती वा टोलको नाम अनिवार्य छ)।');
+        return;
+      }
+    }
+
+    setLoading(true);
     setSubmittedComplaint(null);
 
     const data = new FormData();
@@ -207,11 +216,12 @@ export default function SubmitComplaint({ onNavigate, onViewComplaint }) {
     if (form.custom_category) data.append('custom_category', form.custom_category);
     if (form.description) data.append('description', form.description);
     if (speechTranscript) data.append('speech_transcript', speechTranscript);
+    if (language) data.append('transcript_language', language);
     if (form.contact_number) data.append('contact_number', form.contact_number);
     data.append('municipality_id', String(selectedMunicipalityId));
     data.append('ward_number', String(selectedWard));
-    if (form.village_id) data.append('village_id', String(form.village_id));
-    if (form.settlement_name) data.append('settlement_name', form.settlement_name);
+    if (form.village_id && form.village_id !== 'other') data.append('village_id', String(form.village_id));
+    if (form.settlement_name) data.append('settlement_name', form.settlement_name.trim());
     if (form.latitude) data.append('latitude', String(form.latitude));
     if (form.longitude) data.append('longitude', String(form.longitude));
 
@@ -419,9 +429,9 @@ export default function SubmitComplaint({ onNavigate, onViewComplaint }) {
                     </option>
                   ))
                 ) : (
-                  <option value="other">No registered village in Ward {selectedWard}</option>
+                  <option value="other">No registered village in Ward {selectedWard} (दर्ता भएको गाउँ छैन)</option>
                 )}
-                <option value="other">+ Other / Unregistered Settlement</option>
+                <option value="other">+ Other / Unregistered Settlement (+ अन्य / नयाँ बस्ती)</option>
               </select>
             </label>
 
@@ -432,10 +442,15 @@ export default function SubmitComplaint({ onNavigate, onViewComplaint }) {
                 <input
                   type="text"
                   required
-                  placeholder="e.g., Besi Tole, Khola Gaun, Upper Ridge"
+                  placeholder="e.g., Besi Tole, Khola Gaun, Upper Ridge, Simkhet"
                   value={form.settlement_name}
                   onChange={(e) => updateField('settlement_name', e.target.value)}
                 />
+                {villages.length === 0 && (
+                  <small style={{ color: '#854d0e', display: 'block', marginTop: '4px', background: '#fefce8', padding: '4px 8px', borderRadius: '4px', border: '1px solid #fef08a' }}>
+                    Ward {selectedWard} has no pre-registered villages. Your entered settlement will be submitted for municipal review.
+                  </small>
+                )}
               </label>
             )}
           </div>
@@ -514,25 +529,15 @@ export default function SubmitComplaint({ onNavigate, onViewComplaint }) {
 
         {/* STEP 3: Voice Message & Speech-to-Text */}
         <section className="citizen-card form-section">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ marginBottom: '14px' }}>
             <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#172e25' }}>
-              3. Voice Message & Audio (आवाज सन्देश)
+              3. Voice Message & Audio (आवाज सन्देश तथा लेखाइ)
             </h2>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '12px', color: '#66786d' }}>Language:</span>
-              <select
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-                style={{ padding: '4px 8px', borderRadius: '5px', border: '1px solid #d9e3db', fontSize: '12px' }}
-              >
-                <option value="ne-NP">नेपाली (Nepali)</option>
-                <option value="en-US">English</option>
-              </select>
-            </div>
           </div>
 
           <VoiceRecorder
             language={language}
+            onLanguageChange={setLanguage}
             onRecording={setVoice}
             onTranscript={(text) => {
               setSpeechTranscript(text);

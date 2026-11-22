@@ -105,6 +105,7 @@ class IssueController extends Controller
         $validated = $request->validate([
             'status' => 'required|in:submitted,pending_verification,under_review,verified,in_progress,resolved,rejected,more_information_needed',
             'comment' => 'nullable|string|max:1000',
+            'village_id' => 'nullable|integer|exists:villages,id',
         ]);
 
         DB::transaction(function () use ($issue, $validated, $request, $user) {
@@ -119,7 +120,15 @@ class IssueController extends Controller
             } elseif ($newStatus === 'rejected') {
                 $updatePayload['rejection_reason'] = $request->input('rejection_reason', $validated['comment'] ?? null);
             }
+            if (!empty($validated['village_id'])) {
+                $updatePayload['village_id'] = (int) $validated['village_id'];
+            }
             $issue->update($updatePayload);
+
+            if (!empty($validated['village_id']) && $issue->complaint) {
+                $issue->complaint->village_id = (int) $validated['village_id'];
+                $issue->complaint->save();
+            }
 
             $updateData = ['issue_id' => $issue->id];
             if (Schema::hasColumn('issue_updates', 'status')) {

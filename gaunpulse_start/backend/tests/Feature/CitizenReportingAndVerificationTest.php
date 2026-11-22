@@ -537,4 +537,124 @@ class CitizenReportingAndVerificationTest extends TestCase
 
         $res->assertStatus(403);
     }
+
+    public function test_citizen_can_submit_unregistered_settlement_with_bilingual_transcript(): void
+    {
+        $citizen = User::create([
+            'name' => 'Bikash Tamang',
+            'email' => 'bikash@gaunpulse.test',
+            'password' => Hash::make('Nepal@1234'),
+            'role' => 'citizen',
+        ]);
+        $token = $citizen->createToken('citizen-token')->plainTextToken;
+
+        $nepaliTranscript = 'हाम्रो गाउँको पुल बाढीले बगाएको छ। विद्यार्थीहरू विद्यालय जान सकेका छैनन्।';
+
+        $payload = [
+            'title' => 'Landslide damaged suspension footbridge',
+            'category' => 'Bridge Damage',
+            'municipality_id' => $this->muni1->id,
+            'ward_number' => 3,
+            'village_id' => null,
+            'settlement_name' => 'Besi Khola Settlement',
+            'description' => 'The wooden footbridge was damaged by heavy monsoon river flow.',
+            'speech_transcript' => $nepaliTranscript,
+            'transcript_language' => 'ne-NP',
+            'latitude' => 28.91,
+            'longitude' => 81.72,
+        ];
+
+        $res = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/citizen/complaints', $payload);
+
+        $res->assertStatus(201)
+            ->assertJsonPath('complaint.settlement_name', 'Besi Khola Settlement')
+            ->assertJsonPath('complaint.village_id', null)
+            ->assertJsonPath('complaint.transcript_language', 'ne-NP');
+
+        $this->assertDatabaseHas('complaints', [
+            'settlement_name' => 'Besi Khola Settlement',
+            'village_id' => null,
+            'transcript_language' => 'ne-NP',
+        ]);
+
+        $this->assertDatabaseHas('issues', [
+            'settlement_name' => 'Besi Khola Settlement',
+            'village_id' => null,
+            'transcript_language' => 'ne-NP',
+            'status' => 'pending_verification',
+        ]);
+    }
+
+    public function test_admin_can_link_unregistered_settlement_to_official_village_during_verification(): void
+    {
+        $admin = User::where('email', 'admin@gaunpulse.test')->first() ?? User::create([
+            'name' => 'Muni Admin',
+            'email' => 'admin@gaunpulse.test',
+            'password' => Hash::make('Nepal@1234'),
+            'role' => 'municipality_admin',
+            'municipality_id' => $this->muni1->id,
+        ]);
+        $token = $admin->createToken('admin-link-token')->plainTextToken;
+
+        $complaint = Complaint::create([
+            'complaint_number' => 'GP-2026-99991',
+            'user_id' => $admin->id,
+            'municipality_id' => $this->muni1->id,
+            'ward_number' => 2,
+            'village_id' => null,
+            'settlement_name' => 'Remote Ridge Tole',
+            'title' => 'Culvert blocked',
+            'category' => 'Drainage',
+            'description' => 'Culvert blocked by debris',
+            'status' => 'pending',
+            'submitted_at' => now(),
+        ]);
+
+        $issue = Issue::create([
+            'municipality_id' => $this->muni1->id,
+            'ward_no' => 2,
+            'village_id' => null,
+            'settlement_name' => 'Remote Ridge Tole',
+            'title' => 'Culvert blocked',
+            'category' => 'water_supply',
+            'severity' => 'medium',
+            'status' => 'pending_verification',
+            'description' => 'Culvert blocked by debris',
+            'latitude' => 28.9,
+            'longitude' => 81.7,
+        ]);
+        $complaint->issue_id = $issue->id;
+        $complaint->save();
+
+        $res = $this->withHeader('Authorization', "Bearer {$token}")
+            ->patchJson("/api/admin/issues/{$issue->id}/status", [
+                'status' => 'verified',
+                'comment' => 'Confirmed on-site and linked to Sundar Khola',
+                'village_id' => $this->village1->id,
+            ]);
+
+        $res->assertOk();
+
+        $issue->refresh();
+        $complaint->refresh();
+
+        $this->assertEquals($this->village1->id, $issue->village_id);
+        $this->assertEquals($this->village1->id, $complaint->village_id);
+        $this->assertEquals('verified', $issue->status);
+        $this->assertEquals('verified', $complaint->status);
+    }
+
+    public function test_transcription_endpoint_handles_audio_and_language(): void
+    {
+        $fakeAudio = UploadedFile::fake()->create('report_audio.mp3', 120, 'audio/mpeg');
+
+        $res = $this->postJson('/api/citizen/transcribe', [
+            'audio' => $fakeAudio,
+            'language' => 'ne-NP',
+        ]);
+
+        $res->assertOk()
+            ->assertJsonStructure(['success', 'message']);
+    }
 }

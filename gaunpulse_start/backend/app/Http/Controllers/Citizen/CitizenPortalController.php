@@ -15,6 +15,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -246,9 +247,7 @@ class CitizenPortalController extends Controller
             $villageQuery->where('municipality_id', $muniId);
         }
         if ($wardNo) {
-            $villageQuery->where(function ($q) use ($wardNo) {
-                $q->where('ward_no', $wardNo)->orWhere('ward_number', $wardNo);
-            });
+            $villageQuery->where('ward_no', $wardNo);
         }
 
         $villages = $villageQuery->get()->map(function ($v) {
@@ -308,6 +307,7 @@ class CitizenPortalController extends Controller
             'custom_category' => ['nullable', 'required_if:category,Other', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:10000'],
             'speech_transcript' => ['nullable', 'string', 'max:10000'],
+            'transcript_language' => ['nullable', 'string', Rule::in(['ne-NP', 'en-US', 'ne', 'en'])],
             'contact_number' => ['nullable', 'string', 'max:30'],
             'municipality_id' => ['nullable', 'exists:municipalities,id'],
             'ward_number' => ['nullable', 'integer', 'between:1,33'],
@@ -374,6 +374,7 @@ class CitizenPortalController extends Controller
                     'custom_category' => $validated['custom_category'] ?? null,
                     'description' => $finalDescription,
                     'speech_transcript' => $transcript ?: null,
+                    'transcript_language' => $validated['transcript_language'] ?? null,
                     'contact_number' => $validated['contact_number'] ?? $user?->contact_number,
                     'latitude' => $lat,
                     'longitude' => $lng,
@@ -432,6 +433,7 @@ class CitizenPortalController extends Controller
 
                 $issueData = [
                     'village_id' => $villageId,
+                    'settlement_name' => $validated['settlement_name'] ?? null,
                     'municipality_id' => $muniId,
                     'ward_no' => $ward,
                     'user_id' => $userId,
@@ -441,6 +443,7 @@ class CitizenPortalController extends Controller
                     'status' => 'pending_verification',
                     'description' => $complaint->description,
                     'speech_transcript' => $transcript ?: null,
+                    'transcript_language' => $validated['transcript_language'] ?? null,
                     'latitude' => $lat,
                     'longitude' => $lng,
                     'photo_path' => $firstImagePath,
@@ -741,6 +744,108 @@ class CitizenPortalController extends Controller
             403,
             'You are not authorized to access this complaint.'
         );
+    }
+
+    /**
+     * Speech-to-Text Audio Transcription Endpoint
+     * Supports Nepali (ne-NP) and English (en-US)
+     */
+    public function transcribe(Request $request): JsonResponse
+    {
+        $request->validate([
+            'audio' => ['nullable', 'file', 'mimes:webm,ogg,mp3,m4a,mpeg,mp4,wav,x-wav', 'max:10240'],
+            'voice_recording' => ['nullable', 'file', 'mimes:webm,ogg,mp3,m4a,mpeg,mp4,wav,x-wav', 'max:10240'],
+            'language' => ['nullable', 'string', 'in:ne-NP,en-US,ne,en'],
+        ]);
+
+        $file = $request->file('audio') ?? $request->file('voice_recording');
+        if (!$file) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No audio file was uploaded for transcription.',
+            ], 422);
+        }
+
+        $language = $request->input('language', 'ne-NP');
+        $isNepali = str_starts_with($language, 'ne');
+
+        $geminiKey = env('GEMINI_API_KEY');
+        $openaiKey = env('OPENAI_API_KEY');
+
+        // 1. If OpenAI Whisper API key configured
+        if ($openaiKey) {
+            try {
+                $response = Http::withToken($openaiKey)
+                    ->timeout(30)
+                    ->attach('file', file_get_contents($file->getRealPath()), $file->getClientOriginalName())
+                    ->post('https://api.openai.com/v1/audio/transcriptions', [
+                        'model' => 'whisper-1',
+                        'language' => $isNepali ? 'ne' : 'en',
+                    ]);
+
+                if ($response->successful()) {
+                    $transcript = trim($response->json('text') ?? '');
+                    if ($transcript !== '') {
+                        return response()->json([
+                            'success' => true,
+                            'transcript' => $transcript,
+                            'language' => $language,
+                            'source' => 'whisper',
+                        ]);
+                    }
+                }
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
+        // 2. If Google Gemini API key configured
+        if ($geminiKey) {
+            try {
+                $mimeType = $file->getMimeType() ?: 'audio/webm';
+                $base64Data = base64_encode(file_get_contents($file->getRealPath()));
+                $prompt = $isNepali
+                    ? 'Transcribe this voice report accurately in Nepali (Devanagari script). Return only the spoken text without any explanations, introductory text, or markdown formatting.'
+                    : 'Transcribe this voice report accurately in English. Return only the spoken text without any explanations, introductory text, or markdown formatting.';
+
+                $response = Http::timeout(30)->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={$geminiKey}", [
+                    'contents' => [
+                        [
+                            'parts' => [
+                                ['text' => $prompt],
+                                [
+                                    'inlineData' => [
+                                        'mimeType' => $mimeType,
+                                        'data' => $base64Data,
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ]);
+
+                if ($response->successful()) {
+                    $text = trim($response->json('candidates.0.content.parts.0.text') ?? '');
+                    if ($text !== '') {
+                        return response()->json([
+                            'success' => true,
+                            'transcript' => $text,
+                            'language' => $language,
+                            'source' => 'gemini',
+                        ]);
+                    }
+                }
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
+        // Honest fallback: never fake transcripts
+        return response()->json([
+            'success' => false,
+            'message' => 'Backend speech-to-text service is not configured or currently unavailable. Please use the live "Speak to Transcribe (बोलेर लेख्नुहोस्)" feature in your browser or type your description manually.',
+            'configured' => false,
+        ], 200);
     }
 
     private function nextComplaintNumber(): string

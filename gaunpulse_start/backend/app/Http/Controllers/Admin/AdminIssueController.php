@@ -115,7 +115,15 @@ class AdminIssueController extends Controller
             } elseif ($newStatus === 'rejected') {
                 $updatePayload['rejection_reason'] = $request->input('rejection_reason', $request->comment);
             }
+            if ($request->filled('village_id')) {
+                $updatePayload['village_id'] = (int) $request->input('village_id');
+            }
             $issue->update($updatePayload);
+
+            if ($request->filled('village_id') && $issue->complaint) {
+                $issue->complaint->village_id = (int) $request->input('village_id');
+                $issue->complaint->save();
+            }
 
             $updateData = ['issue_id' => $issue->id];
             if (\Illuminate\Support\Facades\Schema::hasColumn('issue_updates', 'status')) {

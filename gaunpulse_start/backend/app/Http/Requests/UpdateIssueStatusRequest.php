@@ -29,6 +29,7 @@ class UpdateIssueStatusRequest extends FormRequest
             'verification_notes' => ['nullable', 'string', 'max:2000'],
             'rejection_reason' => ['nullable', 'string', 'max:2000'],
             'assigned_officer_id' => ['nullable', 'integer', 'exists:users,id'],
+            'village_id' => ['nullable', 'integer', 'exists:villages,id'],
         ];
     }
 }

@@ -6,6 +6,7 @@ import {
   CheckCircle,
   CheckCircle2,
   Clock,
+  Download,
   ExternalLink,
   Eye,
   FileText,
@@ -105,6 +106,7 @@ export default function IssuesPage({ onNavigate }) {
   const [newStatus, setNewStatus] = useState('');
   const [statusComment, setStatusComment] = useState('');
   const [statusMessage, setStatusMessage] = useState(null);
+  const [linkVillageId, setLinkVillageId] = useState('');
 
   // Form fields
   const [formData, setFormData] = useState({
@@ -423,6 +425,9 @@ export default function IssuesPage({ onNavigate }) {
       verification_notes: targetStatus === 'verified' ? (targetComment.trim() || 'Verified on-site by municipal technical officer.') : undefined,
       rejection_reason: targetStatus === 'rejected' ? targetComment.trim() : undefined,
     };
+    if (linkVillageId) {
+      payload.village_id = Number(linkVillageId);
+    }
 
     try {
       const res = await fetch(`${API_BASE_URL}/api/issues/${selectedIssue.id}/status`, {
@@ -676,6 +681,7 @@ export default function IssuesPage({ onNavigate }) {
                       setNewStatus(item.status);
                       setStatusComment('');
                       setStatusMessage(null);
+                      setLinkVillageId(item.village_id ? String(item.village_id) : '');
                     }}
                   >
                     <td>
@@ -710,7 +716,14 @@ export default function IssuesPage({ onNavigate }) {
                       </small>
                     </td>
                     <td>
-                      <strong>{item.settlement_name || item.complaint?.settlement_name || item.village?.name || 'Municipal Area'}</strong>
+                      <div>
+                        <strong>{item.settlement_name || item.complaint?.settlement_name || item.village?.name || 'Municipal Area'}</strong>
+                        {(item.settlement_name || item.complaint?.settlement_name) && !item.village_id && (
+                          <span style={{ fontSize: '10px', background: '#fef3c7', color: '#92400e', padding: '1px 5px', borderRadius: '4px', marginLeft: '5px', fontWeight: 600 }}>
+                            Unregistered
+                          </span>
+                        )}
+                      </div>
                       <small style={{ display: 'block', color: 'var(--text-secondary)' }}>
                         {item.village?.municipality || 'Municipal Workspace'} {item.ward_no || item.village?.ward_no || item.complaint?.ward_number ? `· Ward ${item.ward_no || item.village?.ward_no || item.complaint?.ward_number}` : ''}
                       </small>
@@ -741,6 +754,7 @@ export default function IssuesPage({ onNavigate }) {
                           setNewStatus(item.status);
                           setStatusComment('');
                           setStatusMessage(null);
+                          setLinkVillageId(item.village_id ? String(item.village_id) : '');
                         }}
                       >
                         {['pending_verification', 'submitted'].includes(norm(item.status)) ? (
@@ -1115,11 +1129,66 @@ export default function IssuesPage({ onNavigate }) {
                   {selectedIssue.reporter_name && <span><strong>Reporter:</strong> {selectedIssue.reporter_name} ({selectedIssue.reporter_phone || 'Resident'})</span>}
                 </div>
 
+                {/* Settlement Linkage to Official Village (if unregistered) */}
+                {(!selectedIssue.village_id || selectedIssue.settlement_name || selectedIssue.complaint?.settlement_name) && (
+                  <div style={{ marginTop: '12px', padding: '10px 12px', background: '#fefce8', border: '1px solid #fde047', borderRadius: 'var(--radius-sm)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <label style={{ fontSize: '12px', fontWeight: 700, color: '#854d0e', margin: 0 }}>
+                        Unregistered Settlement — Link to Registered Village:
+                      </label>
+                      <span style={{ fontSize: '11px', background: '#fef08a', color: '#713f12', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                        Citizen-reported: {selectedIssue.settlement_name || selectedIssue.complaint?.settlement_name || 'Unregistered'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <select
+                        value={linkVillageId}
+                        onChange={(e) => setLinkVillageId(e.target.value)}
+                        style={{ flex: 1, padding: '6px 10px', fontSize: '12px', borderRadius: '4px', border: '1px solid #d9e3db', background: '#fff' }}
+                      >
+                        <option value="">-- Keep Unregistered (Awaiting Survey) --</option>
+                        {dedupedVillages.map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.name} ({v.municipality || 'Municipal Area'}, Ward {v.ward_no || 1})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <small style={{ color: '#a16207', fontSize: '11px', display: 'block', marginTop: '4px' }}>
+                      Linking an official village associates this report with graph simulations, network routes, and priority scoring.
+                    </small>
+                  </div>
+                )}
+
                 {/* Speech-to-Text Transcription Box */}
                 {(selectedIssue.speech_transcript || selectedIssue.complaint?.speech_transcript) && (
                   <div style={{ marginTop: '12px', padding: '12px 14px', background: '#f8fafc', borderLeft: '4px solid #123d30', borderRadius: '4px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#123d30', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
-                      <FileText size={14} /> Citizen Speech Transcription (Nepali / English via Web Speech)
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#123d30', fontSize: '12px', fontWeight: 700 }}>
+                        <FileText size={14} /> Citizen Speech Transcription
+                        <span style={{ fontSize: '10.5px', background: '#eef5f1', color: '#267153', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                          {selectedIssue.transcript_language === 'en-US' || selectedIssue.complaint?.transcript_language === 'en-US' ? 'English (en-US)' : 'नेपाली (ne-NP)'}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="button button--secondary"
+                        style={{ padding: '3px 8px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        onClick={() => {
+                          const text = selectedIssue.speech_transcript || selectedIssue.complaint?.speech_transcript || '';
+                          const blob = new Blob(['\uFEFF' + text], { type: 'text/plain;charset=utf-8' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `gaunpulse-transcript-issue-${selectedIssue.id}.txt`;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                          URL.revokeObjectURL(url);
+                        }}
+                      >
+                        <Download size={12} /> Download Transcript (.txt)
+                      </button>
                     </div>
                     <p style={{ margin: 0, fontStyle: 'italic', fontSize: '13px', color: '#1e293b', lineHeight: 1.6 }}>
                       "{selectedIssue.speech_transcript || selectedIssue.complaint?.speech_transcript}"
@@ -1134,10 +1203,22 @@ export default function IssuesPage({ onNavigate }) {
                       <Volume2 size={16} /> Attached Citizen Voice Recording
                     </div>
                     {selectedIssue.complaint.media.filter((m) => m.media_type === 'audio').map((audioItem) => (
-                      <div key={audioItem.id} style={{ marginBottom: '6px' }}>
-                        <small style={{ display: 'block', marginBottom: '4px', color: 'var(--text-secondary)' }}>
-                          {audioItem.original_name} {audioItem.file_size ? `(${Math.round(audioItem.file_size / 1024)} KB)` : ''}
-                        </small>
+                      <div key={audioItem.id} style={{ marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                          <small style={{ color: 'var(--text-secondary)' }}>
+                            {audioItem.original_name} {audioItem.file_size ? `(${Math.round(audioItem.file_size / 1024)} KB)` : ''}
+                          </small>
+                          <a
+                            href={audioItem.url}
+                            download={audioItem.original_name || `gaunpulse-voice-report-${selectedIssue.id}.webm`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="button button--secondary"
+                            style={{ padding: '3px 8px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
+                          >
+                            <Download size={12} /> Download Audio
+                          </a>
+                        </div>
                         <audio controls src={audioItem.url} style={{ width: '100%', height: '36px' }} />
                       </div>
                     ))}

@@ -23,6 +23,7 @@ class Complaint extends Model
         'custom_category',
         'description',
         'speech_transcript',
+        'transcript_language',
         'contact_number',
         'latitude',
         'longitude',
