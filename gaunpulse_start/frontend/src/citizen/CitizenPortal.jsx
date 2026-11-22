@@ -446,7 +446,7 @@ export default function CitizenPortal() {
 
   // Navigation Items
   const navItems = [
-    { id: 'dashboard', label: t.overview || 'Overview', icon: LayoutDashboard },
+    { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
     { id: 'submit', label: t.registerComplaint || 'Register Complaint', icon: PlusCircle },
     { id: 'complaints', label: t.myComplaints || 'My Complaints', icon: FileText },
     { id: 'notifications', label: t.governmentNotices || 'Government Notices', icon: Bell },

@@ -180,7 +180,7 @@ export const translations = {
   ne: {
     // Navigation & Shell
     brandSubtitle: 'नागरिक सेवा पोर्टल',
-    overview: 'अवलोकन',
+    overview: 'Overview',
     reportIncident: 'उजुरी दर्ता',
     registerComplaint: 'उजुरी दर्ता गर्नुहोस्',
     myReports: 'मेरो उजुरीहरू',

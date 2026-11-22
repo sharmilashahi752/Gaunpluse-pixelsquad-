@@ -53,16 +53,11 @@ export default function CitizenDashboard({ onNavigate, onViewComplaint, lang = '
     loadDashboard();
   }, []);
 
-  const headingTitle = lang === 'ne' ? 'नागरिक पूर्वाधार सहायता केन्द्र' : 'Citizen Infrastructure Support Center';
-  const headingSubtitle =
-    lang === 'ne'
-      ? 'सडक, पुल, खानेपानी र आपतकालीन जोखिमहरूको रिपोर्ट गर्नुहोस् र मर्मत कार्यको प्रत्यक्ष प्रगति ट्र्याक गर्नुहोस्।'
-      : 'Report hazards, damaged roads, broken water taps, and track municipal repairs live.';
-  const registerButtonLabel = lang === 'ne' ? 'उजुरी दर्ता गर्नुहोस्' : 'Register Complaint';
+  const complaintButtonLabel = lang === 'ne' ? 'उजुरी दर्ता गर्नुहोस्' : 'File a complaint';
 
   return (
     <div className="citizen-page">
-      {/* Page Header with Compact Register Complaint Button */}
+      {/* Page Header with Compact Complaint Button */}
       <div
         className="citizen-page-heading"
         style={{
@@ -74,55 +69,55 @@ export default function CitizenDashboard({ onNavigate, onViewComplaint, lang = '
           marginBottom: '24px',
         }}
       >
-        <div style={{ flex: '1 1 300px' }}>
-          <p style={{ margin: '0 0 4px', color: '#267153', fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-            {t.brandSubtitle || 'Citizen Service Portal'}
-          </p>
-          <h1 style={{ margin: '0 0 6px', fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em', color: '#092d22' }}>
-            {headingTitle}
+        <div>
+          <h1
+            style={{
+              margin: 0,
+              fontSize: '24px',
+              fontWeight: 800,
+              letterSpacing: '-0.02em',
+              color: '#092d22',
+              lineHeight: 1.2,
+            }}
+          >
+            Overview
           </h1>
-          <span style={{ color: '#647a71', fontSize: '13.5px', lineHeight: 1.5 }}>
-            {headingSubtitle}
-          </span>
         </div>
 
-        {/* Task 2: Compact, professional Register Complaint Button (160-190px width, 40-44px height, 14px font) */}
+        {/* Top File a complaint Button */}
         <button
           type="button"
-          className="citizen-primary citizen-register-btn"
+          className="citizen-complaint-top-btn"
           onClick={() => onNavigate('submit')}
-          aria-label={registerButtonLabel}
+          aria-label={complaintButtonLabel}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: '8px',
-            width: '180px',
-            minWidth: '160px',
-            maxWidth: '190px',
             height: '42px',
-            padding: '0 14px',
+            padding: '10px 18px',
             borderRadius: '8px',
-            background: '#123D30',
-            color: '#ffffff',
+            backgroundColor: '#173D32',
+            color: '#FFFFFF',
             border: 'none',
             fontSize: '14px',
-            fontWeight: 700,
+            fontWeight: 600,
             whiteSpace: 'nowrap',
             cursor: 'pointer',
             flexShrink: 0,
-            boxShadow: '0 2px 6px rgba(18, 61, 48, 0.25)',
-            transition: 'background 0.2s ease, transform 0.1s ease',
+            boxShadow: '0 2px 6px rgba(23, 61, 50, 0.2)',
+            transition: 'background-color 0.18s ease, transform 0.1s ease',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#1a5241';
+            e.currentTarget.style.backgroundColor = '#215445';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = '#123D30';
+            e.currentTarget.style.backgroundColor = '#173D32';
           }}
         >
-          <PlusCircle size={16} strokeWidth={2.4} />
-          <span>{registerButtonLabel}</span>
+          <PlusCircle size={16} stroke="#FFFFFF" color="#FFFFFF" strokeWidth={2.2} />
+          <span style={{ color: '#FFFFFF', fontWeight: 600 }}>{complaintButtonLabel}</span>
         </button>
       </div>
 
@@ -181,13 +176,13 @@ export default function CitizenDashboard({ onNavigate, onViewComplaint, lang = '
       {/* Stats Cards */}
       {stats && (
         <>
-          <div className="citizen-stats">
+          <div className="citizen-stats" style={{ marginBottom: '24px' }}>
             <article>
               <div className="stat-icon-wrap all">
                 <FileText size={20} />
               </div>
               <div>
-                <span>{lang === 'ne' ? 'कुल उजुरीहरू' : 'Total Reports'}</span>
+                <span>{lang === 'ne' ? 'कुल उजुरीहरू' : 'Total Complaints'}</span>
                 <strong>{stats.total_complaints ?? 0}</strong>
               </div>
             </article>
@@ -196,7 +191,7 @@ export default function CitizenDashboard({ onNavigate, onViewComplaint, lang = '
                 <Clock size={20} />
               </div>
               <div>
-                <span>{lang === 'ne' ? 'प्रमाणीकरण हुन बाँकी' : 'Pending Review'}</span>
+                <span>{lang === 'ne' ? 'प्रमाणीकरण हुन बाँकी' : 'Authentication Pending'}</span>
                 <strong>{stats.pending_complaints ?? 0}</strong>
               </div>
             </article>
@@ -205,7 +200,7 @@ export default function CitizenDashboard({ onNavigate, onViewComplaint, lang = '
                 <PlayCircle size={20} />
               </div>
               <div>
-                <span>{lang === 'ne' ? 'कार्य प्रगतिमा' : 'Work In Progress'}</span>
+                <span>{lang === 'ne' ? 'कार्य प्रगतिमा' : 'Work in Progress'}</span>
                 <strong>{stats.in_progress_complaints ?? 0}</strong>
               </div>
             </article>
@@ -221,7 +216,7 @@ export default function CitizenDashboard({ onNavigate, onViewComplaint, lang = '
           </div>
 
           {/* Recent Reports Section */}
-          <section className="citizen-card" style={{ marginTop: '20px' }}>
+          <section className="citizen-card" style={{ marginBottom: '24px' }}>
             <div className="card-header-flex">
               <h2>{lang === 'ne' ? 'हालैका उजुरीहरू' : 'Your Recent Reports'}</h2>
               <button type="button" className="citizen-text-button" onClick={() => onNavigate('complaints')}>
@@ -310,7 +305,7 @@ export default function CitizenDashboard({ onNavigate, onViewComplaint, lang = '
 
           {/* Recent Notices Section */}
           {Array.isArray(stats.recent_notifications) && stats.recent_notifications.length > 0 && (
-            <section className="citizen-card" style={{ marginTop: '20px' }}>
+            <section className="citizen-card" style={{ marginBottom: '24px' }}>
               <div className="card-header-flex">
                 <h2>{lang === 'ne' ? 'हालैका सरकारी सूचना तथा अपडेट' : 'Recent Government Notices'}</h2>
                 <button type="button" className="citizen-text-button" onClick={() => onNavigate('notifications')}>
