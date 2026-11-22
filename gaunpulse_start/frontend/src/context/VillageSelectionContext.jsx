@@ -3,10 +3,13 @@ import { cachedFetchJson, invalidateApiCache } from '../utils/apiCache';
 
 const STORAGE_KEY = 'gaunpulse.selectedVillageId';
 const VillageSelectionContext = createContext(null);
+const API_BASE = import.meta.env.VITE_API_URL !== undefined ? `${import.meta.env.VITE_API_URL}/api` : '/api';
 
 function readPersistedVillageId() {
   try {
     const value = window.localStorage.getItem(STORAGE_KEY);
+    if (!value) return null;
+    if (value === 'demo-sundar-gaun') return value;
     const villageId = Number(value);
     return Number.isInteger(villageId) && villageId > 0 ? villageId : null;
   } catch {
@@ -22,7 +25,7 @@ export function VillageSelectionProvider({ children }) {
   const fetchVillages = useCallback(async (force = false) => {
     try {
       if (force) invalidateApiCache('api/villages');
-      const data = await cachedFetchJson('http://127.0.0.1:8000/api/villages', {}, {
+      const data = await cachedFetchJson(`${API_BASE}/villages`, {}, {
         force,
         ttlMs: 120000,
         onBackgroundUpdate: (fresh) => {
@@ -44,6 +47,19 @@ export function VillageSelectionProvider({ children }) {
   }, [fetchVillages]);
 
   const selectedVillage = useMemo(() => {
+    if (selectedVillageId === 'demo-sundar-gaun') {
+      return {
+        id: 'demo-sundar-gaun',
+        name: 'Sundar Gaun (सुन्दर गाउँ)',
+        municipality: 'Mid-Hills Demonstration Valley',
+        ward_no: '3 & 4',
+        district: 'Bagmati Demonstration Area',
+        province: 'Bagmati Province',
+        center_lat: 27.8852,
+        center_lng: 85.3448,
+        is_demo: true,
+      };
+    }
     if (!villages || villages.length === 0) return null;
     const found = villages.find((v) => Number(v.id) === Number(selectedVillageId));
     return found || villages[0];
@@ -51,7 +67,7 @@ export function VillageSelectionProvider({ children }) {
 
   // Ensure selectedVillageId defaults to first valid village if unselected or invalid
   useEffect(() => {
-    if (villages.length > 0) {
+    if (villages.length > 0 && selectedVillageId !== 'demo-sundar-gaun') {
       const exists = villages.some((v) => Number(v.id) === Number(selectedVillageId));
       if (!exists) {
         setSelectedVillageIdState(villages[0].id);
@@ -60,6 +76,15 @@ export function VillageSelectionProvider({ children }) {
   }, [villages, selectedVillageId]);
 
   const setSelectedVillageId = useCallback((value) => {
+    if (value === 'demo-sundar-gaun') {
+      setSelectedVillageIdState('demo-sundar-gaun');
+      try {
+        window.localStorage.setItem(STORAGE_KEY, 'demo-sundar-gaun');
+      } catch {
+        // Persistence optional
+      }
+      return;
+    }
     const villageId = Number(value);
     const nextValue = Number.isInteger(villageId) && villageId > 0 ? villageId : null;
     setSelectedVillageIdState(nextValue);

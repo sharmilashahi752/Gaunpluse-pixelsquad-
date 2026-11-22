@@ -118,6 +118,10 @@ export default function InteractiveVillageMap({
   isNationwideView = false,
   highlightedEdgeIds = [],
   highlightedStatus = 'blocked',
+  baselineRouteEdgeIds = [],
+  alternativeRouteEdgeIds = [],
+  affectedSettlementIds = [],
+  isolatedSettlementIds = [],
   height = '580px',
   onSelectEdge,
   onSelectNode,
@@ -552,6 +556,12 @@ export default function InteractiveVillageMap({
           const isHighlighted =
             highlightedEdgeIds.map(String).includes(edgeIdStr) ||
             highlightedEdgeIds.map(String).includes(edgeCodeStr);
+          const isAlternative =
+            alternativeRouteEdgeIds.map(String).includes(edgeIdStr) ||
+            alternativeRouteEdgeIds.map(String).includes(edgeCodeStr);
+          const isBaseline =
+            baselineRouteEdgeIds.map(String).includes(edgeIdStr) ||
+            baselineRouteEdgeIds.map(String).includes(edgeCodeStr);
           const isSelected = selectedEdgeId && (String(selectedEdgeId) === edgeIdStr || String(selectedEdgeId) === edgeCodeStr);
 
           let color = '#248157';
@@ -559,14 +569,21 @@ export default function InteractiveVillageMap({
           let dashArray = null;
 
           if (isHighlighted) {
-            color = highlightedStatus === 'blocked' ? '#c94b46' : '#e98535';
+            color = highlightedStatus === 'blocked' ? '#dc2626' : '#ea580c';
             weight = 8;
             dashArray = '6, 6';
+          } else if (isAlternative) {
+            color = '#d97706';
+            weight = 7;
+            dashArray = '5, 5';
+          } else if (isBaseline) {
+            color = '#059669';
+            weight = 6;
           } else if (edge.status === 'blocked') {
-            color = '#c94b46';
+            color = '#dc2626';
             dashArray = '8, 8';
           } else if (edge.status === 'limited' || edge.status === 'under_review' || edge.status === 'partially_blocked') {
-            color = '#e98535';
+            color = '#d97706';
           } else if (isBridge) {
             color = '#b45309';
           }
@@ -668,8 +685,19 @@ export default function InteractiveVillageMap({
           if (isSettlement && !activeLayers.settlements) return null;
           if (isFacility && !activeLayers.facilities) return null;
 
+          const nodeIdStr = String(node.id);
+          const isIsolated = isolatedSettlementIds.map(String).includes(nodeIdStr);
+          const isAffected = affectedSettlementIds.map(String).includes(nodeIdStr);
+
+          let nodeStatus = 'operational';
+          if (isIsolated) {
+            nodeStatus = 'unreachable';
+          } else if (isAffected) {
+            nodeStatus = 'detour';
+          }
+
           const markerType = isSettlement ? 'settlement' : nodeType;
-          const icon = createCustomIcon(markerType, 'operational', node.households);
+          const icon = createCustomIcon(markerType, nodeStatus, node.households);
 
           return (
             <Marker
@@ -811,8 +839,12 @@ export default function InteractiveVillageMap({
           Suspension Bridge
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <span style={{ width: '16px', height: '4px', background: '#c94b46', borderTop: '2px dashed #c94b46' }}></span>
-          Blocked / Hazard
+          <span style={{ width: '16px', height: '4px', background: '#d97706', borderTop: '2px dashed #d97706' }}></span>
+          Detour / Alternative Route
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <span style={{ width: '16px', height: '4px', background: '#dc2626', borderTop: '2px dashed #dc2626' }}></span>
+          Closed / Blocked Infrastructure
         </span>
       </div>
     </div>

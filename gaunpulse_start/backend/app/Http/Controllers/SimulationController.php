@@ -242,7 +242,7 @@ class SimulationController extends Controller
                 ->timeout(20)
                 ->acceptJson()
                 ->post($simulatorUrl.$path, $payload);
-        } catch (ConnectionException $exception) {
+        } catch (\Throwable $exception) {
             return response()->json([
                 'message' => 'The GaunPulse impact simulator service is unavailable.',
                 'error' => $exception->getMessage(),

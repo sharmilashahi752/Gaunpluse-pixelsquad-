@@ -3,11 +3,13 @@ import { ArrowRight, Route, TriangleAlert } from 'lucide-react';
 import { impactComparison as fallbackJourneys } from '../data/demoData';
 import { Card, CardHeader, LiveLabel, StatusBadge } from './ui';
 
+const API_BASE = import.meta.env.VITE_API_URL !== undefined ? `${import.meta.env.VITE_API_URL}/api` : '/api';
+
 export default function ImpactSimulationPreview({ onOpenSimulation }) {
   const [latestSim, setLatestSim] = useState(null);
 
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/api/simulations')
+    fetch(`${API_BASE}/simulations`)
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
