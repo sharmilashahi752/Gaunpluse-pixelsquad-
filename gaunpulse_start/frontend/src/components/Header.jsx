@@ -159,7 +159,7 @@ export default function Header({ title, onMenuClick, onNavigate }) {
             transition: 'background 0.15s ease',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#1e5a44';
+            e.currentTarget.style.background = '#236A50';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.background = '#123D30';
@@ -237,7 +237,7 @@ export default function Header({ title, onMenuClick, onNavigate }) {
                 cursor: 'pointer',
                 transition: 'background 0.15s ease',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = '#1a5443')}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#236A50')}
               onMouseLeave={(e) => (e.currentTarget.style.background = '#123D30')}
               title={`Sign out (${user.name})`}
             >
@@ -263,7 +263,7 @@ export default function Header({ title, onMenuClick, onNavigate }) {
               cursor: 'pointer',
               transition: 'background 0.15s ease',
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = '#1a5443')}
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#236A50')}
             onMouseLeave={(e) => (e.currentTarget.style.background = '#123D30')}
             title="Sign In to GaunPulse"
           >

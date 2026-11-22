@@ -5,19 +5,19 @@
 
 export const THEME_COLORS = {
   // Core palette
-  primaryForest: '#173D32',
-  secondaryGreen: '#42866A',
+  primaryForest: '#123D30',
+  secondaryGreen: '#236A50',
   warmBg: '#FFFFFF',
-  surfaceGreen: '#DDEBE2',
+  surfaceGreen: '#E7F3ED',
   accentAmber: '#E3AD58',
   alertRed: '#D45F53',
   darkText: '#1B2923',
 
   // Semantic mappings
-  forest: '#173D32',
-  forestSecondary: '#42866A',
+  forest: '#123D30',
+  forestSecondary: '#236A50',
   warmBackground: '#FFFFFF',
-  lightGreenSurface: '#DDEBE2',
+  lightGreenSurface: '#E7F3ED',
   accent: '#E3AD58',
   danger: '#D45F53',
   text: '#1B2923',

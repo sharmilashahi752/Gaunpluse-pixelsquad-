@@ -110,19 +110,19 @@ export function HeroSection() {
           transition={{ duration: 0.5, ease: 'easeOut', delay: 0.36 }}
           className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3.5 sm:gap-4 w-full sm:w-auto"
         >
-          {/* Button 1: EXPLORE GAUNPULSE */}
+          {/* Button 1: EXPLORE GAUNPULSE (Secondary) */}
           <a
             href="#how-it-works"
             onClick={handleScrollToHowItWorks}
-            className="w-full sm:w-auto inline-flex items-center justify-center px-[24px] py-[13px] rounded-[6px] text-[12px] sm:text-[13px] font-semibold uppercase tracking-[0.06em] bg-[#111111] hover:bg-black text-white transition-all duration-150 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-2 select-none"
+            className="w-full sm:w-auto inline-flex items-center justify-center px-[24px] py-[13px] rounded-[6px] text-[12px] sm:text-[13px] font-semibold uppercase tracking-[0.06em] bg-white hover:bg-[#E7F3ED] text-[#123D30] border border-[#123D30] transition-all duration-150 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-2 select-none"
           >
             EXPLORE GAUNPULSE
           </a>
 
-          {/* Button 2: EXPLORE VILLAGE MAP */}
+          {/* Button 2: EXPLORE VILLAGE MAP (Primary) */}
           <Link
             to="/map"
-            className="w-full sm:w-auto inline-flex items-center justify-center px-[24px] py-[13px] rounded-[6px] text-[12px] sm:text-[13px] font-semibold uppercase tracking-[0.06em] bg-white hover:bg-stone-100 text-[#111111] transition-all duration-150 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-2 select-none"
+            className="w-full sm:w-auto inline-flex items-center justify-center px-[24px] py-[13px] rounded-[6px] text-[12px] sm:text-[13px] font-semibold uppercase tracking-[0.06em] bg-[#123D30] hover:bg-[#236A50] text-[#FFFFFF] border border-[#123D30] transition-all duration-150 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-2 select-none"
           >
             EXPLORE VILLAGE MAP
           </Link>

@@ -338,7 +338,7 @@
   height: 42px !important;
   padding: 10px 18px !important;
   border-radius: 8px !important;
-  background-color: #173D32 !important;
+  background-color: #123D30 !important;
   color: #FFFFFF !important;
   border: none !important;
   font-size: 14px !important;
@@ -348,7 +348,7 @@
   cursor: pointer !important;
   flex-shrink: 0 !important;
   opacity: 1 !important;
-  box-shadow: 0 2px 6px rgba(23, 61, 50, 0.2) !important;
+  box-shadow: 0 2px 6px rgba(18, 61, 48, 0.2) !important;
   transition: background-color 0.18s ease, transform 0.1s ease, box-shadow 0.18s ease !important;
   outline: none !important;
 }
@@ -369,18 +369,18 @@
 }
 
 .citizen-complaint-top-btn:hover {
-  background-color: #215445 !important;
+  background-color: #236A50 !important;
   color: #FFFFFF !important;
 }
 
 .citizen-complaint-top-btn:active {
-  background-color: #123329 !important;
+  background-color: #0C2E24 !important;
   color: #FFFFFF !important;
   transform: translateY(1px) !important;
 }
 
 .citizen-complaint-top-btn:focus-visible {
-  outline: 2px solid #173D32 !important;
+  outline: 2px solid #123D30 !important;
   outline-offset: 2px !important;
 }
 
@@ -655,22 +655,30 @@
 }
 
 .citizen-primary {
-  background: #267153;
-  color: #ffffff;
+  background: #123D30 !important;
+  color: #FFFFFF !important;
 }
 
 .citizen-primary:hover {
-  background: #1e5a44;
+  background: #236A50 !important;
+  color: #FFFFFF !important;
+}
+
+.citizen-primary:active {
+  background: #0C2E24 !important;
+  color: #FFFFFF !important;
 }
 
 .citizen-secondary {
-  background: #eef3f0;
-  color: #123d30;
-  border: 1px solid #cbdcd3;
+  background: #FFFFFF !important;
+  color: #123D30 !important;
+  border: 1px solid #123D30 !important;
 }
 
 .citizen-secondary:hover {
-  background: #e1ebe5;
+  background: #E7F3ED !important;
+  border-color: #236A50 !important;
+  color: #123D30 !important;
 }
 
 .citizen-secondary.danger {

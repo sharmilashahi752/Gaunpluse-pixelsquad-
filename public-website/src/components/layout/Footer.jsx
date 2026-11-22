@@ -52,7 +52,7 @@ export function Footer() {
   ];
 
   return (
-    <footer className="bg-[#173D32] text-white border-t border-white/15 text-sm mt-auto">
+    <footer className="bg-[#123D30] text-white border-t border-white/10 text-sm mt-auto">
       {/* Upper Footer: 3-Column Clean Editorial Grid */}
       <div className="py-12 sm:py-16">
         <Container>
@@ -61,7 +61,7 @@ export function Footer() {
             <div className="lg:col-span-5 space-y-4">
               <BrandLogo variant="footer" />
 
-              <p className="text-xs sm:text-sm text-[#DDEBE2] leading-relaxed max-w-sm">
+              <p className="text-xs sm:text-sm text-white leading-relaxed max-w-sm">
                 An AI-assisted rural infrastructure intelligence and decision-support platform designed to help Nepalese communities and local governments understand damaged assets and prioritize repair actions.
               </p>
 
@@ -71,11 +71,11 @@ export function Footer() {
                   href="https://github.com/sharmilashahi752/Gaunpluse-pixelsquad-"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-[14px] font-medium text-white hover:text-[#E3AD58] hover:underline transition-colors focus-visible:ring-2 focus-visible:ring-[#E3AD58] focus-visible:outline-hidden rounded-xs"
+                  className="inline-flex items-center gap-2 text-[14px] font-medium text-white hover:text-[#E7F3ED] hover:underline transition-colors focus-visible:ring-2 focus-visible:ring-[#E7F3ED] focus-visible:outline-hidden rounded-xs"
                 >
                   <GithubIcon className="w-4 h-4 shrink-0 text-white" />
                   <span>Team GitHub Repository (PixelSquad)</span>
-                  <ExternalLink className="w-3.5 h-3.5 shrink-0 text-[#B8D0C4]" />
+                  <ExternalLink className="w-3.5 h-3.5 shrink-0 text-[#E7F3ED]" />
                 </a>
               </div>
             </div>
@@ -90,7 +90,7 @@ export function Footer() {
                   <li key={item.path}>
                     <Link
                       to={item.path}
-                      className="text-[#DDEBE2] hover:text-[#E3AD58] hover:underline transition-colors block py-1 font-medium focus-visible:ring-2 focus-visible:ring-[#E3AD58] focus-visible:outline-hidden rounded-xs"
+                      className="text-white hover:text-[#E7F3ED] hover:underline transition-colors block py-1 font-medium focus-visible:ring-2 focus-visible:ring-[#E7F3ED] focus-visible:outline-hidden rounded-xs"
                     >
                       {item.label}
                     </Link>
@@ -110,7 +110,7 @@ export function Footer() {
                     <li key={item.path}>
                       <Link
                         to={item.path}
-                        className="text-[#DDEBE2] hover:text-[#E3AD58] hover:underline transition-colors block py-1 font-medium focus-visible:ring-2 focus-visible:ring-[#E3AD58] focus-visible:outline-hidden rounded-xs"
+                        className="text-white hover:text-[#E7F3ED] hover:underline transition-colors block py-1 font-medium focus-visible:ring-2 focus-visible:ring-[#E7F3ED] focus-visible:outline-hidden rounded-xs"
                       >
                         {item.label}
                       </Link>
@@ -122,7 +122,7 @@ export function Footer() {
               {/* Prototype Status */}
               <div className="pt-1.5 space-y-1 text-left">
                 <p className="text-[14px] font-semibold text-white">Prototype Status</p>
-                <p className="text-[13px] sm:text-[14px] font-normal text-[#DDEBE2] leading-relaxed">
+                <p className="text-[13px] sm:text-[14px] font-normal text-[#E7F3ED] leading-relaxed">
                   Demonstrated using synthetic Sundar Gaun topology for the Nepalese CivicTech showcase.
                 </p>
               </div>
@@ -131,19 +131,19 @@ export function Footer() {
         </Container>
       </div>
 
-      {/* Bottom Bar: Legal Disclaimer & Copyright Strip (#123126) */}
-      <div className="border-t border-white/15 bg-[#123126] py-5">
+      {/* Bottom Bar: Legal Disclaimer & Copyright Strip (#0C2E24) */}
+      <div className="border-t border-white/10 bg-[#0C2E24] py-5">
         <Container>
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left text-xs text-[#B8D0C4]">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left text-xs text-[#E7F3ED]">
             <div>
               <p>
                 © {CURRENT_YEAR} PixelSquad. Developed as an open-source CivicTech prototype for Nepal.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2 text-xs text-[#B8D0C4]">
+            <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2 text-xs text-[#E7F3ED]">
               <span>Fictional Demonstration Data</span>
-              <span className="text-white/30 hidden sm:inline">•</span>
+              <span className="text-white/40 hidden sm:inline">•</span>
               <span>Not Official Municipal Government Services</span>
             </div>
           </div>

@@ -116,7 +116,7 @@ export function SimulatorPreviewSection() {
             <div className="pt-2">
               <Link
                 to="/map"
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-[#173D32] hover:bg-[#122F26] text-white text-sm font-semibold shadow-xs hover:shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-[#173D32]"
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-[#123D30] hover:bg-[#236A50] active:bg-[#0C2E24] text-white text-sm font-semibold shadow-xs hover:shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-[#123D30]"
               >
                 <Activity className="w-4 h-4 text-[#E3AD58]" />
                 <span>Explore Village Map</span>

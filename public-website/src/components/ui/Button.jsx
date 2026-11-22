@@ -26,10 +26,10 @@ export function Button({
   };
 
   const variantStyles = {
-    primary: 'bg-[#173D32] hover:bg-[#122F26] text-white focus:ring-[#173D32]',
-    secondary: 'bg-[#42866A] hover:bg-[#346F57] text-white focus:ring-[#42866A]',
-    outline: 'border border-[#42866A] text-[#173D32] hover:bg-[#DDEBE2] focus:ring-[#42866A]',
-    ghost: 'text-[#1B2923] hover:bg-[#DDEBE2]/60 focus:ring-[#42866A]',
+    primary: 'bg-[#123D30] hover:bg-[#236A50] text-[#FFFFFF] focus:ring-[#123D30]',
+    secondary: 'bg-[#FFFFFF] border border-[#123D30] text-[#123D30] hover:bg-[#E7F3ED] focus:ring-[#123D30]',
+    outline: 'border border-[#123D30] text-[#123D30] hover:bg-[#E7F3ED] focus:ring-[#123D30]',
+    ghost: 'text-[#1B2923] hover:bg-[#E7F3ED] focus:ring-[#123D30]',
   };
 
   const classes = `${baseStyles} ${sizeStyles[size] || sizeStyles.md} ${variantStyles[variant] || variantStyles.primary} ${className}`;

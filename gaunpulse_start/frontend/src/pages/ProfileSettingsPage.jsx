@@ -300,6 +300,13 @@ export default function ProfileSettingsPage({ onNavigate }) {
                 alignItems: 'center',
                 gap: '8px',
                 justifyContent: 'center',
+                transition: 'background 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                if (!savingProfile) e.currentTarget.style.background = '#236A50';
+              }}
+              onMouseLeave={(e) => {
+                if (!savingProfile) e.currentTarget.style.background = '#123D30';
               }}
             >
               <Save size={14} />
@@ -423,6 +430,13 @@ export default function ProfileSettingsPage({ onNavigate }) {
                 alignItems: 'center',
                 gap: '8px',
                 justifyContent: 'center',
+                transition: 'background 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                if (!changingPassword) e.currentTarget.style.background = '#236A50';
+              }}
+              onMouseLeave={(e) => {
+                if (!changingPassword) e.currentTarget.style.background = '#123D30';
               }}
             >
               <Lock size={14} />

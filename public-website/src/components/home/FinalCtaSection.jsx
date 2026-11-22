@@ -14,9 +14,9 @@ import Badge from '../ui/Badge';
  */
 export function FinalCtaSection() {
   return (
-    <section aria-labelledby="final-cta-heading" className="py-20 sm:py-28 bg-[#173D32] text-white relative overflow-hidden">
+    <section aria-labelledby="final-cta-heading" className="py-20 sm:py-28 bg-[#123D30] text-white relative overflow-hidden">
       {/* Background visual accents */}
-      <div className="absolute inset-0 bg-radial from-[#42866A]/20 via-transparent to-transparent pointer-events-none" />
+      <div className="absolute inset-0 bg-radial from-[#236A50]/20 via-transparent to-transparent pointer-events-none" />
       <div className="absolute right-[-60px] top-[-60px] opacity-5 pointer-events-none">
         <Activity className="w-96 h-96 text-white" />
       </div>
@@ -44,16 +44,16 @@ export function FinalCtaSection() {
           <div className="pt-4 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
             <Link
               to="/issues"
-              className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-[#E3AD58] hover:bg-[#D19942] text-[#173D32] text-sm font-bold shadow-md hover:shadow-lg transition-all focus-visible:ring-2 focus-visible:ring-white cursor-pointer"
+              className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-[#E3AD58] hover:bg-[#D19942] text-[#123D30] text-sm font-bold shadow-md hover:shadow-lg transition-all focus-visible:ring-2 focus-visible:ring-white cursor-pointer"
             >
-              <Activity className="w-4 h-4 text-[#173D32]" />
+              <Activity className="w-4 h-4 text-[#123D30]" />
               <span>Explore Community Issues</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
 
             <Link
               to="/map"
-              className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-sm font-semibold transition-all focus-visible:ring-2 focus-visible:ring-white"
+              className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-white hover:bg-[#E7F3ED] border border-white text-[#123D30] text-sm font-semibold transition-all focus-visible:ring-2 focus-visible:ring-white shadow-xs"
             >
               <Compass className="w-4 h-4 text-[#E3AD58]" />
               <span>Explore Village Map</span>

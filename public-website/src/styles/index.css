@@ -2,27 +2,27 @@
 @import "leaflet/dist/leaflet.css";
 
 @theme {
-  --color-forest: #173D32;
-  --color-forest-secondary: #42866A;
+  --color-forest: #123D30;
+  --color-forest-secondary: #236A50;
   --color-warm-bg: #FFFFFF;
-  --color-surface-green: #DDEBE2;
+  --color-surface-green: #E7F3ED;
   --color-accent-amber: #E3AD58;
   --color-alert-red: #D45F53;
   --color-dark-text: #1B2923;
 
-  --color-primary-forest: #173D32;
-  --color-secondary-green: #42866A;
+  --color-primary-forest: #123D30;
+  --color-secondary-green: #236A50;
   --color-surface-cream: #FFFFFF;
-  --color-surface-light: #DDEBE2;
+  --color-surface-light: #E7F3ED;
 
   --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 :root {
-  --primary-forest: #173D32;
-  --secondary-green: #42866A;
+  --primary-forest: #123D30;
+  --secondary-green: #236A50;
   --warm-bg: #FFFFFF;
-  --surface-green: #DDEBE2;
+  --surface-green: #E7F3ED;
   --accent-amber: #E3AD58;
   --alert-red: #D45F53;
   --dark-text: #1B2923;
@@ -64,22 +64,22 @@ body {
 /* Ensure Leaflet controls match GaunPulse clean UI */
 .leaflet-bar a {
   background-color: #ffffff !important;
-  color: #173D32 !important;
-  border-bottom: 1px solid rgba(66, 134, 106, 0.2) !important;
+  color: #123D30 !important;
+  border-bottom: 1px solid rgba(35, 106, 80, 0.2) !important;
   transition: all 0.15s ease-in-out;
 }
 
 .leaflet-bar a:hover {
-  background-color: #DDEBE2 !important;
-  color: #173D32 !important;
+  background-color: #E7F3ED !important;
+  color: #123D30 !important;
 }
 
 /* Leaflet Popup Styling */
 .leaflet-popup-content-wrapper {
   background: #ffffff !important;
-  border: 1px solid rgba(66, 134, 106, 0.25) !important;
+  border: 1px solid rgba(35, 106, 80, 0.25) !important;
   border-radius: 12px !important;
-  box-shadow: 0 4px 16px -2px rgba(23, 61, 50, 0.15) !important;
+  box-shadow: 0 4px 16px -2px rgba(18, 61, 48, 0.15) !important;
   padding: 0 !important;
 }
 
@@ -90,7 +90,7 @@ body {
 
 .leaflet-popup-tip {
   background: #ffffff !important;
-  border: 1px solid rgba(66, 134, 106, 0.25) !important;
+  border: 1px solid rgba(35, 106, 80, 0.25) !important;
 }
 
 /* 3D Flip Card Utilities */

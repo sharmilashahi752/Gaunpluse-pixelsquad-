@@ -98,7 +98,7 @@ export default function CitizenDashboard({ onNavigate, onViewComplaint, lang = '
             height: '42px',
             padding: '10px 18px',
             borderRadius: '8px',
-            backgroundColor: '#173D32',
+            backgroundColor: '#123D30',
             color: '#FFFFFF',
             border: 'none',
             fontSize: '14px',
@@ -106,14 +106,14 @@ export default function CitizenDashboard({ onNavigate, onViewComplaint, lang = '
             whiteSpace: 'nowrap',
             cursor: 'pointer',
             flexShrink: 0,
-            boxShadow: '0 2px 6px rgba(23, 61, 50, 0.2)',
+            boxShadow: '0 2px 6px rgba(18, 61, 48, 0.2)',
             transition: 'background-color 0.18s ease, transform 0.1s ease',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#215445';
+            e.currentTarget.style.backgroundColor = '#236A50';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#173D32';
+            e.currentTarget.style.backgroundColor = '#123D30';
           }}
         >
           <PlusCircle size={16} stroke="#FFFFFF" color="#FFFFFF" strokeWidth={2.2} />

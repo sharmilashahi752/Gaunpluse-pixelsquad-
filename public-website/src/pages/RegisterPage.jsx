@@ -280,7 +280,7 @@ export function RegisterPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full h-12 py-3 px-4 rounded-xl bg-[#173D32] hover:bg-[#122F26] active:scale-[0.98] text-white text-sm font-semibold transition-all shadow-xs cursor-pointer focus-visible:outline-2 focus-visible:outline-[#173D32] focus-visible:outline-offset-2 flex items-center justify-center select-none disabled:opacity-75 disabled:cursor-not-allowed"
+          className="w-full h-12 py-3 px-4 rounded-xl bg-[#123D30] hover:bg-[#236A50] active:bg-[#0C2E24] active:scale-[0.98] text-white text-sm font-semibold transition-all shadow-xs cursor-pointer focus-visible:outline-2 focus-visible:outline-[#123D30] focus-visible:outline-offset-2 flex items-center justify-center select-none disabled:opacity-75 disabled:cursor-not-allowed"
         >
           {loading ? 'Creating Account...' : 'Create Account'}
         </button>
@@ -290,7 +290,7 @@ export function RegisterPage() {
           Already have an account?{' '}
           <Link
             to="/login"
-            className="font-semibold text-[#173D32] hover:underline"
+            className="font-semibold text-[#123D30] hover:underline"
           >
             Sign In
           </Link>
