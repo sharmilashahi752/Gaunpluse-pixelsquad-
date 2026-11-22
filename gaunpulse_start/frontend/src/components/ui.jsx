@@ -126,3 +126,5 @@ export function LoadingSkeleton({ rows = 3, height = '48px' }) {
     </div>
   );
 }
+
+export { default as GaunPulseLogo } from './GaunPulseLogo';

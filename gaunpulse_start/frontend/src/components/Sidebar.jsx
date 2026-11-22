@@ -2,7 +2,7 @@ import { Building2, ChevronRight, MapPin, X } from 'lucide-react';
 import { navigationItems } from '../data/demoData';
 import { useVillageSelection } from '../context/VillageSelectionContext';
 import { useAuth } from '../context/AuthContext';
-import gaunpulseLogo from '../assets/gaunpulse-logo.png';
+import GaunPulseLogo from './GaunPulseLogo';
 
 export default function Sidebar({ activePage, isOpen, onNavigate, onClose }) {
   const { selectedVillage } = useVillageSelection();
@@ -37,18 +37,7 @@ export default function Sidebar({ activePage, isOpen, onNavigate, onClose }) {
         {/* Brand Area with Official Logo */}
         <div className="sidebar__brand">
           <div className="sidebar__brand-identity">
-            <div className="sidebar__logo-wrapper" aria-hidden="true">
-              <img
-                src={gaunpulseLogo}
-                alt="GaunPulse official emblem"
-                className="sidebar__logo-img"
-                loading="eager"
-              />
-            </div>
-            <div className="sidebar__brand-copy">
-              <strong className="sidebar__brand-title">GaunPulse</strong>
-              <span className="sidebar__brand-tagline">The Village That Speaks</span>
-            </div>
+            <GaunPulseLogo variant="sidebar" size={50} />
           </div>
           <button
             className="icon-button sidebar__close"
