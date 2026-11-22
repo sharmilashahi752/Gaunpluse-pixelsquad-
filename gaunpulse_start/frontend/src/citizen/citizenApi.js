@@ -84,8 +84,8 @@ export const citizenService = {
     return res.data;
   },
 
-  async getLocations() {
-    const res = await citizenClient.get('/api/citizen/locations');
+  async getLocations(params = {}) {
+    const res = await citizenClient.get('/api/citizen/locations', { params });
     return res.data;
   },
 
