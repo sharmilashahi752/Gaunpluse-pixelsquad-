@@ -65,19 +65,23 @@ class AdminIssueController extends Controller
     public function show(Request $request, Issue $issue)
     {
         $user = $request->user();
-        $issueMuniId = $issue->municipality_id ?? $issue->village?->municipality_id;
-        $issueWardNo = $issue->ward_no ?? $issue->village?->ward_no;
+        $issueMuniId = $issue->municipality_id ?? $issue->village?->municipality_id ?? $issue->complaint?->municipality_id;
+        $issueWardNo = $issue->ward_no ?? $issue->village?->ward_no ?? $issue->complaint?->ward_number;
 
         if ($user && $user->isStaff() && !$user->isSystemAdmin()) {
             if ($user->isMunicipalityAdmin()) {
-                abort_unless((string) $issueMuniId === (string) $user->municipality_id, 403, 'Cross-municipality access denied.');
+                if ($issueMuniId !== null) {
+                    abort_unless((string) $issueMuniId === (string) $user->municipality_id, 403, 'Cross-municipality access denied.');
+                }
             } elseif ($user->isWardOfficer()) {
-                abort_unless(
-                    (string) $issueMuniId === (string) $user->municipality_id &&
-                    (string) $issueWardNo === (string) $user->ward_number,
-                    403,
-                    'Cross-ward access denied.'
-                );
+                if ($issueMuniId !== null && $issueWardNo !== null) {
+                    abort_unless(
+                        (string) $issueMuniId === (string) $user->municipality_id &&
+                        (string) $issueWardNo === (string) $user->ward_number,
+                        403,
+                        'Cross-ward access denied.'
+                    );
+                }
             }
         }
 
@@ -87,19 +91,23 @@ class AdminIssueController extends Controller
     public function updateStatus(UpdateIssueStatusRequest $request, Issue $issue)
     {
         $user = $request->user();
-        $issueMuniId = $issue->municipality_id ?? $issue->village?->municipality_id;
-        $issueWardNo = $issue->ward_no ?? $issue->village?->ward_no;
+        $issueMuniId = $issue->municipality_id ?? $issue->village?->municipality_id ?? $issue->complaint?->municipality_id;
+        $issueWardNo = $issue->ward_no ?? $issue->village?->ward_no ?? $issue->complaint?->ward_number;
 
         if ($user && $user->isStaff() && !$user->isSystemAdmin()) {
             if ($user->isMunicipalityAdmin()) {
-                abort_unless((string) $issueMuniId === (string) $user->municipality_id, 403, 'Cross-municipality issue modification denied.');
+                if ($issueMuniId !== null) {
+                    abort_unless((string) $issueMuniId === (string) $user->municipality_id, 403, 'Cross-municipality issue modification denied.');
+                }
             } elseif ($user->isWardOfficer()) {
-                abort_unless(
-                    (string) $issueMuniId === (string) $user->municipality_id &&
-                    (string) $issueWardNo === (string) $user->ward_number,
-                    403,
-                    'Cross-ward issue modification denied.'
-                );
+                if ($issueMuniId !== null && $issueWardNo !== null) {
+                    abort_unless(
+                        (string) $issueMuniId === (string) $user->municipality_id &&
+                        (string) $issueWardNo === (string) $user->ward_number,
+                        403,
+                        'Cross-ward issue modification denied.'
+                    );
+                }
             }
         }
 
@@ -134,13 +142,13 @@ class AdminIssueController extends Controller
             abort(422, 'A closed/rejected report must be moved to under review before transitioning to other statuses.');
         }
 
-        // 4. Validate rejection reason
+        // 3. Validate rejection reason
         $rejectionReason = trim($request->input('rejection_reason', $request->input('comment', '')));
         if ($newStatus === 'rejected' && empty($rejectionReason)) {
             abort(422, 'Please provide a reason for rejecting this report.');
         }
 
-        // 5. Validate more information needed explanation
+        // 4. Validate more information needed explanation
         $infoNotes = trim($request->input('comment', $request->input('verification_notes', '')));
         if ($newStatus === 'more_information_needed' && empty($infoNotes)) {
             abort(422, 'Please provide notes explaining what additional information is required from the resident.');
@@ -148,7 +156,7 @@ class AdminIssueController extends Controller
 
         DB::transaction(function () use ($request, $issue, $user, $issueMuniId, $currentStatus, $newStatus, $rejectionReason, $infoNotes) {
             $updatePayload = ['status' => $newStatus];
-            if ($newStatus === 'verified') {
+            if (in_array($newStatus, ['verified', 'in_progress', 'resolved'], true) && ($newStatus === 'verified' || !$issue->verified_at)) {
                 $updatePayload['verified_by'] = $user?->id;
                 $updatePayload['verified_at'] = now();
                 $updatePayload['verification_notes'] = $request->input('verification_notes', $request->comment ?? 'Verified on-site by municipal technical staff.');
@@ -157,12 +165,29 @@ class AdminIssueController extends Controller
             }
 
             if ($request->has('village_id')) {
-                $updatePayload['village_id'] = $request->input('village_id') ? (int) $request->input('village_id') : null;
+                $targetVillageId = $request->input('village_id') ? (int) $request->input('village_id') : null;
+                $updatePayload['village_id'] = $targetVillageId;
+                if ($targetVillageId) {
+                    $targetVillage = \App\Models\Village::find($targetVillageId);
+                    if ($targetVillage) {
+                        $updatePayload['municipality_id'] = $targetVillage->municipality_id;
+                        $updatePayload['ward_no'] = $targetVillage->ward_no;
+                    }
+                }
+            }
+            if (empty($issue->municipality_id) && !isset($updatePayload['municipality_id']) && $user?->municipality_id) {
+                $updatePayload['municipality_id'] = $user->municipality_id;
             }
             $issue->update($updatePayload);
 
             if ($request->has('village_id') && $issue->complaint) {
                 $issue->complaint->village_id = $updatePayload['village_id'];
+                if (isset($updatePayload['municipality_id'])) {
+                    $issue->complaint->municipality_id = $updatePayload['municipality_id'];
+                }
+                if (isset($updatePayload['ward_no'])) {
+                    $issue->complaint->ward_number = $updatePayload['ward_no'];
+                }
                 $issue->complaint->save();
             }
 

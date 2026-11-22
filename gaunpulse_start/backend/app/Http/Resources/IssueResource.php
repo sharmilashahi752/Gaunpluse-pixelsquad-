@@ -11,6 +11,8 @@ class IssueResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'village_id' => $this->village_id,
+            'edge_id' => $this->edge_id,
             'tracking_code' => $this->tracking_code ?? "GP-{$this->id}",
             'title' => $this->title,
             'category' => $this->category,
@@ -25,8 +27,8 @@ class IssueResource extends JsonResource
             'verifier_name' => $this->relationLoaded('verifier') ? $this->verifier?->name : ($this->verifier?->name ?? null),
             'verification_notes' => $this->verification_notes,
             'rejection_reason' => $this->rejection_reason,
-            'ward_no' => $this->ward_no ?? $this->village?->ward_no,
-            'municipality_id' => $this->municipality_id ?? $this->village?->municipality_id,
+            'ward_no' => $this->ward_no ?? $this->village?->ward_no ?? $this->complaint?->ward_number,
+            'municipality_id' => $this->municipality_id ?? $this->village?->municipality_id ?? $this->complaint?->municipality_id,
             'latitude' => (float)$this->latitude,
             'longitude' => (float)$this->longitude,
             'reporter_name' => $this->reporter_name ?? 'Community Resident',

@@ -22,18 +22,30 @@ class IssueController extends Controller
         $user = $request->user('sanctum') ?? $request->user();
         if ($user && $user->isStaff() && !$user->isSystemAdmin()) {
             if ($user->isWardOfficer()) {
-                $query->whereHas('village', function ($q) use ($user) {
-                    $q->where('municipality_id', (string) $user->municipality_id)
-                      ->where('ward_no', (string) $user->ward_number);
+                $query->where(function ($q) use ($user) {
+                    $q->where(function ($sub) use ($user) {
+                        $sub->where('issues.municipality_id', (string) $user->municipality_id)
+                            ->where('issues.ward_no', (string) $user->ward_number);
+                    })->orWhereHas('village', function ($v) use ($user) {
+                        $v->where('municipality_id', (string) $user->municipality_id)
+                          ->where('ward_no', (string) $user->ward_number);
+                    });
                 });
             } elseif ($user->isMunicipalityAdmin()) {
-                $query->whereHas('village', function ($q) use ($user) {
-                    $q->where('municipality_id', (string) $user->municipality_id);
+                $query->where(function ($q) use ($user) {
+                    $q->where('issues.municipality_id', (string) $user->municipality_id)
+                      ->orWhereHas('village', function ($v) use ($user) {
+                          $v->where('municipality_id', (string) $user->municipality_id);
+                      });
                 });
             }
         } elseif ($request->filled('municipality_id')) {
-            $query->whereHas('village', function ($q) use ($request) {
-                $q->where('municipality_id', (string) $request->input('municipality_id'));
+            $mId = $request->input('municipality_id');
+            $query->where(function ($q) use ($mId) {
+                $q->where('issues.municipality_id', (string) $mId)
+                  ->orWhereHas('village', function ($v) use ($mId) {
+                      $v->where('municipality_id', (string) $mId);
+                  });
             });
         }
 
@@ -48,16 +60,23 @@ class IssueController extends Controller
     public function show(Request $request, Issue $issue)
     {
         $user = $request->user('sanctum') ?? $request->user();
-        if ($user && $user->isStaff() && !$user->isSystemAdmin() && $issue->village) {
+        $issueMuniId = $issue->municipality_id ?? $issue->village?->municipality_id ?? $issue->complaint?->municipality_id;
+        $issueWardNo = $issue->ward_no ?? $issue->village?->ward_no ?? $issue->complaint?->ward_number;
+
+        if ($user && $user->isStaff() && !$user->isSystemAdmin()) {
             if ($user->isMunicipalityAdmin()) {
-                abort_unless((string) $issue->village->municipality_id === (string) $user->municipality_id, 403, 'Cross-municipality access denied.');
+                if ($issueMuniId !== null) {
+                    abort_unless((string) $issueMuniId === (string) $user->municipality_id, 403, 'Cross-municipality access denied.');
+                }
             } elseif ($user->isWardOfficer()) {
-                abort_unless(
-                    (string) $issue->village->municipality_id === (string) $user->municipality_id &&
-                    (string) $issue->village->ward_no === (string) $user->ward_number,
-                    403,
-                    'Cross-ward access denied.'
-                );
+                if ($issueMuniId !== null && $issueWardNo !== null) {
+                    abort_unless(
+                        (string) $issueMuniId === (string) $user->municipality_id &&
+                        (string) $issueWardNo === (string) $user->ward_number,
+                        403,
+                        'Cross-ward access denied.'
+                    );
+                }
             }
         }
 
@@ -93,19 +112,23 @@ class IssueController extends Controller
             abort(403, 'Unauthorized. Official municipal staff credentials are required.');
         }
 
-        $issueMuniId = $issue->municipality_id ?? $issue->village?->municipality_id;
-        $issueWardNo = $issue->ward_no ?? $issue->village?->ward_no;
+        $issueMuniId = $issue->municipality_id ?? $issue->village?->municipality_id ?? $issue->complaint?->municipality_id;
+        $issueWardNo = $issue->ward_no ?? $issue->village?->ward_no ?? $issue->complaint?->ward_number;
 
         if ($user->isStaff() && !$user->isSystemAdmin()) {
             if ($user->isMunicipalityAdmin()) {
-                abort_unless((string) $issueMuniId === (string) $user->municipality_id, 403, 'Cross-municipality issue modification denied.');
+                if ($issueMuniId !== null) {
+                    abort_unless((string) $issueMuniId === (string) $user->municipality_id, 403, 'Cross-municipality issue modification denied.');
+                }
             } elseif ($user->isWardOfficer()) {
-                abort_unless(
-                    (string) $issueMuniId === (string) $user->municipality_id &&
-                    (string) $issueWardNo === (string) $user->ward_number,
-                    403,
-                    'Cross-ward issue modification denied.'
-                );
+                if ($issueMuniId !== null && $issueWardNo !== null) {
+                    abort_unless(
+                        (string) $issueMuniId === (string) $user->municipality_id &&
+                        (string) $issueWardNo === (string) $user->ward_number,
+                        403,
+                        'Cross-ward issue modification denied.'
+                    );
+                }
             }
         }
 
@@ -162,7 +185,7 @@ class IssueController extends Controller
 
         DB::transaction(function () use ($issue, $validated, $request, $user, $currentStatus, $newStatus, $rejectionReason, $infoNotes, $issueMuniId) {
             $updatePayload = ['status' => $newStatus];
-            if ($newStatus === 'verified') {
+            if (in_array($newStatus, ['verified', 'in_progress', 'resolved'], true) && ($newStatus === 'verified' || !$issue->verified_at)) {
                 $updatePayload['verified_by'] = $user?->id;
                 $updatePayload['verified_at'] = now();
                 $updatePayload['verification_notes'] = $request->input('verification_notes', $validated['comment'] ?? 'Verified on-site by municipal technical staff.');
@@ -171,12 +194,30 @@ class IssueController extends Controller
             }
 
             if (array_key_exists('village_id', $validated)) {
-                $updatePayload['village_id'] = $validated['village_id'] ? (int) $validated['village_id'] : null;
+                $targetVillageId = $validated['village_id'] ? (int) $validated['village_id'] : null;
+                $updatePayload['village_id'] = $targetVillageId;
+                if ($targetVillageId) {
+                    $targetVillage = \App\Models\Village::find($targetVillageId);
+                    if ($targetVillage) {
+                        $updatePayload['municipality_id'] = $targetVillage->municipality_id;
+                        $updatePayload['ward_no'] = $targetVillage->ward_no;
+                    }
+                }
             }
+            if (empty($issue->municipality_id) && !isset($updatePayload['municipality_id']) && $user?->municipality_id) {
+                $updatePayload['municipality_id'] = $user->municipality_id;
+            }
+
             $issue->update($updatePayload);
 
             if (array_key_exists('village_id', $validated) && $issue->complaint) {
                 $issue->complaint->village_id = $updatePayload['village_id'];
+                if (isset($updatePayload['municipality_id'])) {
+                    $issue->complaint->municipality_id = $updatePayload['municipality_id'];
+                }
+                if (isset($updatePayload['ward_no'])) {
+                    $issue->complaint->ward_number = $updatePayload['ward_no'];
+                }
                 $issue->complaint->save();
             }
 

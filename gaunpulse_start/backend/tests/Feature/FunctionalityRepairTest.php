@@ -54,11 +54,18 @@ class FunctionalityRepairTest extends TestCase
         $issueId = $createResponse->json('data.id') ?? $createResponse->json('id');
         $this->assertNotNull($issueId);
 
-        // Update status
-        $updateResponse = $this->patchJson("/api/issues/{$issueId}/status", [
-            'status' => 'verified',
-            'comment' => 'Verified on site by ward engineer.',
-        ]);
+        // Update status as municipal staff
+        $staff = \App\Models\User::firstOrCreate(
+            ['email' => 'staff_repair@gaunpulse.test'],
+            ['name' => 'Municipal Repair Staff', 'role' => 'system_admin', 'password' => \Illuminate\Support\Facades\Hash::make('Secret123!')]
+        );
+        $token = $staff->createToken('repair-token')->plainTextToken;
+
+        $updateResponse = $this->withHeader('Authorization', "Bearer {$token}")
+            ->patchJson("/api/issues/{$issueId}/status", [
+                'status' => 'verified',
+                'comment' => 'Verified on site by ward engineer.',
+            ]);
 
         $updateResponse->assertStatus(200);
         $this->assertDatabaseHas('issues', [

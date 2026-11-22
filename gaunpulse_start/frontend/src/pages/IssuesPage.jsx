@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   AlertTriangle,
@@ -73,6 +73,9 @@ const statusTones = {
   resolved: 'green',
   rejected: 'red',
 };
+
+// Case- and delimiter-insensitive status normalization
+const norm = (s) => (s || '').toLowerCase().replace(/[\s-]+/g, '_');
 
 export default function IssuesPage({ onNavigate }) {
   const { token, user: authUser } = useAuth();
@@ -413,6 +416,23 @@ export default function IssuesPage({ onNavigate }) {
     setIsAuditTrailOpen(true);
   };
 
+  // Derive municipality / ward cross-jurisdiction restriction for modal issue
+  const isCrossMunicipality = useMemo(() => {
+    if (!selectedIssue || !authUser) return false;
+    if (['system_admin', 'admin'].includes(authUser.role)) return false;
+    const issueMuni = selectedIssue.municipality_id || selectedIssue.village?.municipality_id;
+    if (authUser.role === 'municipality_admin') {
+      return Boolean(issueMuni && String(issueMuni) !== String(authUser.municipality_id));
+    }
+    if (authUser.role === 'ward_officer') {
+      const issueWard = selectedIssue.ward_no || selectedIssue.village?.ward_no;
+      const muniMismatch = Boolean(issueMuni && String(issueMuni) !== String(authUser.municipality_id));
+      const wardMismatch = Boolean(issueWard && String(issueWard) !== String(authUser.ward_number));
+      return muniMismatch || wardMismatch;
+    }
+    return false;
+  }, [selectedIssue, authUser]);
+
   // Village Assignment Handler: links village WITHOUT modifying report status
   const handleSaveVillageLink = async () => {
     if (!selectedIssue) return;
@@ -420,16 +440,22 @@ export default function IssuesPage({ onNavigate }) {
     setVillageSaveMessage(null);
     setActionError(null);
 
+    const authToken = token || localStorage.getItem('gaunpulse_auth_token');
+    if (!authToken) {
+      setActionError('Authentication session not found. Please log in with official municipal staff credentials.');
+      setIsSavingVillage(false);
+      return;
+    }
+
     const targetVillageId = linkVillageId ? Number(linkVillageId) : null;
     const villageName = targetVillageId
       ? (villages.find((v) => Number(v.id) === targetVillageId)?.name || 'Selected Village')
       : 'Unregistered Settlement';
 
-    const authToken = token || localStorage.getItem('gaunpulse_auth_token');
     const headers = {
       'Content-Type': 'application/json',
       Accept: 'application/json',
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      Authorization: `Bearer ${authToken}`,
     };
 
     const payload = {
@@ -447,7 +473,13 @@ export default function IssuesPage({ onNavigate }) {
         body: JSON.stringify(payload),
       });
 
-      const updated = await res.json();
+      let updated = {};
+      try {
+        updated = await res.json();
+      } catch {
+        updated = {};
+      }
+
       if (!res.ok) {
         throw new Error(updated.message || 'Failed to update village linkage.');
       }
@@ -471,6 +503,22 @@ export default function IssuesPage({ onNavigate }) {
     setActionError(null);
     setActionSuccess(null);
     setVillageSaveMessage(null);
+
+    const authToken = token || localStorage.getItem('gaunpulse_auth_token');
+    if (!authToken) {
+      setActionError('Authentication required: Please sign in with an official municipal staff account to review reports.');
+      return;
+    }
+
+    if (authUser && authUser.role === 'citizen') {
+      setActionError('Citizen accounts are not authorized to perform municipal administrative actions.');
+      return;
+    }
+
+    if (isCrossMunicipality) {
+      setActionError('Permission denied: You cannot modify complaints outside your assigned municipality or ward.');
+      return;
+    }
 
     // 1. Eligibility validation for Verification
     if (targetStatus === 'verified') {
@@ -517,10 +565,16 @@ export default function IssuesPage({ onNavigate }) {
     setActionSuccess(null);
 
     const authToken = token || localStorage.getItem('gaunpulse_auth_token');
+    if (!authToken) {
+      setActionError('Authentication session not found. Please log in with municipal staff credentials.');
+      setIsActionLoading(false);
+      return;
+    }
+
     const headers = {
       'Content-Type': 'application/json',
       Accept: 'application/json',
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      Authorization: `Bearer ${authToken}`,
     };
 
     const notesTrimmed = actionNotes.trim();
@@ -541,9 +595,24 @@ export default function IssuesPage({ onNavigate }) {
         body: JSON.stringify(payload),
       });
 
-      const updated = await res.json();
+      let updated = {};
+      try {
+        updated = await res.json();
+      } catch {
+        updated = {};
+      }
+
       if (!res.ok) {
-        throw new Error(updated.message || 'Failed to update report status.');
+        if (res.status === 401) {
+          throw new Error('Your session has expired. Please sign in again.');
+        } else if (res.status === 403) {
+          throw new Error(updated.message || 'Permission denied: Official municipal staff credentials are required.');
+        } else if (res.status === 422) {
+          const detail = updated.message || (updated.errors ? Object.values(updated.errors).flat().join(' ') : 'Invalid review input.');
+          throw new Error(detail);
+        } else {
+          throw new Error(updated.message || `Server returned error (${res.status}). Please try again.`);
+        }
       }
 
       const updatedData = updated.data || updated;
@@ -579,9 +648,6 @@ export default function IssuesPage({ onNavigate }) {
         return `Report status updated to ${status.replace(/_/g, ' ')}.`;
     }
   };
-
-  // Filter issues with case and format normalization
-  const norm = (s) => (s || '').toLowerCase().replace(/[\s-]+/g, '_');
 
   const getSeverityTone = (sev) => severityTones[(sev || '').toLowerCase()] || severityTones[sev] || 'default';
   const getStatusTone = (st) => statusTones[(st || '').toLowerCase().replace(/[\s-]+/g, '_')] || statusTones[st] || 'default';
@@ -865,11 +931,7 @@ export default function IssuesPage({ onNavigate }) {
                         style={{ padding: '4px 10px', fontSize: '11px' }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          setSelectedIssue(item);
-                          setNewStatus(item.status);
-                          setStatusComment('');
-                          setStatusMessage(null);
-                          setLinkVillageId(item.village_id ? String(item.village_id) : '');
+                          handleOpenIssueModal(item);
                         }}
                       >
                         {['pending_verification', 'submitted'].includes(norm(item.status)) ? (
@@ -1462,6 +1524,36 @@ export default function IssuesPage({ onNavigate }) {
                   )}
                 </div>
 
+                {/* Jurisdiction / Authentication status banner */}
+                {!token && !localStorage.getItem('gaunpulse_auth_token') && (
+                  <div style={{ padding: '8px 12px', background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '6px', fontSize: '12px', color: '#92400E', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    <span>Sign in with municipal staff credentials to verify, request information, or reject reports.</span>
+                    <button
+                      type="button"
+                      className="button button--secondary"
+                      style={{ padding: '3px 8px', fontSize: '11px', whiteSpace: 'nowrap' }}
+                      onClick={() => {
+                        const publicBase = import.meta.env.VITE_PUBLIC_URL || 'http://localhost:5173';
+                        window.location.href = `${publicBase}/login`;
+                      }}
+                    >
+                      Sign In
+                    </button>
+                  </div>
+                )}
+
+                {authUser && authUser.role === 'citizen' && (
+                  <div style={{ padding: '8px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '6px', fontSize: '12px', color: '#991B1B', marginBottom: '12px' }}>
+                    Citizen accounts cannot perform municipal verifications. Please sign in with official municipal staff credentials.
+                  </div>
+                )}
+
+                {isCrossMunicipality && (
+                  <div style={{ padding: '8px 12px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '6px', fontSize: '12px', color: '#475569', marginBottom: '12px' }}>
+                    This complaint is outside your assigned municipal jurisdiction. Modification is restricted to local staff or System Administrators.
+                  </div>
+                )}
+
                 {/* Actions: If Report is Unverified/Pending */}
                 {['submitted', 'pending_verification', 'under_review', 'more_information_needed'].includes(norm(selectedIssue.status)) ? (
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -1469,7 +1561,7 @@ export default function IssuesPage({ onNavigate }) {
                       type="button"
                       className="button button--primary"
                       onClick={() => handleReviewAction('verified')}
-                      disabled={isActionLoading}
+                      disabled={isActionLoading || isCrossMunicipality || (!token && !localStorage.getItem('gaunpulse_auth_token')) || (authUser && authUser.role === 'citizen')}
                       style={{ height: '36px', fontSize: '12px' }}
                     >
                       {isActionLoading ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle2 size={14} />}
@@ -1479,7 +1571,7 @@ export default function IssuesPage({ onNavigate }) {
                       type="button"
                       className="button"
                       onClick={() => handleReviewAction('more_information_needed')}
-                      disabled={isActionLoading}
+                      disabled={isActionLoading || isCrossMunicipality || (!token && !localStorage.getItem('gaunpulse_auth_token')) || (authUser && authUser.role === 'citizen')}
                       style={{ height: '36px', fontSize: '12px', background: '#D97706', color: '#FFFFFF', border: '1px solid #D97706' }}
                     >
                       <HelpCircle size={14} />
@@ -1489,7 +1581,7 @@ export default function IssuesPage({ onNavigate }) {
                       type="button"
                       className="button"
                       onClick={() => handleReviewAction('rejected')}
-                      disabled={isActionLoading}
+                      disabled={isActionLoading || isCrossMunicipality || (!token && !localStorage.getItem('gaunpulse_auth_token')) || (authUser && authUser.role === 'citizen')}
                       style={{ height: '36px', fontSize: '12px', background: '#DC2626', color: '#FFFFFF', border: '1px solid #DC2626' }}
                     >
                       <XCircle size={14} />

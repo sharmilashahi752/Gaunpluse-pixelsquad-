@@ -862,4 +862,137 @@ class CitizenReportingAndVerificationTest extends TestCase
 
         $res->assertStatus(403);
     }
+
+    public function test_municipality_admin_can_verify_and_assign_unregistered_settlement_issue(): void
+    {
+        $admin = User::create([
+            'name' => 'Dailekh Admin',
+            'email' => 'dailekh_verify@gaunpulse.test',
+            'password' => Hash::make('Nepal@1234'),
+            'role' => 'municipality_admin',
+            'municipality_id' => $this->muni1->id,
+        ]);
+        $token = $admin->createToken('admin-verify')->plainTextToken;
+
+        $unassignedIssue = Issue::create([
+            'village_id' => null,
+            'settlement_name' => 'Bhaise Tol',
+            'title' => 'Landslide blocked trail',
+            'description' => 'Trail completely obstructed by loose rock debris',
+            'category' => 'damaged_road',
+            'severity' => 'high',
+            'status' => 'submitted',
+            'latitude' => 28.9,
+            'longitude' => 81.7,
+        ]);
+
+        $res = $this->withHeader('Authorization', "Bearer {$token}")
+            ->patchJson("/api/issues/{$unassignedIssue->id}/status", [
+                'status' => 'verified',
+                'village_id' => $this->village1->id,
+                'verification_notes' => 'Inspected on-site; confirmed rockslide.',
+            ]);
+
+        $res->assertStatus(200);
+        $res->assertJsonPath('data.status', 'verified');
+        $res->assertJsonPath('data.village_id', $this->village1->id);
+        $res->assertJsonPath('data.verifier_name', 'Dailekh Admin');
+
+        $this->assertDatabaseHas('issues', [
+            'id' => $unassignedIssue->id,
+            'status' => 'verified',
+            'village_id' => $this->village1->id,
+            'verified_by' => $admin->id,
+            'verification_notes' => 'Inspected on-site; confirmed rockslide.',
+        ]);
+    }
+
+    public function test_request_more_info_updates_status_and_notifies(): void
+    {
+        $admin = User::create([
+            'name' => 'Dailekh Admin Info',
+            'email' => 'dailekh_info@gaunpulse.test',
+            'password' => Hash::make('Nepal@1234'),
+            'role' => 'municipality_admin',
+            'municipality_id' => $this->muni1->id,
+        ]);
+        $token = $admin->createToken('admin-info')->plainTextToken;
+
+        $issue = Issue::create([
+            'village_id' => $this->village1->id,
+            'title' => 'Water line valve broken',
+            'description' => 'Valve leaking near main tank',
+            'category' => 'water_supply',
+            'severity' => 'medium',
+            'status' => 'submitted',
+            'municipality_id' => $this->muni1->id,
+            'latitude' => 28.9,
+            'longitude' => 81.7,
+        ]);
+
+        $res = $this->withHeader('Authorization', "Bearer {$token}")
+            ->patchJson("/api/issues/{$issue->id}/status", [
+                'status' => 'more_information_needed',
+                'comment' => 'Please provide a photograph of the valve model plate.',
+            ]);
+
+        $res->assertStatus(200);
+        $res->assertJsonPath('data.status', 'more_information_needed');
+
+        $this->assertDatabaseHas('issues', [
+            'id' => $issue->id,
+            'status' => 'more_information_needed',
+        ]);
+
+        $this->assertDatabaseHas('issue_updates', [
+            'issue_id' => $issue->id,
+            'new_status' => 'more_information_needed',
+            'comment' => 'Please provide a photograph of the valve model plate.',
+        ]);
+    }
+
+    public function test_reject_report_with_reason_updates_issue_and_audit(): void
+    {
+        $admin = User::create([
+            'name' => 'Dailekh Admin Reject',
+            'email' => 'dailekh_reject@gaunpulse.test',
+            'password' => Hash::make('Nepal@1234'),
+            'role' => 'municipality_admin',
+            'municipality_id' => $this->muni1->id,
+        ]);
+        $token = $admin->createToken('admin-reject')->plainTextToken;
+
+        $issue = Issue::create([
+            'village_id' => $this->village1->id,
+            'title' => 'Private backyard garden wall damaged',
+            'description' => 'Wall cracked on private residential land',
+            'category' => 'other_infrastructure',
+            'severity' => 'low',
+            'status' => 'submitted',
+            'municipality_id' => $this->muni1->id,
+            'latitude' => 28.9,
+            'longitude' => 81.7,
+        ]);
+
+        $res = $this->withHeader('Authorization', "Bearer {$token}")
+            ->patchJson("/api/issues/{$issue->id}/status", [
+                'status' => 'rejected',
+                'rejection_reason' => 'Private residential property; not public municipal infrastructure.',
+            ]);
+
+        $res->assertStatus(200);
+        $res->assertJsonPath('data.status', 'rejected');
+        $res->assertJsonPath('data.rejection_reason', 'Private residential property; not public municipal infrastructure.');
+
+        $this->assertDatabaseHas('issues', [
+            'id' => $issue->id,
+            'status' => 'rejected',
+            'rejection_reason' => 'Private residential property; not public municipal infrastructure.',
+        ]);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'action_type' => 'issue_rejected',
+            'entity_id' => $issue->id,
+        ]);
+    }
 }

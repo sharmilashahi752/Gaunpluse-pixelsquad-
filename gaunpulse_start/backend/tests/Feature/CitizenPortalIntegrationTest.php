@@ -169,7 +169,7 @@ class CitizenPortalIntegrationTest extends TestCase
             'title' => 'Broken drinking water tap line',
             'category' => 'water_supply',
             'severity' => 'high',
-            'status' => 'pending_verification',
+            'status' => 'verified',
             'description' => 'Pipe broke near main ward junction',
             'latitude' => 28.9242,
             'longitude' => 81.7125,
