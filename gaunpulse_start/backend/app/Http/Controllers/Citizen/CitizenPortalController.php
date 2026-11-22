@@ -185,11 +185,27 @@ class CitizenPortalController extends Controller
             ]);
         }
 
+        // Account Active Check
+        if (isset($user->is_active) && !$user->is_active) {
+            return response()->json([
+                'message' => 'Your citizen account has been deactivated. Please contact the municipality.',
+            ], 403);
+        }
+
+        // Restrict citizen-specific login endpoint strictly to citizen accounts
+        if (!$user->isCitizen()) {
+            return response()->json([
+                'message' => 'This portal login is restricted to citizen accounts. Official staff must sign in via the official login portal.',
+                'role' => $user->role,
+            ], 403);
+        }
+
         $token = $user->createToken('gaunpulse-citizen')->plainTextToken;
 
         return response()->json([
             'token' => $token,
             'user' => $user,
+            'role' => 'citizen',
             'message' => 'Login successful.',
         ]);
     }

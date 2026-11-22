@@ -5,13 +5,15 @@ export default defineConfig({
   cacheDir: '.vite-cache',
   plugins: [react()],
   server: {
+    host: true,
+    port: 5174,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8000',
+        target: process.env.VITE_API_URL || 'http://127.0.0.1:8000',
         changeOrigin: true,
       },
       '/storage': {
-        target: 'http://127.0.0.1:8000',
+        target: process.env.VITE_API_URL || 'http://127.0.0.1:8000',
         changeOrigin: true,
       },
     },

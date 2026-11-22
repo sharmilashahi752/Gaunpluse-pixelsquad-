@@ -15,7 +15,7 @@ import AuditLogsPage from './pages/AuditLogsPage';
 import CitizenPortal from './citizen/CitizenPortal';
 import { navigationItems } from './data/demoData';
 import { VillageSelectionProvider } from './context/VillageSelectionContext';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
 const pages = {
   dashboard: DashboardPage,
@@ -40,8 +40,9 @@ const getPageFromHash = () => {
   return validPages.has(page) ? page : 'dashboard';
 };
 
-export default function App() {
+function AppContent() {
   const [activePage, setActivePage] = useState(getPageFromHash);
+  const { user, isCitizen, isAdmin, loading } = useAuth();
 
   useEffect(() => {
     const handleHashChange = () => setActivePage(getPageFromHash());
@@ -58,19 +59,51 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Route Guard: enforce role-based access restrictions on route changes
+  useEffect(() => {
+    if (loading) return;
+
+    // 1. Citizen accounts MUST stay in Citizen Portal; prevent URL manipulation to official pages
+    if (user && isCitizen && activePage !== 'citizen') {
+      console.warn(`[RouteGuard] Citizen accounts cannot access official workspace: ${activePage}. Redirecting to citizen portal.`);
+      navigate('citizen');
+      return;
+    }
+
+    // 2. Ward officers and unauthenticated visitors cannot access admin-only pages
+    if (!isAdmin && (activePage === 'user-management' || activePage === 'audit-logs')) {
+      console.warn(`[RouteGuard] Access to ${activePage} restricted to system/municipality administrators. Redirecting.`);
+      navigate('dashboard');
+    }
+  }, [activePage, user, isCitizen, isAdmin, loading]);
+
+  const handleSwitchToAdmin = () => {
+    if (user && isCitizen) {
+      alert('Your current account is a Citizen account. Official municipal administration workspaces require municipal official credentials.');
+      return;
+    }
+    navigate('dashboard');
+  };
+
   if (activePage === 'citizen') {
-    return <CitizenPortal onSwitchToAdmin={() => navigate('dashboard')} />;
+    return <CitizenPortal onSwitchToAdmin={handleSwitchToAdmin} />;
   }
 
   const ActivePage = pages[activePage] || DashboardPage;
 
   return (
+    <VillageSelectionProvider>
+      <AppLayout activePage={activePage} onNavigate={navigate}>
+        <ActivePage onNavigate={navigate} />
+      </AppLayout>
+    </VillageSelectionProvider>
+  );
+}
+
+export default function App() {
+  return (
     <AuthProvider>
-      <VillageSelectionProvider>
-        <AppLayout activePage={activePage} onNavigate={navigate}>
-          <ActivePage onNavigate={navigate} />
-        </AppLayout>
-      </VillageSelectionProvider>
+      <AppContent />
     </AuthProvider>
   );
 }

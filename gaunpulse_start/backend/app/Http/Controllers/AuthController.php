@@ -57,6 +57,15 @@ class AuthController extends Controller
         return response()->json([
             'token' => $token,
             'user' => $user->load('municipality'),
+            'role' => $user->role,
+            'redirect_route' => match ($user->role) {
+                User::ROLE_CITIZEN => 'citizen',
+                User::ROLE_WARD_OFFICER => 'dashboard',
+                User::ROLE_MUNICIPALITY_ADMIN => 'dashboard',
+                User::ROLE_SYSTEM_ADMIN => 'dashboard',
+                'admin' => 'dashboard',
+                default => $user->isStaff() ? 'dashboard' : 'citizen',
+            },
             'message' => 'Logged in successfully.',
         ]);
     }

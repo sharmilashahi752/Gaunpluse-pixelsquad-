@@ -11,7 +11,7 @@ export const citizenClient = axios.create({
 });
 
 citizenClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem(TOKEN_KEY);
+  const token = localStorage.getItem(TOKEN_KEY) || localStorage.getItem('gaunpulse_auth_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -24,28 +24,38 @@ citizenClient.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
+      localStorage.removeItem('gaunpulse_auth_token');
+      localStorage.removeItem('gaunpulse_auth_user');
     }
     return Promise.reject(error);
   }
 );
 
 export const citizenAuth = {
-  getToken: () => localStorage.getItem(TOKEN_KEY),
+  getToken: () => localStorage.getItem(TOKEN_KEY) || localStorage.getItem('gaunpulse_auth_token'),
   getUser: () => {
     try {
-      const data = localStorage.getItem(USER_KEY);
+      const data = localStorage.getItem(USER_KEY) || localStorage.getItem('gaunpulse_auth_user');
       return data ? JSON.parse(data) : null;
     } catch {
       return null;
     }
   },
   saveSession: (token, user) => {
-    if (token) localStorage.setItem(TOKEN_KEY, token);
-    if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+    if (token) {
+      localStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem('gaunpulse_auth_token', token);
+    }
+    if (user) {
+      localStorage.setItem(USER_KEY, JSON.stringify(user));
+      localStorage.setItem('gaunpulse_auth_user', JSON.stringify(user));
+    }
   },
   clearSession: () => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    localStorage.removeItem('gaunpulse_auth_token');
+    localStorage.removeItem('gaunpulse_auth_user');
   },
 };
 

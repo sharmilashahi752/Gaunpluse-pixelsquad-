@@ -1,0 +1,247 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+@theme {
+  --color-forest: #173D32;
+  --color-forest-secondary: #42866A;
+  --color-warm-bg: #FFFFFF;
+  --color-surface-green: #DDEBE2;
+  --color-accent-amber: #E3AD58;
+  --color-alert-red: #D45F53;
+  --color-dark-text: #1B2923;
+
+  --color-primary-forest: #173D32;
+  --color-secondary-green: #42866A;
+  --color-surface-cream: #FFFFFF;
+  --color-surface-light: #DDEBE2;
+
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+:root {
+  --primary-forest: #173D32;
+  --secondary-green: #42866A;
+  --warm-bg: #FFFFFF;
+  --surface-green: #DDEBE2;
+  --accent-amber: #E3AD58;
+  --alert-red: #D45F53;
+  --dark-text: #1B2923;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #FFFFFF;
+  color: #1B2923;
+  min-height: 100vh;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom Leaflet Map Container Tweaks */
+.leaflet-container {
+  font-family: var(--font-sans) !important;
+  background-color: #ECE7DD !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  z-index: 0 !important;
+}
+
+/* Hide scrollbar utility while preserving scrolling */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Ensure Leaflet controls match GaunPulse clean UI */
+.leaflet-bar a {
+  background-color: #ffffff !important;
+  color: #173D32 !important;
+  border-bottom: 1px solid rgba(66, 134, 106, 0.2) !important;
+  transition: all 0.15s ease-in-out;
+}
+
+.leaflet-bar a:hover {
+  background-color: #DDEBE2 !important;
+  color: #173D32 !important;
+}
+
+/* Leaflet Popup Styling */
+.leaflet-popup-content-wrapper {
+  background: #ffffff !important;
+  border: 1px solid rgba(66, 134, 106, 0.25) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 16px -2px rgba(23, 61, 50, 0.15) !important;
+  padding: 0 !important;
+}
+
+.leaflet-popup-content {
+  margin: 12px !important;
+  line-height: 1.4 !important;
+}
+
+.leaflet-popup-tip {
+  background: #ffffff !important;
+  border: 1px solid rgba(66, 134, 106, 0.25) !important;
+}
+
+/* 3D Flip Card Utilities */
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.transform-style-3d {
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.rotate-y-180 {
+  transform: rotateY(180deg);
+  -webkit-transform: rotateY(180deg);
+}
+
+/* =========================================================================
+   How It Works 5-Step Editorial Flow
+   ========================================================================= */
+.how-it-works-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.how-it-works-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  border-color: rgba(231, 229, 228, 0.85); /* border-stone-200/85 */
+}
+
+/* Mobile (< 768px): Single-column vertical list with subtle horizontal separators */
+@media (max-width: 767px) {
+  .how-it-works-step {
+    padding: 1.25rem 0.5rem;
+    border-bottom-width: 1px;
+    border-bottom-style: solid;
+  }
+  .how-it-works-step:last-child {
+    border-bottom-width: 0;
+  }
+}
+
+/* Tablet (768px - 1199px): 3 columns on row 1, 2 centered columns on row 2 */
+@media (min-width: 768px) and (max-width: 1199px) {
+  .how-it-works-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    row-gap: 2rem;
+  }
+  .how-it-works-step {
+    padding: 0.75rem 1.25rem; /* px-5 py-3 */
+    grid-column: span 2 / span 2;
+  }
+  /* Row 1: Steps 1 & 2 have right divider, Step 3 has none */
+  .how-it-works-step:nth-child(1),
+  .how-it-works-step:nth-child(2) {
+    border-right-width: 1px;
+    border-right-style: solid;
+  }
+  /* Row 2: Step 4 starts at col 2 (centered), has right divider */
+  .how-it-works-step:nth-child(4) {
+    grid-column-start: 2;
+    border-right-width: 1px;
+    border-right-style: solid;
+  }
+}
+
+/* Desktop (>= 1200px): 5 equal columns in 1 single row, 4 subtle vertical dividers */
+@media (min-width: 1200px) {
+  .how-it-works-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    row-gap: 0;
+  }
+  .how-it-works-step {
+    padding: 0.75rem 1.25rem; /* px-5 py-3 */
+    grid-column: auto / span 1;
+    grid-column-start: auto;
+    border-right-width: 1px;
+    border-right-style: solid;
+    border-bottom-width: 0;
+  }
+  .how-it-works-step:last-child {
+    border-right-width: 0;
+  }
+}
+
+/* =========================================================================
+   Core Principles 5-Card Layout (Key Strengths Reference)
+   ========================================================================= */
+.core-principles-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: start;
+  gap: 1.25rem;
+}
+
+@media (min-width: 640px) {
+  .core-principles-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  .core-principles-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.25rem;
+  }
+}
+
+@media (min-width: 1200px) {
+  .core-principles-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 1.375rem;
+  }
+}
+
+/* =========================================================================
+   Global Micro-Interactions & Reduced-Motion Performance System
+   ========================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Subtle interactive button pressed state */
+button:not(:disabled):active,
+a[role="button"]:not([aria-disabled="true"]):active {
+  transform: scale(0.98);
+  transition: transform 0.12s ease-out;
+}
+
+/* Subtle card lift hover interaction */
+.card-hover-lift {
+  transition: transform 0.2s cubic-bezier(0.25, 0.1, 0.25, 1), box-shadow 0.2s cubic-bezier(0.25, 0.1, 0.25, 1), border-color 0.2s ease-out;
+}
+.card-hover-lift:hover {
+  transform: translateY(-3px);
+}
+
+
+

@@ -21,9 +21,9 @@ class EnsureAdmin
         }
 
         abort_unless(
-            $user->isAdmin(),
+            $user->isStaff(),
             403,
-            'Municipal administrator access is required.'
+            'Municipal staff access is required.'
         );
 
         return $next($request);

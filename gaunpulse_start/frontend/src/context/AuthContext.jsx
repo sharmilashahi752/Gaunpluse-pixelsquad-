@@ -4,12 +4,38 @@ const TOKEN_KEY = 'gaunpulse_auth_token';
 const USER_KEY = 'gaunpulse_auth_user';
 const MUNICIPALITY_KEY = 'gaunpulse_active_municipality_id';
 
+const API_BASE = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : 'http://127.0.0.1:8000';
+
+function extractCallbackToken() {
+  if (typeof window === 'undefined') return null;
+  const hash = window.location.hash || '';
+  if (hash.includes('auth-callback') || (hash.includes('token=') && (hash.includes('target=') || hash.includes('auth')))) {
+    try {
+      const queryPart = hash.includes('?') ? hash.split('?')[1] : hash.replace(/^#\/?/, '');
+      const params = new URLSearchParams(queryPart);
+      const incomingToken = params.get('token');
+      const target = params.get('target') || 'dashboard';
+      if (incomingToken) {
+        localStorage.setItem(TOKEN_KEY, incomingToken);
+        localStorage.setItem('gaunpulse_citizen_token', incomingToken);
+        window.history.replaceState(null, '', `#/${target}`);
+        return incomingToken;
+      }
+    } catch (err) {
+      console.warn('Error extracting callback token:', err);
+    }
+  }
+  return null;
+}
+
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => {
     try {
-      return localStorage.getItem(TOKEN_KEY) || null;
+      const cbToken = extractCallbackToken();
+      if (cbToken) return cbToken;
+      return localStorage.getItem(TOKEN_KEY) || localStorage.getItem('gaunpulse_citizen_token') || null;
     } catch {
       return null;
     }
@@ -17,7 +43,7 @@ export function AuthProvider({ children }) {
 
   const [user, setUser] = useState(() => {
     try {
-      const stored = localStorage.getItem(USER_KEY);
+      const stored = localStorage.getItem(USER_KEY) || localStorage.getItem('gaunpulse_citizen_user');
       return stored ? JSON.parse(stored) : null;
     } catch {
       return null;
@@ -38,6 +64,18 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
 
+  // Watch for any hash-based authentication handoff
+  useEffect(() => {
+    const handleHashCheck = () => {
+      const cbToken = extractCallbackToken();
+      if (cbToken && cbToken !== token) {
+        setToken(cbToken);
+      }
+    };
+    window.addEventListener('hashchange', handleHashCheck);
+    return () => window.removeEventListener('hashchange', handleHashCheck);
+  }, [token]);
+
   // Fetch current workspace and municipalities
   const fetchWorkspace = useCallback(async (authToken) => {
     const activeToken = authToken || token;
@@ -47,14 +85,14 @@ export function AuthProvider({ children }) {
     };
 
     try {
-      const muniRes = await fetch('http://127.0.0.1:8000/api/municipalities', { headers });
+      const muniRes = await fetch(`${API_BASE}/api/municipalities`, { headers });
       if (muniRes.ok) {
         const muniData = await muniRes.json();
         setMunicipalities(Array.isArray(muniData) ? muniData : (muniData.data || []));
       }
 
       if (activeToken) {
-        const wsRes = await fetch('http://127.0.0.1:8000/api/workspace/current', { headers });
+        const wsRes = await fetch(`${API_BASE}/api/workspace/current`, { headers });
         if (wsRes.ok) {
           const wsData = await wsRes.json();
           setCurrentWorkspace(wsData);
@@ -73,10 +111,10 @@ export function AuthProvider({ children }) {
     let isMounted = true;
 
     async function initAuth() {
-      const storedToken = localStorage.getItem(TOKEN_KEY);
+      const storedToken = token || localStorage.getItem(TOKEN_KEY) || localStorage.getItem('gaunpulse_citizen_token');
       if (storedToken) {
         try {
-          const res = await fetch('http://127.0.0.1:8000/api/user', {
+          const res = await fetch(`${API_BASE}/api/user`, {
             headers: {
               Accept: 'application/json',
               Authorization: `Bearer ${storedToken}`,
@@ -89,6 +127,7 @@ export function AuthProvider({ children }) {
               const freshUser = data.user || data;
               setUser(freshUser);
               localStorage.setItem(USER_KEY, JSON.stringify(freshUser));
+              localStorage.setItem('gaunpulse_citizen_user', JSON.stringify(freshUser));
               await fetchWorkspace(storedToken);
             }
           } else {
@@ -98,6 +137,8 @@ export function AuthProvider({ children }) {
               setUser(null);
               localStorage.removeItem(TOKEN_KEY);
               localStorage.removeItem(USER_KEY);
+              localStorage.removeItem('gaunpulse_citizen_token');
+              localStorage.removeItem('gaunpulse_citizen_user');
             }
           }
         } catch (err) {
@@ -116,13 +157,13 @@ export function AuthProvider({ children }) {
     return () => {
       isMounted = false;
     };
-  }, [fetchWorkspace]);
+  }, [token, fetchWorkspace]);
 
   // Login handler
   const login = useCallback(async (email, password) => {
     setAuthError(null);
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/login', {
+      const res = await fetch(`${API_BASE}/api/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -148,6 +189,8 @@ export function AuthProvider({ children }) {
       setUser(receivedUser);
       localStorage.setItem(TOKEN_KEY, receivedToken);
       localStorage.setItem(USER_KEY, JSON.stringify(receivedUser));
+      localStorage.setItem('gaunpulse_citizen_token', receivedToken);
+      localStorage.setItem('gaunpulse_citizen_user', JSON.stringify(receivedUser));
 
       if (receivedUser?.municipality_id) {
         setActiveMunicipalityIdState(receivedUser.municipality_id);
@@ -156,7 +199,7 @@ export function AuthProvider({ children }) {
 
       await fetchWorkspace(receivedToken);
 
-      return { success: true, user: receivedUser };
+      return { success: true, user: receivedUser, role: data.role, redirect_route: data.redirect_route };
     } catch (err) {
       const msg = err.message || 'Network error while connecting to authentication server.';
       setAuthError(msg);
@@ -168,7 +211,7 @@ export function AuthProvider({ children }) {
   const logout = useCallback(async () => {
     try {
       if (token) {
-        await fetch('http://127.0.0.1:8000/api/logout', {
+        await fetch(`${API_BASE}/api/logout`, {
           method: 'POST',
           headers: {
             Accept: 'application/json',
@@ -184,6 +227,12 @@ export function AuthProvider({ children }) {
       setCurrentWorkspace(null);
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
+      localStorage.removeItem('gaunpulse_citizen_token');
+      localStorage.removeItem('gaunpulse_citizen_user');
+      localStorage.removeItem(MUNICIPALITY_KEY);
+
+      const publicBase = import.meta.env.VITE_PUBLIC_URL || 'http://localhost:5173';
+      window.location.href = `${publicBase}/login`;
     }
   }, [token]);
 
@@ -192,7 +241,7 @@ export function AuthProvider({ children }) {
     if (!token) return { success: false, message: 'Not authenticated' };
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/user/profile', {
+      const res = await fetch(`${API_BASE}/api/user/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -212,6 +261,7 @@ export function AuthProvider({ children }) {
       const updated = data.user;
       setUser(updated);
       localStorage.setItem(USER_KEY, JSON.stringify(updated));
+      localStorage.setItem('gaunpulse_citizen_user', JSON.stringify(updated));
       return { success: true, user: updated, message: data.message };
     } catch (err) {
       return { success: false, message: err.message };
@@ -223,7 +273,7 @@ export function AuthProvider({ children }) {
     if (!token) return { success: false, message: 'Not authenticated' };
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/user/change-password', {
+      const res = await fetch(`${API_BASE}/api/user/change-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

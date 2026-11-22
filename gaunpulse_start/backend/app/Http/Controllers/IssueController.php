@@ -89,6 +89,9 @@ class IssueController extends Controller
     public function updateStatus(Request $request, Issue $issue)
     {
         $user = $request->user('sanctum') ?? $request->user();
+        if ($user && !$user->isStaff()) {
+            abort(403, 'Citizens and unauthorized users cannot modify official municipal issue status.');
+        }
         if ($user && $user->isStaff() && !$user->isSystemAdmin() && $issue->village) {
             if ($user->isMunicipalityAdmin()) {
                 abort_unless((string) $issue->village->municipality_id === (string) $user->municipality_id, 403, 'Cross-municipality issue modification denied.');
