@@ -36,6 +36,8 @@ export function VillageSelectionProvider({ children }) {
       // If system admin explicitly selected a specific municipality workspace, scope query
       if (isSystemAdmin && activeMunicipalityId && activeMunicipalityId !== 'all') {
         url = `${API_BASE}/villages?municipality_id=${activeMunicipalityId}`;
+      } else if (isSystemAdmin && (activeMunicipalityId === 'all' || !activeMunicipalityId)) {
+        url = `${API_BASE}/villages?municipality_id=all`;
       }
 
       const data = await cachedFetchJson(url, {}, {

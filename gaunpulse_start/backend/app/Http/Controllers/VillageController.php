@@ -480,8 +480,24 @@ class VillageController extends Controller
     /**
      * Full infrastructure network graph for simulator, GIS & data manager.
      */
-    public function network(Village $village, SimulationNetworkService $networks)
+    public function network(Request $request, Village $village, SimulationNetworkService $networks)
     {
+        $user = $request->user('sanctum') ?? $request->user();
+        if ($user && $user->isStaff() && !$user->isSystemAdmin()) {
+            if ($user->isMunicipalityAdmin()) {
+                abort_unless((string) $village->municipality_id === (string) $user->municipality_id, 403, 'Cross-municipality access denied.');
+            } elseif ($user->isWardOfficer()) {
+                abort_unless(
+                    (string) $village->municipality_id === (string) $user->municipality_id &&
+                    (string) $village->ward_no === (string) $user->ward_number,
+                    403,
+                    'Cross-ward access denied.'
+                );
+            }
+        } elseif (!$user || !$user->isStaff()) {
+            abort_unless($village->status === 'active', 404, 'Village not found or not active.');
+        }
+
         $village->loadMissing(['nodes', 'edges.source', 'edges.target', 'facilities.node', 'settlements', 'issues']);
 
         return response()->json([
@@ -496,8 +512,24 @@ class VillageController extends Controller
         ]);
     }
 
-    public function networkReadiness(Village $village, SimulationNetworkService $networks)
+    public function networkReadiness(Request $request, Village $village, SimulationNetworkService $networks)
     {
+        $user = $request->user('sanctum') ?? $request->user();
+        if ($user && $user->isStaff() && !$user->isSystemAdmin()) {
+            if ($user->isMunicipalityAdmin()) {
+                abort_unless((string) $village->municipality_id === (string) $user->municipality_id, 403, 'Cross-municipality access denied.');
+            } elseif ($user->isWardOfficer()) {
+                abort_unless(
+                    (string) $village->municipality_id === (string) $user->municipality_id &&
+                    (string) $village->ward_no === (string) $user->ward_number,
+                    403,
+                    'Cross-ward access denied.'
+                );
+            }
+        } elseif (!$user || !$user->isStaff()) {
+            abort_unless($village->status === 'active', 404, 'Village not found or not active.');
+        }
+
         return response()->json($networks->readiness($village));
     }
 

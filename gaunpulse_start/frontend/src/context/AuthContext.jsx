@@ -54,7 +54,7 @@ export function AuthProvider({ children }) {
   const [activeMunicipalityId, setActiveMunicipalityIdState] = useState(() => {
     try {
       const stored = localStorage.getItem(MUNICIPALITY_KEY);
-      return stored ? Number(stored) : null;
+      return stored ? (stored === 'all' ? 'all' : Number(stored)) : null;
     } catch {
       return null;
     }

@@ -9,6 +9,7 @@ import {
   FileClock,
   Footprints,
   GitCompare,
+  Globe,
   HeartPulse,
   History,
   Info,
@@ -26,6 +27,7 @@ import {
 } from 'lucide-react';
 import InteractiveVillageMap from '../components/InteractiveVillageMap';
 import { Card, CardHeader, FeatureNotice, LiveLabel, PageIntro, StatusBadge } from '../components/ui';
+import { useAuth } from '../context/AuthContext';
 import { useVillageSelection } from '../context/VillageSelectionContext';
 import { deduplicateVillages, formatVillageLabel } from '../utils/villageUtils';
 import { cachedFetchJson } from '../utils/apiCache';
@@ -70,7 +72,12 @@ function readinessTone(status) {
 }
 
 export default function SimulationsPage({ onNavigate }) {
-  const { selectedVillageId, setSelectedVillageId, villages: contextVillages } = useVillageSelection();
+  const auth = useAuth();
+  const isSystemAdmin = auth?.isSystemAdmin ?? false;
+  const activeMunicipalityId = auth?.activeMunicipalityId ?? null;
+  const switchMunicipality = auth?.switchMunicipality;
+
+  const { selectedVillageId, setSelectedVillageId, villages: contextVillages, refreshVillages } = useVillageSelection();
   const [villages, setVillages] = useState(contextVillages || []);
   const [villageData, setVillageData] = useState(null);
   const [loadingVillage, setLoadingVillage] = useState(false);
@@ -102,28 +109,19 @@ export default function SimulationsPage({ onNavigate }) {
 
   const isDemoVillage = selectedVillageId === 'demo-sundar-gaun';
 
-  // 1. Fetch Village list (live from backend)
+  // 1. Reactively synchronize villages with VillageSelectionContext
   useEffect(() => {
-    if (contextVillages && contextVillages.length > 0) {
+    if (Array.isArray(contextVillages)) {
       setVillages(contextVillages);
-      return;
     }
-    cachedFetchJson(`${API_BASE}/villages?status=active`, {}, { ttlMs: 120000 })
-      .then((data) => {
-        if (!Array.isArray(data)) return;
-        setVillages(data);
-        if (!selectedVillageId && data.length > 0) {
-          setSelectedVillageId(data[0].id);
-        }
-      })
-      .catch((error) => {
-        console.warn('Could not fetch active villages:', error.message);
-        // If live fetch fails and no selection, fallback smoothly to demo village
-        if (!selectedVillageId) {
-          setSelectedVillageId('demo-sundar-gaun');
-        }
-      });
-  }, [contextVillages, selectedVillageId, setSelectedVillageId]);
+  }, [contextVillages]);
+
+  // Ensure an authorized village is selected when list loads or changes
+  useEffect(() => {
+    if (!selectedVillageId && villages.length > 0) {
+      setSelectedVillageId(villages[0].id);
+    }
+  }, [villages, selectedVillageId, setSelectedVillageId]);
 
   // 2. Load Network Graph when Selected Village Changes
   useEffect(() => {
@@ -563,6 +561,18 @@ export default function SimulationsPage({ onNavigate }) {
           </div>
 
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            {isSystemAdmin && activeMunicipalityId && activeMunicipalityId !== 'all' && (
+              <button
+                type="button"
+                className="button button--secondary"
+                style={{ padding: '7px 11px', fontSize: '11.5px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                onClick={() => switchMunicipality?.('all')}
+                title="View all registered villages across Nepal"
+              >
+                <Globe size={13} /> View All Nepal
+              </button>
+            )}
+
             <select
               id="village-select"
               aria-label="Select village"
@@ -579,18 +589,37 @@ export default function SimulationsPage({ onNavigate }) {
                 cursor: 'pointer',
               }}
             >
-              <optgroup label="Live Municipal Databases">
-                {deduplicateVillages(villages).map((village) => (
-                  <option key={village.id} value={village.id}>
-                    {formatVillageLabel(village)}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="Illustrative Simulation Models">
-                <option value="demo-sundar-gaun">
-                  🌿 Sundar Gaun (Fictional Demonstration Model · Ward 3 & 4)
-                </option>
-              </optgroup>
+              {(() => {
+                const deduped = deduplicateVillages(villages);
+                const liveVillages = deduped.filter((v) => !v.is_demo);
+                const demoVillages = deduped.filter((v) => v.is_demo);
+
+                return (
+                  <>
+                    <optgroup label="Live Municipal Databases">
+                      {liveVillages.length > 0 ? (
+                        liveVillages.map((village) => (
+                          <option key={village.id} value={village.id}>
+                            {formatVillageLabel(village)}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="" disabled>No registered municipal records</option>
+                      )}
+                    </optgroup>
+                    <optgroup label="Illustrative Simulation Models">
+                      <option value="demo-sundar-gaun">
+                        🌿 Sundar Gaun (Fictional Demonstration Model · Ward 3 & 4)
+                      </option>
+                      {demoVillages.map((village) => (
+                        <option key={village.id} value={village.id}>
+                          🧪 {formatVillageLabel(village)}
+                        </option>
+                      ))}
+                    </optgroup>
+                  </>
+                );
+              })()}
             </select>
 
             {readiness && (
@@ -645,25 +674,42 @@ export default function SimulationsPage({ onNavigate }) {
         </Card>
       )}
 
-      {/* Unvalidated Network Notice for Incomplete Live Villages */}
-      {!loadingVillage && readiness && !readiness.can_simulate && !isDemo && (
+      {/* Missing Graph or Unvalidated Network Notice for Incomplete Live Villages */}
+      {!loadingVillage && !isDemo && (!readiness?.can_simulate || edges.length === 0) && (
         <Card>
           <CardHeader
             eyebrow="Network readiness"
-            title={readinessLabel(readiness.status)}
-            description="This village's graph does not yet meet simulation criteria. You can validate the network, add missing infrastructure, or explore the Sundar Gaun demonstration dataset."
+            title={edges.length === 0 ? 'No Mapped Infrastructure Graph' : readinessLabel(readiness?.status)}
+            description={
+              edges.length === 0
+                ? "This village currently does not have any mapped roads, footpaths, or bridges in its infrastructure network. Real-time topological impact simulations require at least one mapped infrastructure asset."
+                : "This village's graph does not yet meet simulation criteria. You can validate the network, add missing infrastructure, or explore the Sundar Gaun demonstration dataset."
+            }
           />
           <div style={{ padding: 16, background: '#fff5f2', border: '1px solid #f0b4a8', borderRadius: 10 }}>
-            {(readiness.errors || []).map((error) => (
-              <p key={error} style={{ margin: '5px 0', color: '#9f2f2f' }}>
+            {edges.length === 0 ? (
+              <p style={{ margin: '5px 0', color: '#9f2f2f' }}>
                 <TriangleAlert size={15} style={{ verticalAlign: 'middle', marginRight: 6 }} />
-                {error}
+                No road or bridge segments recorded. Without physical lifeline edges, disconnection impacts and detours cannot be simulated.
+              </p>
+            ) : (
+              (readiness?.errors || []).map((error) => (
+                <p key={error} style={{ margin: '5px 0', color: '#9f2f2f' }}>
+                  <TriangleAlert size={15} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+                  {error}
+                </p>
+              ))
+            )}
+            {readiness?.warnings && readiness.warnings.map((warning) => (
+              <p key={warning} style={{ margin: '5px 0', color: '#b45309' }}>
+                <Info size={15} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+                {warning}
               </p>
             ))}
           </div>
           <div style={{ display: 'flex', gap: 9, marginTop: 14, flexWrap: 'wrap' }}>
             <button className="button button--primary" type="button" onClick={() => setSelectedVillageId('demo-sundar-gaun')}>
-              <Zap size={15} /> Launch Sundar Gaun Demo
+              <Zap size={15} /> Launch Sundar Gaun Demo Model
             </button>
             <button className="button button--secondary" type="button" onClick={() => onNavigate?.('village-data')}>
               <Wrench size={15} /> Add infrastructure
@@ -676,7 +722,7 @@ export default function SimulationsPage({ onNavigate }) {
       )}
 
       {/* TAB 1: IMPACT SIMULATION */}
-      {!loadingVillage && (readiness?.can_simulate || isDemo) && activeTab === 'simulate' && (
+      {!loadingVillage && (isDemo || (readiness?.can_simulate && edges.length > 0)) && activeTab === 'simulate' && (
         <div className="simulator-grid">
           {/* Left Column: Controls & Result Summary */}
           <div style={{ display: 'grid', gap: 18, alignContent: 'start' }}>
@@ -1057,7 +1103,7 @@ export default function SimulationsPage({ onNavigate }) {
       )}
 
       {/* TAB 2: REPAIR PRIORITIZATION (WHAT IF WE FIX THIS FIRST?) */}
-      {!loadingVillage && activeTab === 'compare' && (
+      {!loadingVillage && (isDemo || (readiness?.can_simulate && edges.length > 0)) && activeTab === 'compare' && (
         <div style={{ display: 'grid', gap: 18 }}>
           <Card>
             <CardHeader

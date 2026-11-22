@@ -31,7 +31,7 @@ class WorkspaceController extends Controller
         if ($user->isSystemAdmin()) {
             $requestedId = $request->input('municipality_id') ?? $request->header('X-Municipality-Id') ?? $user->municipality_id;
 
-            if ($requestedId === 'all') {
+            if (!$requestedId || $requestedId === 'all') {
                 $allVillages = Village::query()->orderBy('name')->get();
                 $allVillageIds = $allVillages->pluck('id')->toArray();
                 $activeIssuesCount = Issue::query()
