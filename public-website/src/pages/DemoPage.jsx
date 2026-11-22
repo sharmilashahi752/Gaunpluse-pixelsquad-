@@ -1,8 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Compass } from 'lucide-react';
 import Container from '../components/ui/Container';
-import Badge from '../components/ui/Badge';
 import SimulationMap from '../components/demo/SimulationMap';
 import SimulationControls from '../components/demo/SimulationControls';
 import ImpactResults from '../components/demo/ImpactResults';
@@ -16,7 +14,7 @@ import { BRIDGES, NETWORK_METADATA } from '../data/demoVillage';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 export function DemoPage() {
-  useDocumentTitle('Infrastructure Impact Simulator');
+  useDocumentTitle('Infrastructure Decision Support — GaunPulse');
 
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -56,6 +54,10 @@ export function DemoPage() {
   const handleSimulate = () => {
     setIsDualClosure(false);
     setIsSimulating(true);
+    const targetBridge = BRIDGES.find((b) => b.id === activeBridgeId);
+    if (targetBridge) {
+      setSearchParams({ edge: targetBridge.id });
+    }
   };
 
   const handleRestore = () => {
@@ -82,96 +84,78 @@ export function DemoPage() {
         setSelectedBridgeId(bridge.id);
         setIsDualClosure(false);
         setIsSimulating(true);
-        window.scrollTo({ top: 300, behavior: 'smooth' });
+        setSearchParams({ edge: bridge.id });
       }
+    } else if (scenarioEdgeIds.length === 2) {
+      setIsDualClosure(true);
+      setIsSimulating(true);
     }
   };
 
   return (
-    <Container className="py-8 sm:py-12">
-      <div className="space-y-8">
-        {/* 1. Page Header & Public Civic Education Introduction */}
-        <div className="bg-white/90 border border-[#42866A]/20 rounded-2xl p-6 sm:p-8 shadow-xs">
-          <div className="flex flex-wrap items-center gap-2 mb-3">
-            <Badge variant="amber">
-              Interactive Simulation — Fictional Village Data
-            </Badge>
-            <Badge variant="neutral">
-              Graph Topology: {NETWORK_METADATA.villageName} ({NETWORK_METADATA.version})
-            </Badge>
-          </div>
-
-          <div className="max-w-3xl">
+    <div className="bg-white text-[#1B2923]">
+      <Container className="py-8 sm:py-12 max-w-6xl">
+        <div className="space-y-8">
+          {/* 1. Compact Page Heading */}
+          <div className="text-left border-b border-[#E5E7EB] pb-6">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[#42866A]">
+                Infrastructure Decision Support
+              </span>
+              <span className="text-gray-300">•</span>
+              <span className="text-[11px] font-medium text-[#64748B]">
+                {NETWORK_METADATA.villageName} Topology (Simulated)
+              </span>
+            </div>
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#173D32] tracking-tight">
-              What Happens When a Bridge Breaks?
+              See How Infrastructure Failures Affect Communities
             </h1>
-            <p className="mt-2.5 text-sm sm:text-base text-[#1B2923]/80 leading-relaxed font-normal">
-              Explore how damaged infrastructure can change access to schools, healthcare, and essential
-              village connections. This simulation executes live Dijkstra graph calculations to compute
-              topological delays, alternative detour routes, and isolated settlements.
+            <p className="mt-2 text-sm sm:text-base text-[#1B2923]/70 max-w-3xl leading-relaxed">
+              Simulate structural failures on rural bridges to evaluate real-time changes to school and healthcare accessibility.
+              GaunPulse executes Dijkstra shortest-path calculations to determine travel delays, route detours, and isolated settlements.
             </p>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-[#42866A]/15 flex flex-wrap items-center justify-between gap-3 text-xs text-[#42866A]">
-            <div className="flex items-center gap-2">
-              <Compass className="w-4 h-4 text-[#173D32]" />
-              <span>
-                Real-time shortest-path network calculations • Select bridge scenario below to run model
+          {/* 2. Simple Simulation Controller */}
+          <SimulationControls
+            selectedBridgeId={activeBridgeId}
+            onSelectBridge={handleSelectBridge}
+            isSimulating={isSimulating}
+            onSimulate={handleSimulate}
+            onRestore={handleRestore}
+            isDualClosure={isDualClosure}
+            onToggleDualClosure={() => setIsDualClosure(!isDualClosure)}
+          />
+
+          {/* 3. Large Interactive Leaflet Map */}
+          <div className="space-y-2 text-left">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base sm:text-lg font-bold text-[#173D32]">
+                Infrastructure Network & Computed Detour Routes
+              </h2>
+              <span className="text-xs text-[#64748B] hidden sm:inline">
+                {isSimulating ? 'Detour routing actively illuminated' : 'Baseline network state'}
               </span>
             </div>
-            <span className="font-semibold text-[#173D32]">
-              Status: {isSimulating ? 'Active Disruption Mode' : 'Baseline Normal'}
-            </span>
-          </div>
-        </div>
 
-        {/* 2. Simulation Controls Toolbar */}
-        <SimulationControls
-          selectedBridgeId={activeBridgeId}
-          onSelectBridge={handleSelectBridge}
-          isSimulating={isSimulating}
-          onSimulate={handleSimulate}
-          onRestore={handleRestore}
-          isDualClosure={isDualClosure}
-          onToggleDualClosure={() => setIsDualClosure(!isDualClosure)}
-        />
-
-        {/* 3. Live Topological Simulation Map */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm sm:text-base font-bold text-[#173D32]">
-              Topological Network Simulation Canvas
-            </h2>
-            <span className="text-xs text-[#42866A] font-medium hidden sm:inline">
-              Alternative detour paths automatically computed and illuminated
-            </span>
+            <SimulationMap
+              disabledEdgeIds={activeDisabledEdgeIds}
+              activeAlternativeEdgeIds={simulationResult.activeAlternativeEdgeIds}
+              simulationResult={simulationResult}
+            />
           </div>
 
-          <SimulationMap
-            disabledEdgeIds={activeDisabledEdgeIds}
-            activeAlternativeEdgeIds={simulationResult.activeAlternativeEdgeIds}
-            simulationResult={simulationResult}
-          />
+          {/* 4 & 5. Concise Results & Travel Impact Table */}
+          <ImpactResults simulationResult={simulationResult} />
+
+          {/* 6. Short Decision-Support Summary */}
+          <SimulationExplanation simulationResult={simulationResult} />
+
+          {/* 7. Simplified BR-01 vs BR-02 Repair-Priority Comparison */}
+          <RepairComparison onApplyScenario={handleApplyComparisonScenario} />
         </div>
-
-        {/* 4. Quantitative Before-and-After Impact Results */}
-        <div className="space-y-3">
-          <h2 className="text-sm sm:text-base font-bold text-[#173D32]">
-            Calculated Accessibility Impact Analysis
-          </h2>
-          <ImpactResults
-            simulationResult={simulationResult}
-            selectedBridgeId={activeBridgeId}
-          />
-        </div>
-
-        {/* 5. Deterministic AI Insight Executive Synthesis */}
-        <SimulationExplanation simulationResult={simulationResult} />
-
-        {/* 6. Multi-Hazard Repair Prioritization Analysis */}
-        <RepairComparison onApplyScenario={handleApplyComparisonScenario} />
-      </div>
-    </Container>
+      </Container>
+    </div>
   );
 }
 

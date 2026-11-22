@@ -1,11 +1,11 @@
 import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Activity,
   HeartPulse,
   GraduationCap,
   Users,
   Info,
+  Compass,
 } from 'lucide-react';
 import Card from '../ui/Card';
 import Badge from '../ui/Badge';
@@ -77,11 +77,11 @@ export function AccessibilityInsights() {
         </div>
 
         <Link
-          to="/demo?edge=edge-bridge-b"
+          to="/map?asset=edge-bridge-b"
           className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#173D32] hover:bg-[#122F26] text-white text-xs font-semibold shadow-xs transition-colors self-start sm:self-center"
         >
-          <Activity className="w-3.5 h-3.5 text-[#E3AD58]" />
-          <span>Launch Live Simulator</span>
+          <Compass className="w-3.5 h-3.5 text-[#E3AD58]" />
+          <span>View on Explore Map</span>
         </Link>
       </div>
 

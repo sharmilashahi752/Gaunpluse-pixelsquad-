@@ -12,7 +12,7 @@ import { Link } from 'react-router-dom';
  * - Small centered supporting paragraph (~16-17px desktop, 14-16px mobile, max-width ~650px)
  * - Two compact rectangular buttons matching Frame Studio's refined aesthetic:
  *     1. EXPLORE GAUNPULSE (black background, white text, scrolls to #how-it-works)
- *     2. TRY THE LIVE DEMO (white background, black text, links to /demo)
+ *     2. EXPLORE VILLAGE MAP (white background, black text, links to /map)
  * - Removed all eyebrow badges, sparkles, decorative dots, chevrons, and glassmorphic styling
  */
 export function HeroSection() {
@@ -121,12 +121,12 @@ export function HeroSection() {
             EXPLORE GAUNPULSE
           </a>
 
-          {/* Button 2: TRY THE LIVE DEMO */}
+          {/* Button 2: EXPLORE VILLAGE MAP */}
           <Link
-            to="/demo"
+            to="/map"
             className="w-full sm:w-auto inline-flex items-center justify-center px-[24px] py-[13px] rounded-[6px] text-[12px] sm:text-[13px] font-semibold uppercase tracking-[0.06em] bg-white hover:bg-stone-100 text-[#111111] transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-2"
           >
-            TRY THE LIVE DEMO
+            EXPLORE VILLAGE MAP
           </Link>
         </div>
       </div>

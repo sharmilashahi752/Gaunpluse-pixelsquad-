@@ -235,16 +235,6 @@ export function IssueDetails({ issue, onClose }) {
               <Compass className="w-3.5 h-3.5" />
               <span>Inspect on Map</span>
             </Link>
-
-            {issue.canSimulate && (
-              <Link
-                to={`/demo?edge=${issue.edgeId || issue.targetId}`}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#E3AD58] hover:bg-[#D19942] text-[#173D32] text-xs font-bold transition-colors shadow-xs"
-              >
-                <Activity className="w-3.5 h-3.5" />
-                <span>Simulate Impact</span>
-              </Link>
-            )}
           </div>
         </div>
       </div>

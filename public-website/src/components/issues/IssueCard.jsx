@@ -4,7 +4,6 @@ import {
   MapPin,
   Calendar,
   Layers,
-  Activity,
   Compass,
   Eye,
 } from 'lucide-react';
@@ -123,17 +122,6 @@ export function IssueCard({ issue, onSelect }) {
             <Compass className="w-3.5 h-3.5 text-[#42866A]" />
             <span>Map</span>
           </Link>
-
-          {issue.canSimulate && (
-            <Link
-              to={`/demo?edge=${issue.edgeId || issue.targetId}`}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#E3AD58]/20 hover:bg-[#E3AD58]/30 border border-[#E3AD58]/40 text-[#8F5E16] text-xs font-semibold transition-colors"
-              title="Run Graph Simulation Demo"
-            >
-              <Activity className="w-3.5 h-3.5 text-[#8F5E16]" />
-              <span>Simulate</span>
-            </Link>
-          )}
         </div>
       </div>
     </Card>

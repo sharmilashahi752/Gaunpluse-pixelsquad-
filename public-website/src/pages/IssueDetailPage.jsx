@@ -5,7 +5,6 @@ import {
   Share2,
   Check,
   Compass,
-  Activity,
 } from 'lucide-react';
 import CommunityFeedback from '../components/issues/CommunityFeedback';
 import { ISSUES } from '../data/demoVillage';
@@ -315,16 +314,6 @@ export function IssueDetailPage() {
               <Compass className="w-3.5 h-3.5" />
               <span>View on Map</span>
             </Link>
-
-            {issue.canSimulate && (
-              <Link
-                to={`/demo?edge=${issue.edgeId || issue.targetId}`}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] bg-white border border-[#E5E7EB] hover:bg-stone-50 text-[#173D32] text-xs font-medium transition-colors"
-              >
-                <Activity className="w-3.5 h-3.5 text-[#173D32]" />
-                <span>Simulate Delay</span>
-              </Link>
-            )}
           </div>
         </section>
 

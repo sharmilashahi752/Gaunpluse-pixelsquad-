@@ -2,7 +2,6 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
-  ArrowRight,
   MapPin,
   X,
   HeartPulse,
@@ -176,12 +175,6 @@ export function InfrastructureDetails({
     selectedFeature.status === 'critical' ||
     selectedFeature.severity === 'critical';
 
-  const simulationTarget =
-    selectedFeature.edgeId ||
-    selectedFeature.bridgeId ||
-    selectedFeature.targetId ||
-    (selectedFeature.type === 'bridge' ? selectedFeature.id : null);
-
   return (
     <div className="bg-white/95 backdrop-blur-md border border-[#E5E7EB] rounded-2xl p-4 sm:p-5 shadow-xl text-left animate-in fade-in duration-150">
       {/* 1. Header: Icon, Category Badge, ID & Dismiss */}
@@ -319,26 +312,16 @@ export function InfrastructureDetails({
         {relatedIssue ? (
           <Link
             to={`/issues/${relatedIssue.id}`}
-            className="flex-1 py-2 px-3 rounded-[6px] bg-[#173D32] hover:bg-[#122F26] text-white text-xs font-semibold text-center transition-colors shadow-2xs"
+            className="w-full py-2 px-3 rounded-[6px] bg-[#173D32] hover:bg-[#122F26] text-white text-xs font-semibold text-center transition-colors shadow-2xs"
           >
             View Details
           </Link>
         ) : (
           <Link
             to="/issues"
-            className="flex-1 py-2 px-3 rounded-[6px] bg-[#173D32] hover:bg-[#122F26] text-white text-xs font-semibold text-center transition-colors shadow-2xs"
+            className="w-full py-2 px-3 rounded-[6px] bg-[#173D32] hover:bg-[#122F26] text-white text-xs font-semibold text-center transition-colors shadow-2xs"
           >
             Explore Issues
-          </Link>
-        )}
-
-        {simulationTarget && (
-          <Link
-            to={`/demo?edge=${simulationTarget}`}
-            className="flex-1 py-2 px-3 rounded-[6px] bg-white border border-[#E5E7EB] hover:bg-stone-50 text-[#173D32] text-xs font-semibold text-center transition-colors inline-flex items-center justify-center gap-1"
-          >
-            <span>Simulate Route</span>
-            <ArrowRight className="w-3 h-3 text-[#E3AD58]" />
           </Link>
         )}
       </div>

@@ -1,12 +1,12 @@
 import React, { Suspense, lazy } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import AppLayout from './components/layout/AppLayout';
 import HomePage from './pages/HomePage';
 import LoadingSpinner from './components/ui/LoadingSpinner';
 
 // Lazy-load route components for optimized code-splitting and fast initial load
 const MapPage = lazy(() => import('./pages/MapPage'));
-const DemoPage = lazy(() => import('./pages/DemoPage'));
+// Preserved for future use: const DemoPage = lazy(() => import('./pages/DemoPage'));
 const IssuesPage = lazy(() => import('./pages/IssuesPage'));
 const IssueDetailPage = lazy(() => import('./pages/IssueDetailPage'));
 const NoticesPage = lazy(() => import('./pages/NoticesPage'));
@@ -15,6 +15,8 @@ const AboutPage = lazy(() => import('./pages/AboutPage'));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const TermsPage = lazy(() => import('./pages/TermsPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 
 export function App() {
   return (
@@ -32,14 +34,8 @@ export function App() {
             </Suspense>
           }
         />
-        <Route
-          path="demo"
-          element={
-            <Suspense fallback={<LoadingSpinner message="Loading Failure Simulator..." />}>
-              <DemoPage />
-            </Suspense>
-          }
-        />
+        {/* Redirect /demo to home page while preserving DemoPage source code for future use */}
+        <Route path="demo" element={<Navigate to="/" replace />} />
         <Route
           path="issues"
           element={
@@ -93,6 +89,22 @@ export function App() {
           element={
             <Suspense fallback={<LoadingSpinner message="Loading Terms of Use..." />}>
               <TermsPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="login"
+          element={
+            <Suspense fallback={<LoadingSpinner message="Loading Sign In..." />}>
+              <LoginPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="register"
+          element={
+            <Suspense fallback={<LoadingSpinner message="Loading Registration..." />}>
+              <RegisterPage />
             </Suspense>
           }
         />

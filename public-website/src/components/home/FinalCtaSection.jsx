@@ -43,11 +43,11 @@ export function FinalCtaSection() {
           {/* Action Button Row */}
           <div className="pt-4 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
             <Link
-              to="/demo"
+              to="/issues"
               className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-[#E3AD58] hover:bg-[#D19942] text-[#173D32] text-sm font-bold shadow-md hover:shadow-lg transition-all focus-visible:ring-2 focus-visible:ring-white cursor-pointer"
             >
               <Activity className="w-4 h-4 text-[#173D32]" />
-              <span>Launch Live Simulator</span>
+              <span>Explore Community Issues</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
 

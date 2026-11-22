@@ -6,7 +6,6 @@ import {
   Calendar,
   Compass,
   FileText,
-  Activity,
   Info,
   CheckCircle2,
 } from 'lucide-react';
@@ -195,16 +194,6 @@ export function NoticeDetails({ notice, onClose }) {
               <Compass className="w-3.5 h-3.5" />
               <span>View Location on Map</span>
             </Link>
-
-            {notice.canSimulate && (
-              <Link
-                to={`/demo?edge=${notice.edgeId || notice.relatedInfrastructureId}`}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#E3AD58] hover:bg-[#D19942] text-[#173D32] text-xs font-bold transition-colors"
-              >
-                <Activity className="w-3.5 h-3.5" />
-                <span>Simulate Impact</span>
-              </Link>
-            )}
           </div>
         </div>
       </div>

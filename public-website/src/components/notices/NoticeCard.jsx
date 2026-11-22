@@ -6,7 +6,6 @@ import {
   MapPin,
   Compass,
   FileText,
-  Activity,
   Eye,
 } from 'lucide-react';
 import Card from '../ui/Card';
@@ -116,17 +115,6 @@ export function NoticeCard({ notice, onSelect, isFeaturedView = false }) {
             >
               <FileText className="w-3.5 h-3.5 text-[#42866A]" />
               <span>Issue</span>
-            </Link>
-          )}
-
-          {notice.canSimulate && (
-            <Link
-              to={`/demo?edge=${notice.edgeId || notice.relatedInfrastructureId}`}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#E3AD58]/20 hover:bg-[#E3AD58]/30 border border-[#E3AD58]/40 text-[#8F5E16] text-xs font-semibold transition-colors"
-              title="Simulate Network Disruption"
-            >
-              <Activity className="w-3.5 h-3.5 text-[#8F5E16]" />
-              <span>Simulate</span>
             </Link>
           )}
         </div>

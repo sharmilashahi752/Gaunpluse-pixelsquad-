@@ -40,7 +40,6 @@ export function Footer() {
   const platformModuleLinks = [
     { label: 'Home', path: '/' },
     { label: 'Explore Map', path: '/map' },
-    { label: 'Live Demo', path: '/demo' },
     { label: 'Community Issues', path: '/issues' },
     { label: 'Public Notices', path: '/notices' },
     { label: 'Insights & Data', path: '/insights' },

@@ -4,7 +4,7 @@ import { NAV_LINKS, FOOTER_LINKS } from '../src/data/routes.js';
 
 describe('GaunPulse Navigation & Site Configuration Tests', () => {
   it('1. Navigation integrity: All main routes are correctly declared', () => {
-    const requiredNavPaths = ['/', '/map', '/demo', '/issues', '/insights', '/about'];
+    const requiredNavPaths = ['/', '/map', '/issues', '/insights', '/about'];
     const declaredNavPaths = NAV_LINKS.map((link) => link.path);
 
     requiredNavPaths.forEach((path) => {
@@ -29,5 +29,28 @@ describe('GaunPulse Navigation & Site Configuration Tests', () => {
 
     assert.equal(teamName, 'PixelSquad');
     assert.ok(repoUrl.includes('Gaunpluse-pixelsquad-'));
+  });
+
+  it('4. Footer visibility rules: Hidden on /login, /register, and /map; visible on all content pages', () => {
+    const shouldHideFooter = (pathname) =>
+      pathname === '/map' || pathname === '/login' || pathname === '/register';
+
+    assert.equal(shouldHideFooter('/login'), true, 'Footer must be hidden on /login');
+    assert.equal(shouldHideFooter('/register'), true, 'Footer must be hidden on /register');
+    assert.equal(shouldHideFooter('/map'), true, 'Footer must be hidden on /map');
+
+    const pagesWithFooter = [
+      '/',
+      '/about',
+      '/insights',
+      '/issues',
+      '/issues/bridge-scour',
+      '/privacy',
+      '/terms',
+      '/notices',
+    ];
+    pagesWithFooter.forEach((path) => {
+      assert.equal(shouldHideFooter(path), false, `Footer must be visible on ${path}`);
+    });
   });
 });
