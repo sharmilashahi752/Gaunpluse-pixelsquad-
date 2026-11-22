@@ -11,6 +11,7 @@ const IssuesPage = lazy(() => import('./pages/IssuesPage'));
 const IssueDetailPage = lazy(() => import('./pages/IssueDetailPage'));
 const NoticesPage = lazy(() => import('./pages/NoticesPage'));
 const InsightsPage = lazy(() => import('./pages/InsightsPage'));
+const InsightDetailPage = lazy(() => import('./pages/InsightDetailPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const TermsPage = lazy(() => import('./pages/TermsPage'));
@@ -65,6 +66,14 @@ export function App() {
           element={
             <Suspense fallback={<LoadingSpinner message="Loading Infrastructure Insights..." />}>
               <InsightsPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="insights/:id"
+          element={
+            <Suspense fallback={<LoadingSpinner message="Loading Research Publication..." />}>
+              <InsightDetailPage />
             </Suspense>
           }
         />

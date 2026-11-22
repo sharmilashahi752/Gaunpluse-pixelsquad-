@@ -52,6 +52,15 @@ body {
   z-index: 0 !important;
 }
 
+/* Hide scrollbar utility while preserving scrolling */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 /* Ensure Leaflet controls match GaunPulse clean UI */
 .leaflet-bar a {
   background-color: #ffffff !important;

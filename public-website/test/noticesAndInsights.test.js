@@ -8,6 +8,12 @@ import {
   FACILITIES,
 } from '../src/data/demoVillage.js';
 import { runNetworkSimulation } from '../src/utils/graphSimulation.js';
+import {
+  RESEARCH_ARTICLES,
+  getArticleById,
+  getAllArticles,
+  getRelatedArticles,
+} from '../src/data/researchArticles.js';
 
 describe('GaunPulse Notices & Insights Test Suite', () => {
   it('1. NOTICES dataset integrity: Has required fields and valid demonstration labels', () => {
@@ -127,5 +133,85 @@ describe('GaunPulse Notices & Insights Test Suite', () => {
     assert.ok(talloHealthRoute.alternativeRouteAvailable, 'Alternative route must be available');
     assert.equal(scenario.metrics.delayedSettlementsCount, 1, 'Exactly 1 settlement delayed');
     assert.equal(scenario.metrics.totalAffectedHouseholds, 95, '95 households affected');
+  });
+
+  it('6. RESEARCH_ARTICLES dataset integrity: Has 4 articles, required fields, and valid demonstration labels', () => {
+    assert.ok(Array.isArray(RESEARCH_ARTICLES), 'RESEARCH_ARTICLES must be an array');
+    assert.equal(RESEARCH_ARTICLES.length, 4, 'Must contain exactly 4 research articles');
+
+    const expectedTitles = [
+      'Rural Bridge Connectivity and Community Access',
+      'Landslide and Trail Safety in Mountain Settlements',
+      'Healthcare Accessibility During Infrastructure Disruptions',
+      'Community-Based Infrastructure Monitoring',
+    ];
+
+    RESEARCH_ARTICLES.forEach((article, idx) => {
+      assert.ok(article.id, `Article #${idx} missing id`);
+      assert.equal(
+        article.title,
+        expectedTitles[idx],
+        `Article #${idx} has title mismatch: ${article.title}`
+      );
+      assert.ok(article.category, `Article ${article.id} missing category`);
+      assert.ok(article.date, `Article ${article.id} missing date`);
+      assert.ok(article.summary, `Article ${article.id} missing summary`);
+      assert.ok(article.image, `Article ${article.id} missing image`);
+      assert.ok(article.imageCaption, `Article ${article.id} missing imageCaption`);
+      assert.ok(article.location, `Article ${article.id} missing location`);
+      assert.ok(article.author, `Article ${article.id} missing author`);
+      assert.ok(Array.isArray(article.metrics) && article.metrics.length === 4, `Article ${article.id} must have 4 metrics`);
+      assert.ok(Array.isArray(article.explanation) && article.explanation.length >= 2, `Article ${article.id} must have explanation paragraphs`);
+      assert.ok(Array.isArray(article.keyFindings) && article.keyFindings.length >= 3, `Article ${article.id} must have key findings`);
+      assert.ok(article.communityImpact, `Article ${article.id} missing community impact`);
+      assert.ok(article.methodology, `Article ${article.id} missing methodology`);
+    });
+  });
+
+  it('7. RESEARCH_ARTICLES cross-references: Every article references valid issue and infrastructure IDs', () => {
+    const knownAssetIds = new Set([
+      ...BRIDGES.map((b) => b.id),
+      ...BRIDGES.map((b) => b.edgeId),
+      ...EDGES.map((e) => e.id),
+      ...FACILITIES.map((f) => f.id),
+    ]);
+    const knownIssueIds = new Set(ISSUES.map((i) => i.id));
+
+    RESEARCH_ARTICLES.forEach((article) => {
+      assert.ok(
+        knownAssetIds.has(article.relatedInfrastructureId),
+        `Article ${article.id} references invalid infrastructure: ${article.relatedInfrastructureId}`
+      );
+      assert.ok(
+        knownIssueIds.has(article.relatedIssueId),
+        `Article ${article.id} references invalid issue: ${article.relatedIssueId}`
+      );
+    });
+  });
+
+  it('8. Article lookup and alias resolution: Correctly resolves primary IDs and legacy aliases', () => {
+    assert.equal(getAllArticles().length, 4);
+
+    // Primary ID lookups
+    const bridgeArt = getArticleById('rural-bridge-connectivity');
+    assert.ok(bridgeArt, 'Primary ID rural-bridge-connectivity must resolve');
+    assert.equal(bridgeArt.title, 'Rural Bridge Connectivity and Community Access');
+
+    // Legacy aliases
+    const alias1 = getArticleById('healthcare-impact');
+    assert.ok(alias1, 'Alias healthcare-impact must resolve to healthcare-accessibility');
+    assert.equal(alias1.id, 'healthcare-accessibility');
+
+    const alias2 = getArticleById('school-accessibility');
+    assert.ok(alias2, 'Alias school-accessibility must resolve to community-infrastructure-monitoring');
+    assert.equal(alias2.id, 'community-infrastructure-monitoring');
+
+    // Related articles helper
+    const related = getRelatedArticles('rural-bridge-connectivity', 3);
+    assert.equal(related.length, 3);
+    assert.ok(!related.some((r) => r.id === 'rural-bridge-connectivity'), 'Related must exclude current article');
+
+    // Unknown ID returns null
+    assert.equal(getArticleById('unknown-article-slug'), null);
   });
 });
