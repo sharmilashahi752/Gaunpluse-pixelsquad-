@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, ArrowRight, Clock } from 'lucide-react';
 import { getAllArticles } from '../../data/researchArticles';
+import ScrollReveal from '../ui/ScrollReveal';
 
 /**
  * Latest Research & Field Insights Section
@@ -30,7 +31,7 @@ export function LatestResearchGrid({ activeCategory = 'all' }) {
   return (
     <section aria-labelledby="research-grid-heading" className="space-y-6 text-left">
       {/* Section Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-stone-200 pb-3 gap-2">
+      <ScrollReveal className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-stone-200 pb-3 gap-2">
         <div>
           <h2
             id="research-grid-heading"
@@ -45,7 +46,7 @@ export function LatestResearchGrid({ activeCategory = 'all' }) {
         <span className="text-xs text-[#64748B] font-medium shrink-0">
           Showing {filteredArticles.length} of {allArticles.length} research publications
         </span>
-      </div>
+      </ScrollReveal>
 
       {/* Research Cards Grid or Empty State */}
       {filteredArticles.length === 0 ? (
@@ -55,56 +56,57 @@ export function LatestResearchGrid({ activeCategory = 'all' }) {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
-          {filteredArticles.map((article) => (
-            <Link
-              key={article.id}
-              to={`/insights/${article.id}`}
-              className="group rounded-[8px] border border-stone-200 bg-white overflow-hidden shadow-xs hover:border-[#173D32] hover:shadow-md transition-all duration-300 flex flex-col justify-between text-left focus:outline-none focus:ring-2 focus:ring-[#173D32]/30"
-            >
-              <div>
-                {/* Card Image with subtle hover zoom */}
-                <div className="h-44 sm:h-48 w-full overflow-hidden bg-stone-100 relative">
-                  <img
-                    src={article.image}
-                    alt={article.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
-                  />
-                  <div className="absolute top-2.5 right-2.5 bg-black/60 backdrop-blur-xs text-white text-[10px] font-medium px-2 py-0.5 rounded-[3px] flex items-center gap-1">
-                    <Clock className="w-2.5 h-2.5" />
-                    <span>{article.readTime}</span>
+          {filteredArticles.map((article, idx) => (
+            <ScrollReveal key={article.id} delay={idx * 0.08} className="h-full">
+              <Link
+                to={`/insights/${article.id}`}
+                className="group rounded-[8px] border border-stone-200 bg-white overflow-hidden shadow-xs hover:border-[#173D32] hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between text-left h-full focus:outline-none focus:ring-2 focus:ring-[#173D32]/30"
+              >
+                <div>
+                  {/* Card Image with subtle hover zoom */}
+                  <div className="h-44 sm:h-48 w-full overflow-hidden bg-stone-100 relative">
+                    <img
+                      src={article.image}
+                      alt={article.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+                    />
+                    <div className="absolute top-2.5 right-2.5 bg-black/60 backdrop-blur-xs text-white text-[10px] font-medium px-2 py-0.5 rounded-[3px] flex items-center gap-1">
+                      <Clock className="w-2.5 h-2.5" />
+                      <span>{article.readTime}</span>
+                    </div>
+                  </div>
+
+                  {/* Card Body */}
+                  <div className="p-5 sm:p-6 space-y-2.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-xs font-semibold text-[#438B70]">
+                        {article.category}
+                      </span>
+                      <span className="text-[#64748B] flex items-center gap-1 text-[11px]">
+                        <Calendar className="w-3 h-3 text-[#42866A]" />
+                        {article.date}
+                      </span>
+                    </div>
+
+                    <h3 className="text-base font-bold text-[#173D32] group-hover:text-[#42866A] transition-colors leading-snug">
+                      {article.title}
+                    </h3>
+
+                    <p className="text-xs sm:text-[13px] text-[#1B2923]/75 leading-relaxed font-normal line-clamp-3">
+                      {article.subtitle || article.summary}
+                    </p>
                   </div>
                 </div>
 
-                {/* Card Body */}
-                <div className="p-5 sm:p-6 space-y-2.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-xs font-semibold text-[#438B70]">
-                      {article.category}
-                    </span>
-                    <span className="text-[#64748B] flex items-center gap-1 text-[11px]">
-                      <Calendar className="w-3 h-3 text-[#42866A]" />
-                      {article.date}
-                    </span>
+                {/* Bottom Action Link */}
+                <div className="p-5 sm:p-6 pt-0">
+                  <div className="pt-3 border-t border-stone-100 flex items-center justify-between text-xs font-semibold text-[#173D32] group-hover:text-[#42866A] transition-colors">
+                    <span>Read Full Brief</span>
+                    <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1 duration-200" />
                   </div>
-
-                  <h3 className="text-base font-bold text-[#173D32] group-hover:text-[#42866A] transition-colors leading-snug">
-                    {article.title}
-                  </h3>
-
-                  <p className="text-xs sm:text-[13px] text-[#1B2923]/75 leading-relaxed font-normal line-clamp-3">
-                    {article.subtitle || article.summary}
-                  </p>
                 </div>
-              </div>
-
-              {/* Bottom Action Link */}
-              <div className="p-5 sm:p-6 pt-0">
-                <div className="pt-3 border-t border-stone-100 flex items-center justify-between text-xs font-semibold text-[#173D32] group-hover:text-[#42866A] transition-colors">
-                  <span>Read Full Brief</span>
-                  <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1 duration-200" />
-                </div>
-              </div>
-            </Link>
+              </Link>
+            </ScrollReveal>
           ))}
         </div>
       )}

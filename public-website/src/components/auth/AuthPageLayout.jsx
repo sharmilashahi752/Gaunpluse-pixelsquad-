@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { motion } from 'motion/react';
 import BrandLogo from '../layout/BrandLogo';
 
 /**
@@ -55,15 +56,17 @@ export function AuthPageLayout({
 
       {/* 2. Right Column: 50% width Vertically Centered Form Container */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-8 md:p-10 lg:p-12 xl:p-14 bg-white self-stretch">
-        <div className="w-full max-w-[500px] text-left my-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: 'easeOut' }}
+          className="w-full max-w-[500px] text-left my-auto"
+        >
           {/* Brand Logo & Header */}
           <div className="mb-6">
-            <Link
-              to="/"
-              className="inline-block mb-3.5 focus-visible:outline-2 focus-visible:outline-[#173D32]"
-            >
+            <div className="inline-block mb-3.5">
               <BrandLogo variant="navbar" />
-            </Link>
+            </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-[#173D32] tracking-tight">
               {title}
             </h1>
@@ -73,7 +76,7 @@ export function AuthPageLayout({
           </div>
 
           {isSubmitted ? submittedContent : children}
-        </div>
+        </motion.div>
       </div>
     </div>
   );

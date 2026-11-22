@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -26,8 +27,8 @@ import { runNetworkSimulation } from '../../utils/graphSimulation';
 
 /**
  * Rural Infrastructure at a Glance Section
- * - Chart 1: Infrastructure Status Over Time (Clean Area/Line chart across dates)
- * - Chart 2: Infrastructure Issues by Category (Donut chart with percentage, count, accessible legend)
+ * - Chart 1: Infrastructure Status Over Time (Clean Area/Line chart across dates with bright vibrant colors & visible dots)
+ * - Chart 2: Infrastructure Issues by Category (Donut chart with bright palette, count, percentage, accessible legend)
  * - Additional visual indicators: Issues by Severity & Baseline vs Disrupted Travel Times
  * Derived 100% dynamically from actual GaunPulse data structures.
  */
@@ -104,14 +105,15 @@ export function RuralInfrastructureGlance() {
   }, [hasIssues]);
 
   // Chart 2 Data: Issues by Category (Donut Chart with count & percentage)
+  // Vibrant palette: Bridges: #3B82F6, Roads: #10B981, Education: #8B5CF6, Healthcare: #F97316
   const categoryData = useMemo(() => {
     if (!hasIssues) return [];
 
     const categoryConfig = {
-      bridge: { name: 'Bridges', fill: '#173D32' },
-      road: { name: 'Roads & Trails', fill: '#42866A' },
-      school: { name: 'Education', fill: '#5C7C64' },
-      health_post: { name: 'Healthcare', fill: '#8F5E16' },
+      bridge: { name: 'Bridges', fill: '#3B82F6' },
+      road: { name: 'Roads & Trails', fill: '#10B981' },
+      school: { name: 'Education', fill: '#8B5CF6' },
+      health_post: { name: 'Healthcare', fill: '#F97316' },
     };
 
     const counts = {};
@@ -143,9 +145,9 @@ export function RuralInfrastructureGlance() {
     if (!hasIssues) return [];
 
     const severityConfig = {
-      critical: { name: 'Critical Alert', fill: '#D45F53' }, // red strictly for critical
-      warning: { name: 'Monitored Warning', fill: '#E3AD58' }, // amber
-      low: { name: 'Low / Monitored', fill: '#42866A' }, // green
+      critical: { name: 'Critical Alert', fill: '#EF4444' }, // Vibrant red
+      warning: { name: 'Monitored Warning', fill: '#F59E0B' }, // Vibrant amber
+      low: { name: 'Low / Monitored', fill: '#10B981' }, // Vibrant green
     };
 
     const counts = { critical: 0, warning: 0, low: 0 };
@@ -230,9 +232,9 @@ export function RuralInfrastructureGlance() {
           <button
             type="button"
             onClick={() => setActiveTab('primary')}
-            className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-[3px] transition-colors cursor-pointer ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-[3px] transition-colors cursor-pointer ${
               activeTab === 'primary'
-                ? 'bg-white text-[#173D32] shadow-2xs'
+                ? 'bg-white text-[#173D32] shadow-2xs font-bold'
                 : 'text-[#64748B] hover:text-[#173D32]'
             }`}
           >
@@ -242,9 +244,9 @@ export function RuralInfrastructureGlance() {
           <button
             type="button"
             onClick={() => setActiveTab('severity')}
-            className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-[3px] transition-colors cursor-pointer ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-[3px] transition-colors cursor-pointer ${
               activeTab === 'severity'
-                ? 'bg-white text-[#173D32] shadow-2xs'
+                ? 'bg-white text-[#173D32] shadow-2xs font-bold'
                 : 'text-[#64748B] hover:text-[#173D32]'
             }`}
           >
@@ -254,9 +256,9 @@ export function RuralInfrastructureGlance() {
           <button
             type="button"
             onClick={() => setActiveTab('accessibility')}
-            className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-[3px] transition-colors cursor-pointer ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-[3px] transition-colors cursor-pointer ${
               activeTab === 'accessibility'
-                ? 'bg-white text-[#173D32] shadow-2xs'
+                ? 'bg-white text-[#173D32] shadow-2xs font-bold'
                 : 'text-[#64748B] hover:text-[#173D32]'
             }`}
           >
@@ -270,18 +272,27 @@ export function RuralInfrastructureGlance() {
         <div className="rounded-[8px] border border-stone-200 bg-stone-50 p-8 text-center text-sm text-[#64748B]">
           No active community hazard reports found in the current registry.
         </div>
-      ) : activeTab === 'primary' ? (
-        /* Primary View: Chart 1 (Timeline Area Chart) & Chart 2 (Category Donut Chart) */
+      ) : (
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+          >
+            {activeTab === 'primary' ? (
+              /* Primary View: Chart 1 (Timeline Area Chart) & Chart 2 (Category Donut Chart) */
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
           {/* Chart 1: Infrastructure Status Over Time */}
-          <div className="bg-white border border-stone-200 rounded-[8px] p-6 sm:p-7 lg:p-8 space-y-4 shadow-xs flex flex-col justify-between">
+          <div className="bg-white border border-stone-200 rounded-[8px] p-6 sm:p-7 lg:p-8 space-y-4 shadow-xs hover:border-stone-300 hover:shadow-sm transition-all duration-200 flex flex-col justify-between">
             <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <h3 className="text-base sm:text-lg font-bold text-[#173D32]">
                   Infrastructure Status Over Time
                 </h3>
-                <span className="text-[11px] font-semibold text-[#42866A] bg-emerald-50 px-2 py-0.5 rounded-[2px] border border-emerald-100">
-                  Reporting Period: Nov 17–21, 2026
+                <span className="text-[11px] font-semibold text-[#10B981] bg-emerald-50 px-2.5 py-0.5 rounded-[4px] border border-emerald-200">
+                  Nov 17–21, 2026
                 </span>
               </div>
               <p className="text-xs text-[#64748B]">
@@ -296,62 +307,68 @@ export function RuralInfrastructureGlance() {
                   margin={{ top: 15, right: 15, left: -20, bottom: 10 }}
                 >
                   <defs>
+                    {/* Vibrant Blue Gradient for Total Reported */}
                     <linearGradient id="colorReported" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#173D32" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#173D32" stopOpacity={0.0} />
+                      <stop offset="5%" stopColor="#2563EB" stopOpacity={0.22} />
+                      <stop offset="95%" stopColor="#2563EB" stopOpacity={0.0} />
                     </linearGradient>
+                    {/* Vibrant Emerald Green Gradient for Field-Verified */}
                     <linearGradient id="colorVerified" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#42866A" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#42866A" stopOpacity={0.0} />
+                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#10B981" stopOpacity={0.0} />
                     </linearGradient>
+                    {/* Vibrant Orange Gradient for Action Planned */}
                     <linearGradient id="colorAction" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#E3AD58" stopOpacity={0.35} />
-                      <stop offset="95%" stopColor="#E3AD58" stopOpacity={0.0} />
+                      <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#F59E0B" stopOpacity={0.0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
                   <XAxis
                     dataKey="label"
-                    tick={{ fill: '#1B2923', fontSize: 11, fontWeight: 500 }}
-                    stroke="#CBD5E1"
+                    tick={{ fill: '#334155', fontSize: 11, fontWeight: 500 }}
+                    stroke="#94A3B8"
                     tickLine={false}
                     dy={6}
                   />
                   <YAxis
                     tick={{ fill: '#64748B', fontSize: 11 }}
-                    stroke="#CBD5E1"
+                    stroke="#94A3B8"
                     tickLine={false}
                     allowDecimals={false}
                     unit=" pts"
                     domain={[0, 5]}
                   />
                   <Tooltip
-                    cursor={{ stroke: '#94A3B8', strokeWidth: 1 }}
+                    cursor={{ stroke: '#94A3B8', strokeWidth: 1, strokeDasharray: '3 3' }}
                     content={({ active, payload }) => {
                       if (!active || !payload || !payload.length) return null;
                       const d = payload[0].payload;
                       return (
-                        <div className="bg-white border border-stone-200 shadow-md p-3 rounded-[3px] text-xs space-y-1.5 text-left">
-                          <p className="font-bold text-[#173D32] border-b border-stone-100 pb-1">
-                            {d.label} ({d.date})
+                        <div className="bg-white border border-stone-200 shadow-md p-3 rounded-[6px] text-xs space-y-2 text-left">
+                          <p className="font-bold text-[#173D32] border-b border-stone-100 pb-1 flex items-center justify-between gap-3">
+                            <span>{d.label}</span>
+                            <span className="text-[11px] font-normal text-[#64748B]">{d.date}</span>
                           </p>
-                          <div className="flex justify-between gap-4 text-[#64748B]">
-                            <span className="flex items-center gap-1.5">
-                              <span className="w-2 h-2 rounded-full bg-[#173D32]" /> Total Reported:
-                            </span>
-                            <span className="font-semibold text-[#173D32]">{d.reported} issues</span>
-                          </div>
-                          <div className="flex justify-between gap-4 text-[#64748B]">
-                            <span className="flex items-center gap-1.5">
-                              <span className="w-2 h-2 rounded-full bg-[#42866A]" /> Field-Verified:
-                            </span>
-                            <span className="font-semibold text-[#42866A]">{d.verified} issues</span>
-                          </div>
-                          <div className="flex justify-between gap-4 text-[#64748B]">
-                            <span className="flex items-center gap-1.5">
-                              <span className="w-2 h-2 rounded-full bg-[#E3AD58]" /> Action Planned:
-                            </span>
-                            <span className="font-semibold text-[#8F5E16]">{d.actionProposed} issues</span>
+                          <div className="space-y-1">
+                            <div className="flex justify-between gap-4 text-[#475569]">
+                              <span className="flex items-center gap-1.5 font-medium">
+                                <span className="w-2.5 h-2.5 rounded-full bg-[#2563EB]" /> Total Reported:
+                              </span>
+                              <span className="font-bold text-[#2563EB]">{d.reported} issues</span>
+                            </div>
+                            <div className="flex justify-between gap-4 text-[#475569]">
+                              <span className="flex items-center gap-1.5 font-medium">
+                                <span className="w-2.5 h-2.5 rounded-full bg-[#10B981]" /> Field-Verified:
+                              </span>
+                              <span className="font-bold text-[#10B981]">{d.verified} issues</span>
+                            </div>
+                            <div className="flex justify-between gap-4 text-[#475569]">
+                              <span className="flex items-center gap-1.5 font-medium">
+                                <span className="w-2.5 h-2.5 rounded-full bg-[#F59E0B]" /> Action Planned:
+                              </span>
+                              <span className="font-bold text-[#F59E0B]">{d.actionProposed} issues</span>
+                            </div>
                           </div>
                         </div>
                       );
@@ -361,34 +378,46 @@ export function RuralInfrastructureGlance() {
                     verticalAlign="top"
                     align="right"
                     iconType="circle"
-                    wrapperStyle={{ fontSize: '11px', paddingBottom: '10px' }}
+                    wrapperStyle={{ fontSize: '11px', paddingBottom: '12px' }}
                   />
                   <Area
                     type="monotone"
                     dataKey="reported"
                     name="Total Reported"
-                    stroke="#173D32"
-                    strokeWidth={2}
+                    stroke="#2563EB"
+                    strokeWidth={2.5}
+                    dot={{ r: 3.5, fill: '#2563EB', stroke: '#FFFFFF', strokeWidth: 1.5 }}
+                    activeDot={{ r: 5, stroke: '#2563EB', strokeWidth: 2, fill: '#FFFFFF' }}
                     fillOpacity={1}
                     fill="url(#colorReported)"
+                    isAnimationActive={true}
+                    animationDuration={750}
                   />
                   <Area
                     type="monotone"
                     dataKey="verified"
                     name="Field-Verified"
-                    stroke="#42866A"
-                    strokeWidth={2}
+                    stroke="#10B981"
+                    strokeWidth={2.5}
+                    dot={{ r: 3.5, fill: '#10B981', stroke: '#FFFFFF', strokeWidth: 1.5 }}
+                    activeDot={{ r: 5, stroke: '#10B981', strokeWidth: 2, fill: '#FFFFFF' }}
                     fillOpacity={1}
                     fill="url(#colorVerified)"
+                    isAnimationActive={true}
+                    animationDuration={750}
                   />
                   <Area
                     type="monotone"
                     dataKey="actionProposed"
                     name="Action Planned"
-                    stroke="#E3AD58"
-                    strokeWidth={2}
+                    stroke="#F59E0B"
+                    strokeWidth={2.5}
+                    dot={{ r: 3.5, fill: '#F59E0B', stroke: '#FFFFFF', strokeWidth: 1.5 }}
+                    activeDot={{ r: 5, stroke: '#F59E0B', strokeWidth: 2, fill: '#FFFFFF' }}
                     fillOpacity={1}
                     fill="url(#colorAction)"
+                    isAnimationActive={true}
+                    animationDuration={750}
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -401,13 +430,13 @@ export function RuralInfrastructureGlance() {
           </div>
 
           {/* Chart 2: Infrastructure Issues by Category (Donut Chart) */}
-          <div className="bg-white border border-stone-200 rounded-[8px] p-6 sm:p-7 lg:p-8 space-y-4 shadow-xs flex flex-col justify-between">
+          <div className="bg-white border border-stone-200 rounded-[8px] p-6 sm:p-7 lg:p-8 space-y-4 shadow-xs hover:border-stone-300 hover:shadow-sm transition-all duration-200 flex flex-col justify-between">
             <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <h3 className="text-base sm:text-lg font-bold text-[#173D32]">
                   Infrastructure Issues by Category
                 </h3>
-                <span className="text-[11px] font-semibold text-[#64748B] bg-stone-100 px-2 py-0.5 rounded-[2px]">
+                <span className="text-[11px] font-semibold text-[#173D32] bg-[#F0F6F2] px-2.5 py-0.5 rounded-[4px] border border-[#E2EBE5]">
                   Total: {ISSUES.length} Issues
                 </span>
               </div>
@@ -425,12 +454,19 @@ export function RuralInfrastructureGlance() {
                       data={categoryData}
                       dataKey="count"
                       nameKey="name"
-                      innerRadius={50}
-                      outerRadius={80}
+                      innerRadius={52}
+                      outerRadius={84}
                       paddingAngle={4}
+                      isAnimationActive={true}
+                      animationDuration={750}
                     >
                       {categoryData.map((entry) => (
-                        <Cell key={`cell-${entry.key}`} fill={entry.fill} />
+                        <Cell
+                          key={`cell-${entry.key}`}
+                          fill={entry.fill}
+                          stroke="#FFFFFF"
+                          strokeWidth={2}
+                        />
                       ))}
                     </Pie>
                     <Tooltip
@@ -438,13 +474,13 @@ export function RuralInfrastructureGlance() {
                         if (!active || !payload || !payload.length) return null;
                         const d = payload[0].payload;
                         return (
-                          <div className="bg-white border border-stone-200 shadow-md p-2.5 rounded-[3px] text-xs space-y-1 text-left">
-                            <span className="font-bold text-[#173D32] flex items-center gap-1.5">
+                          <div className="bg-white border border-stone-200 shadow-md p-2.5 rounded-[6px] text-xs space-y-1 text-left">
+                            <span className="font-bold text-[#173D32] flex items-center gap-2">
                               <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.fill }} />
                               {d.name}
                             </span>
-                            <p className="text-[#64748B]">
-                              Count: <strong>{d.count}</strong> ({d.percentage}% of total)
+                            <p className="text-[#475569]">
+                              Count: <strong className="text-[#173D32]">{d.count}</strong> ({d.percentage}% of total)
                             </p>
                           </div>
                         );
@@ -454,11 +490,11 @@ export function RuralInfrastructureGlance() {
                 </ResponsiveContainer>
                 {/* Center Donut Label */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-2xl font-bold text-[#173D32] leading-none">
+                  <span className="text-3xl font-extrabold text-[#173D32] leading-none">
                     {ISSUES.length}
                   </span>
-                  <span className="text-[10px] text-[#64748B] font-medium uppercase tracking-wider pt-0.5">
-                    Issues
+                  <span className="text-xs text-[#64748B] font-medium pt-0.5">
+                    Total Issues
                   </span>
                 </div>
               </div>
@@ -468,17 +504,17 @@ export function RuralInfrastructureGlance() {
                 {categoryData.map((item) => (
                   <div
                     key={item.key}
-                    className="flex items-center justify-between p-1.5 rounded-[3px] hover:bg-stone-50 transition-colors"
+                    className="flex items-center justify-between p-2 rounded-[4px] hover:bg-stone-50 transition-colors"
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2.5">
                       <span
-                        className="w-3 h-3 rounded-[2px] shrink-0"
+                        className="w-3.5 h-3.5 rounded-[3px] shrink-0"
                         style={{ backgroundColor: item.fill }}
                         aria-hidden="true"
                       />
-                      <span className="font-medium text-[#1B2923]">{item.name}</span>
+                      <span className="font-semibold text-[#1B2923]">{item.name}</span>
                     </div>
-                    <span className="font-semibold text-[#173D32]">
+                    <span className="font-bold text-[#173D32]">
                       {item.count} <span className="text-[#64748B] font-normal">({item.percentage}%)</span>
                     </span>
                   </div>
@@ -495,7 +531,7 @@ export function RuralInfrastructureGlance() {
       ) : activeTab === 'severity' ? (
         /* Supporting View: Severity & Risk Distribution */
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
-          <div className="bg-white border border-stone-200 rounded-[8px] p-6 sm:p-7 lg:p-8 space-y-4 shadow-xs flex flex-col justify-between">
+          <div className="bg-white border border-stone-200 rounded-[8px] p-6 sm:p-7 lg:p-8 space-y-4 shadow-xs hover:border-stone-300 hover:shadow-sm transition-all duration-200 flex flex-col justify-between">
             <div className="space-y-1">
               <h3 className="text-base sm:text-lg font-bold text-[#173D32]">
                 Infrastructure Severity Breakdown
@@ -511,17 +547,17 @@ export function RuralInfrastructureGlance() {
                   data={severityData}
                   margin={{ top: 15, right: 15, left: -20, bottom: 20 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
                   <XAxis
                     dataKey="name"
-                    tick={{ fill: '#1B2923', fontSize: 11, fontWeight: 500 }}
-                    stroke="#CBD5E1"
+                    tick={{ fill: '#334155', fontSize: 11, fontWeight: 500 }}
+                    stroke="#94A3B8"
                     tickLine={false}
                     dy={6}
                   />
                   <YAxis
                     tick={{ fill: '#64748B', fontSize: 11 }}
-                    stroke="#CBD5E1"
+                    stroke="#94A3B8"
                     tickLine={false}
                     allowDecimals={false}
                     unit=" rep"
@@ -532,14 +568,24 @@ export function RuralInfrastructureGlance() {
                       if (!active || !payload || !payload.length) return null;
                       const d = payload[0].payload;
                       return (
-                        <div className="bg-white border border-stone-200 shadow-md p-2.5 rounded-[3px] text-xs space-y-1 text-left">
-                          <span className="font-bold text-[#173D32]">{d.name}</span>
-                          <p className="text-[#64748B]">Count: <strong>{d.count}</strong> reports</p>
+                        <div className="bg-white border border-stone-200 shadow-md p-2.5 rounded-[6px] text-xs space-y-1 text-left">
+                          <span className="font-bold text-[#173D32] flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.fill }} />
+                            {d.name}
+                          </span>
+                          <p className="text-[#475569]">Count: <strong className="text-[#173D32]">{d.count}</strong> reports</p>
                         </div>
                       );
                     }}
                   />
-                  <Bar dataKey="count" name="Reports" radius={[3, 3, 0, 0]} maxBarSize={44}>
+                  <Bar
+                    dataKey="count"
+                    name="Reports"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={48}
+                    isAnimationActive={true}
+                    animationDuration={750}
+                  >
                     {severityData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
@@ -555,7 +601,7 @@ export function RuralInfrastructureGlance() {
           </div>
 
           {/* Severity Guidance Card */}
-          <div className="bg-white border border-stone-200 rounded-[8px] p-6 sm:p-7 lg:p-8 space-y-4 shadow-xs flex flex-col justify-between">
+          <div className="bg-white border border-stone-200 rounded-[8px] p-6 sm:p-7 lg:p-8 space-y-4 shadow-xs hover:border-stone-300 hover:shadow-sm transition-all duration-200 flex flex-col justify-between">
             <div className="space-y-1">
               <h3 className="text-base sm:text-lg font-bold text-[#173D32]">
                 Triage Thresholds &amp; Protocols
@@ -566,8 +612,8 @@ export function RuralInfrastructureGlance() {
             </div>
 
             <div className="space-y-3 text-xs text-[#1B2923] pt-1">
-              <div className="border border-red-100 bg-red-50/60 rounded-[4px] p-3 space-y-1">
-                <div className="flex items-center gap-1.5 font-bold text-[#D45F53]">
+              <div className="border border-red-200 bg-red-50/70 rounded-[6px] p-3 space-y-1">
+                <div className="flex items-center gap-1.5 font-bold text-[#EF4444]">
                   <AlertTriangle className="w-3.5 h-3.5" />
                   <span>Critical Alert (1 Issue • 25%)</span>
                 </div>
@@ -577,9 +623,9 @@ export function RuralInfrastructureGlance() {
                 </p>
               </div>
 
-              <div className="border border-amber-100 bg-amber-50/60 rounded-[4px] p-3 space-y-1">
-                <div className="flex items-center gap-1.5 font-bold text-[#8F5E16]">
-                  <Clock className="w-3.5 h-3.5 text-[#E3AD58]" />
+              <div className="border border-amber-200 bg-amber-50/70 rounded-[6px] p-3 space-y-1">
+                <div className="flex items-center gap-1.5 font-bold text-[#D97706]">
+                  <Clock className="w-3.5 h-3.5 text-[#F59E0B]" />
                   <span>Monitored Warning (2 Issues • 50%)</span>
                 </div>
                 <p className="text-xs text-[#1B2923]/80 leading-relaxed font-normal">
@@ -587,9 +633,9 @@ export function RuralInfrastructureGlance() {
                 </p>
               </div>
 
-              <div className="border border-emerald-100 bg-emerald-50/60 rounded-[4px] p-3 space-y-1">
-                <div className="flex items-center gap-1.5 font-bold text-[#42866A]">
-                  <PieIcon className="w-3.5 h-3.5" />
+              <div className="border border-emerald-200 bg-emerald-50/70 rounded-[6px] p-3 space-y-1">
+                <div className="flex items-center gap-1.5 font-bold text-[#10B981]">
+                  <PieIcon className="w-3.5 h-3.5 text-[#10B981]" />
                   <span>Low Risk (1 Issue • 25%)</span>
                 </div>
                 <p className="text-xs text-[#1B2923]/80 leading-relaxed font-normal">
@@ -606,7 +652,7 @@ export function RuralInfrastructureGlance() {
       ) : (
         /* Supporting View: Baseline vs Disrupted Travel Times & Community Accessibility */
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
-          <div className="bg-white border border-stone-200 rounded-[8px] p-6 sm:p-7 lg:p-8 space-y-4 shadow-xs flex flex-col justify-between">
+          <div className="bg-white border border-stone-200 rounded-[8px] p-6 sm:p-7 lg:p-8 space-y-4 shadow-xs hover:border-stone-300 hover:shadow-sm transition-all duration-200 flex flex-col justify-between">
             <div className="space-y-1">
               <h3 className="text-base sm:text-lg font-bold text-[#173D32]">
                 Transit Delay Under Bridge Failure
@@ -623,17 +669,17 @@ export function RuralInfrastructureGlance() {
                   margin={{ top: 15, right: 15, left: -10, bottom: 20 }}
                   barGap={6}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
                   <XAxis
                     dataKey="name"
-                    tick={{ fill: '#1B2923', fontSize: 11, fontWeight: 500 }}
-                    stroke="#CBD5E1"
+                    tick={{ fill: '#334155', fontSize: 11, fontWeight: 500 }}
+                    stroke="#94A3B8"
                     tickLine={false}
                     dy={6}
                   />
                   <YAxis
                     tick={{ fill: '#64748B', fontSize: 11 }}
-                    stroke="#CBD5E1"
+                    stroke="#94A3B8"
                     tickLine={false}
                     unit="m"
                   />
@@ -642,22 +688,47 @@ export function RuralInfrastructureGlance() {
                       if (!active || !payload || !payload.length) return null;
                       const d = payload[0].payload;
                       return (
-                        <div className="bg-white border border-stone-200 shadow-md p-3 rounded-[3px] text-xs space-y-1 text-left">
-                          <p className="font-bold text-[#173D32]">{d.name}</p>
-                          <p className="text-[#64748B]">Normal Transit: <strong>{d.baselineTime} min</strong></p>
-                          <p className="text-[#173D32]">Disrupted Detour: <strong>{d.disruptedTime} min</strong></p>
-                          {d.delta > 0 && (
-                            <p className="text-[#D45F53] font-bold pt-1 border-t border-stone-100">
-                              Delay Penalty: +{d.delta} min
+                        <div className="bg-white border border-stone-200 shadow-md p-3 rounded-[6px] text-xs space-y-1.5 text-left">
+                          <p className="font-bold text-[#173D32] border-b border-stone-100 pb-1">{d.name}</p>
+                          <div className="space-y-1 pt-0.5">
+                            <p className="text-[#475569] flex justify-between gap-4">
+                              <span>Normal Transit:</span>
+                              <strong className="text-[#64748B]">{d.baselineTime} min</strong>
                             </p>
-                          )}
+                            <p className="text-[#2563EB] flex justify-between gap-4 font-semibold">
+                              <span>Disrupted Detour:</span>
+                              <strong>{d.disruptedTime} min</strong>
+                            </p>
+                            {d.delta > 0 && (
+                              <p className="text-[#EF4444] font-bold pt-1 border-t border-stone-100 flex justify-between gap-4">
+                                <span>Delay Penalty:</span>
+                                <span>+{d.delta} min</span>
+                              </p>
+                            )}
+                          </div>
                         </div>
                       );
                     }}
                   />
-                  <Legend verticalAlign="top" align="right" wrapperStyle={{ fontSize: '11px', paddingBottom: '10px' }} />
-                  <Bar dataKey="baselineTime" name="Baseline (Normal)" fill="#94A3B8" radius={[2, 2, 0, 0]} maxBarSize={32} />
-                  <Bar dataKey="disruptedTime" name="Disrupted Detour" fill="#173D32" radius={[2, 2, 0, 0]} maxBarSize={32} />
+                  <Legend verticalAlign="top" align="right" wrapperStyle={{ fontSize: '11px', paddingBottom: '12px' }} />
+                  <Bar
+                    dataKey="baselineTime"
+                    name="Baseline (Normal)"
+                    fill="#94A3B8"
+                    radius={[3, 3, 0, 0]}
+                    maxBarSize={32}
+                    isAnimationActive={true}
+                    animationDuration={750}
+                  />
+                  <Bar
+                    dataKey="disruptedTime"
+                    name="Disrupted Detour"
+                    fill="#2563EB"
+                    radius={[3, 3, 0, 0]}
+                    maxBarSize={32}
+                    isAnimationActive={true}
+                    animationDuration={750}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -669,7 +740,7 @@ export function RuralInfrastructureGlance() {
           </div>
 
           {/* Community Accessibility Impact Card */}
-          <div className="bg-white border border-stone-200 rounded-[8px] p-6 sm:p-7 lg:p-8 space-y-4 shadow-xs flex flex-col justify-between">
+          <div className="bg-white border border-stone-200 rounded-[8px] p-6 sm:p-7 lg:p-8 space-y-4 shadow-xs hover:border-stone-300 hover:shadow-sm transition-all duration-200 flex flex-col justify-between">
             <div className="space-y-1">
               <h3 className="text-base sm:text-lg font-bold text-[#173D32]">
                 Community Accessibility Breakdown
@@ -683,13 +754,13 @@ export function RuralInfrastructureGlance() {
               {SETTLEMENTS.map((settlement) => (
                 <div
                   key={settlement.id}
-                  className="border border-stone-200 rounded-[4px] p-3.5 space-y-2 bg-[#F9FAF9]"
+                  className="border border-stone-200 rounded-[6px] p-3.5 space-y-2 bg-[#F9FAF9] hover:bg-stone-50 transition-colors"
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-sm text-[#173D32]">
                       {settlement.name}
                     </span>
-                    <span className="text-[11px] font-semibold text-[#42866A] bg-emerald-50 px-2 py-0.5 rounded-[2px] border border-emerald-100">
+                    <span className="text-[11px] font-semibold text-[#10B981] bg-emerald-50 px-2 py-0.5 rounded-[4px] border border-emerald-200">
                       {settlement.estimatedPopulation} Residents ({settlement.households} Households)
                     </span>
                   </div>
@@ -708,6 +779,9 @@ export function RuralInfrastructureGlance() {
             </div>
           </div>
         </div>
+      )}
+          </motion.div>
+        </AnimatePresence>
       )}
     </section>
   );

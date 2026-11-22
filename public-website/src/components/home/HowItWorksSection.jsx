@@ -6,6 +6,7 @@ import {
   GitCompare,
   ClipboardCheck,
 } from 'lucide-react';
+import ScrollReveal from '../ui/ScrollReveal';
 
 export function HowItWorksSection() {
   const steps = [
@@ -50,7 +51,7 @@ export function HowItWorksSection() {
     >
       <div className="max-w-[1320px] mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
-        <div className="max-w-2xl mx-auto text-center mb-11 sm:mb-12">
+        <ScrollReveal className="max-w-2xl mx-auto text-center mb-11 sm:mb-12">
           <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-widest text-[#173D32] mb-2.5">
             HOW IT WORKS
           </p>
@@ -65,19 +66,23 @@ export function HowItWorksSection() {
           <p className="mt-3 text-sm sm:text-[15px] text-[#1B2923]/70 font-normal leading-relaxed max-w-xl mx-auto">
             From identifying an infrastructure problem to understanding its impact and planning a response.
           </p>
-        </div>
+        </ScrollReveal>
 
         {/* 5-Step Balanced Editorial Flow */}
         <div className="how-it-works-grid">
-          {steps.map((step) => {
+          {steps.map((step, idx) => {
             const Icon = step.icon;
 
             return (
-              <div key={step.id} className="how-it-works-step">
+              <ScrollReveal
+                key={step.id}
+                delay={idx * 0.08}
+                className="how-it-works-step transition-all duration-200 hover:-translate-y-0.5"
+              >
                 {/* 1. Horizontally centered outline icon (22px, no bg, dark forest green) */}
                 <div className="flex items-center justify-center">
                   <Icon
-                    className="w-[22px] h-[22px] text-[#173D32]"
+                    className="w-[22px] h-[22px] text-[#173D32] transition-transform duration-200 group-hover:scale-110"
                     strokeWidth={1.75}
                     aria-hidden="true"
                   />
@@ -92,7 +97,7 @@ export function HowItWorksSection() {
                 <p className="mt-[10px] text-[12.5px] leading-[1.5] text-stone-600 font-normal max-w-[200px] sm:max-w-[210px] mx-auto text-center">
                   {step.description}
                 </p>
-              </div>
+              </ScrollReveal>
             );
           })}
         </div>

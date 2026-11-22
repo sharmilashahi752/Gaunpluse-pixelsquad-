@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { motion } from 'motion/react';
 import {
   ArrowLeft,
   Share2,
@@ -254,7 +255,14 @@ export function IssueDetailPage() {
                 const isCompleted = step.status === 'completed';
 
                 return (
-                  <div key={idx} className="relative">
+                  <motion.div
+                    key={idx}
+                    initial={{ opacity: 0, x: -10 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.35, delay: idx * 0.08, ease: 'easeOut' }}
+                    className="relative"
+                  >
                     {/* Vertical line dot */}
                     <span
                       className={`absolute -left-[31px] top-1 w-3.5 h-3.5 rounded-full border-2 ${
@@ -288,7 +296,7 @@ export function IssueDetailPage() {
                     <p className="text-xs sm:text-sm text-[#485650] leading-relaxed">
                       {step.note}
                     </p>
-                  </div>
+                  </motion.div>
                 );
               })}
             </div>

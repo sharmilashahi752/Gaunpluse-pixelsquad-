@@ -1,86 +1,13 @@
 import React from 'react';
-import {
-  Users,
-  Map,
-  Network,
-  Cpu,
-  UserCheck,
-} from 'lucide-react';
 import Container from '../ui/Container';
+import ScrollReveal from '../ui/ScrollReveal';
 
 // Local curated village photography
 import village1Img from '../../assets/solution/village1.jpg';
 import villageImg from '../../assets/solution/village.jpg';
 import village8Img from '../../assets/solution/village8.png';
 
-// Preserved decision-support architecture data structure for reuse and maintainability
-const solutionPillars = [
-  {
-    id: 0,
-    title: 'Community Reports',
-    tagline: 'Grassroots Eyes on the Ground',
-    icon: Users,
-    badge: 'Input Layer',
-    shortDesc: 'Citizens submit real-time hazard notices with photos, audio notes, and location markers.',
-    deepDive:
-      'Local residents identify cracked culverts, scouring riverbanks, and landslides immediately when they appear, bypassing bureaucratic reporting delays.',
-    workflowNode: 'Community Report Intake',
-    systemOutput: 'Raw observation geocoded & logged with timestamp',
-  },
-  {
-    id: 1,
-    title: 'Digital Infrastructure Maps',
-    tagline: 'Spatial Network Foundation',
-    icon: Map,
-    badge: 'Spatial Topology',
-    shortDesc: 'Ground observations are registered directly against mapped physical bridges, trails, and ward routes.',
-    deepDive:
-      'Instead of isolated text tickets, incidents are attached to digital topological networks representing roads, foot trails, and public river crossings.',
-    workflowNode: 'Topology Asset Matching',
-    systemOutput: 'Incident attached to Road Segment #RD-104 & Bridge #BR-02',
-  },
-  {
-    id: 2,
-    title: 'Graph-Based Impact Simulation',
-    tagline: 'Topological Cascades & Cut-offs',
-    icon: Network,
-    badge: 'Analytical Core',
-    shortDesc: 'Network graph algorithms calculate which hamlets, schools, or clinics lose connectivity if a structure fails.',
-    deepDive:
-      'The simulation evaluates reachability across alternative paths, calculating detour delays and identifying communities at critical isolation risk.',
-    workflowNode: 'Graph Reachability Engine',
-    systemOutput: 'Isolation Severity Index: Critical (140 households cut off)',
-  },
-  {
-    id: 3,
-    title: 'AI-Assisted Explanations',
-    tagline: 'Plain-Language Intelligence',
-    icon: Cpu,
-    badge: 'Cognitive Synthesis',
-    shortDesc: 'Complex network metrics are translated into clear, actionable summaries for elected ward representatives.',
-    deepDive:
-      'Natural language synthesis converts raw topological data into concise impact summaries that explain who is affected, why, and how urgently intervention is needed.',
-    workflowNode: 'AI Decision Synthesis',
-    systemOutput: 'Automated briefing: "South Bridge closure severs clinic access by 2.5h"',
-  },
-  {
-    id: 4,
-    title: 'Human-Reviewed Action Planning',
-    tagline: 'Local Democratic Accountability',
-    icon: UserCheck,
-    badge: 'Governance Outcome',
-    shortDesc: 'Ward chairs and municipal engineers review objective simulation evidence to schedule prioritized repairs.',
-    deepDive:
-      'AI advises, but humans decide. Elected local officials use transparent data to allocate scarce municipal budgets where they restore the greatest community access.',
-    workflowNode: 'Municipal Action Plan',
-    systemOutput: 'Work order approved & public advisory issued to ward bulletin',
-  },
-];
-
 export function SolutionSection() {
-  // Retain data reference for future re-extension
-  void solutionPillars;
-
   return (
     <>
       {/* =========================================================================
@@ -95,19 +22,19 @@ export function SolutionSection() {
         <Container>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 xl:gap-14 items-center">
             {/* Left Column: One Large Portrait-Oriented Village Photograph (village1.jpg) */}
-            <div className="lg:col-span-6 flex items-center justify-center">
-              <div className="w-full rounded-xl overflow-hidden aspect-[4/5] bg-stone-100">
+            <ScrollReveal className="lg:col-span-6 flex items-center justify-center">
+              <div className="w-full rounded-xl overflow-hidden aspect-[4/5] bg-stone-100 shadow-xs border border-stone-200/50">
                 <img
                   src={village1Img}
                   alt="Rural Nepalese hillside community trail network"
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover transition-transform duration-700 hover:scale-[1.02]"
                   loading="lazy"
                 />
               </div>
-            </div>
+            </ScrollReveal>
 
             {/* Right Column: Compact Centered Content Composition */}
-            <div className="lg:col-span-6 flex flex-col items-center justify-center text-center">
+            <ScrollReveal delay={0.15} className="lg:col-span-6 flex flex-col items-center justify-center text-center">
               <div className="w-full max-w-[540px] flex flex-col items-center text-center">
                 {/* Small label */}
                 <span className="text-[10px] sm:text-[11px] font-medium uppercase tracking-[0.08em] text-[#666]">
@@ -124,11 +51,11 @@ export function SolutionSection() {
 
                 {/* Supporting landscape photograph (village.jpg) */}
                 <div className="mt-4 sm:mt-5 w-[82%] sm:w-[80%] max-w-[400px]">
-                  <div className="rounded-xl overflow-hidden aspect-[4/3] bg-stone-100">
+                  <div className="rounded-xl overflow-hidden aspect-[4/3] bg-stone-100 shadow-xs border border-stone-200/50">
                     <img
                       src={villageImg}
                       alt="Village access network example"
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover transition-transform duration-500 hover:scale-[1.03]"
                       loading="lazy"
                     />
                   </div>
@@ -158,7 +85,7 @@ export function SolutionSection() {
                   </a>
                 </div>
               </div>
-            </div>
+            </ScrollReveal>
           </div>
         </Container>
       </section>
@@ -174,7 +101,7 @@ export function SolutionSection() {
       >
         <div className="max-w-[1140px] mx-auto px-4 sm:px-6 lg:px-8">
           {/* Centered Text Group */}
-          <div className="flex flex-col items-center text-center max-w-[800px] mx-auto">
+          <ScrollReveal className="flex flex-col items-center text-center max-w-[800px] mx-auto">
             {/* 1. Small uppercase label */}
             <span className="text-[12px] font-medium uppercase tracking-[0.1em] text-[#42866A]">
               DECISION-SUPPORT ARCHITECTURE
@@ -192,19 +119,19 @@ export function SolutionSection() {
             <p className="mt-[18px] text-[14px] sm:text-[15px] lg:text-[16.5px] text-[#1B2923]/70 font-normal leading-[1.6] max-w-[800px]">
               Discover how GaunPulse connects community reports, infrastructure mapping, and simulation to support informed local decisions.
             </p>
-          </div>
+          </ScrollReveal>
 
           {/* 4. One Large, Wide Landscape Image (village8) */}
-          <div className="mt-7 sm:mt-[28px] w-full max-w-[1100px] mx-auto">
+          <ScrollReveal delay={0.15} className="mt-7 sm:mt-[28px] w-full max-w-[1100px] mx-auto">
             <div className="w-full rounded-[14px] overflow-hidden aspect-[16/8] sm:aspect-[16/7] bg-stone-100 border border-stone-200/60 shadow-xs">
               <img
                 src={village8Img}
                 alt="Panoramic view of rural Himalayan village settlement and terrain network"
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover transition-transform duration-700 hover:scale-[1.02]"
                 loading="lazy"
               />
             </div>
-          </div>
+          </ScrollReveal>
         </div>
       </section>
     </>

@@ -6,6 +6,8 @@ import {
   FACILITIES,
   SETTLEMENTS,
 } from '../../data/demoVillage';
+import AnimatedCounter from '../ui/AnimatedCounter';
+import ScrollReveal from '../ui/ScrollReveal';
 
 /**
  * Community Impact in Numbers Section
@@ -64,7 +66,7 @@ export function CommunityImpactNumbers() {
 
   return (
     <section aria-labelledby="impact-numbers-heading" className="space-y-6 text-left">
-      <div className="space-y-1.5 border-b border-stone-200 pb-3">
+      <ScrollReveal className="space-y-1.5 border-b border-stone-200 pb-3">
         <h2
           id="impact-numbers-heading"
           className="scroll-mt-24 text-2xl sm:text-3xl font-bold text-[#173D32] tracking-tight"
@@ -74,7 +76,7 @@ export function CommunityImpactNumbers() {
         <p className="text-sm sm:text-base text-[#64748B] max-w-2xl leading-relaxed font-normal">
           Real indicators dynamically calculated from the Sundar Gaun spatial network and incident registry.
         </p>
-      </div>
+      </ScrollReveal>
 
       {!hasData ? (
         <div className="rounded-[8px] border border-stone-200 bg-stone-50 p-6 text-center text-sm text-[#64748B]">
@@ -82,15 +84,16 @@ export function CommunityImpactNumbers() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
-          {stats.map((stat) => (
-            <div
+          {stats.map((stat, idx) => (
+            <ScrollReveal
               key={stat.id}
-              className="rounded-[8px] border border-stone-200 bg-white p-6 lg:p-7 shadow-xs hover:border-[#173D32] hover:shadow-sm transition-all flex flex-col justify-between text-left space-y-3"
+              delay={idx * 0.08}
+              className="rounded-[8px] border border-stone-200 bg-white p-6 lg:p-7 shadow-xs hover:border-[#173D32] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between text-left space-y-3"
             >
               <div className="space-y-1.5">
                 <div className="flex items-baseline justify-between">
                   <p className="text-3xl sm:text-4xl lg:text-[40px] font-bold text-[#173D32] tracking-tight leading-none">
-                    {stat.value}
+                    <AnimatedCounter value={stat.value} duration={1.2} />
                   </p>
                   {stat.rateBadge && (
                     <span className="text-[11px] font-semibold text-[#42866A] bg-emerald-50 px-2 py-0.5 rounded-[2px] border border-emerald-100">
@@ -111,7 +114,7 @@ export function CommunityImpactNumbers() {
               <div className="pt-3 border-t border-stone-100 text-[11px] sm:text-xs text-[#64748B] leading-tight">
                 {stat.context}
               </div>
-            </div>
+            </ScrollReveal>
           ))}
         </div>
       )}

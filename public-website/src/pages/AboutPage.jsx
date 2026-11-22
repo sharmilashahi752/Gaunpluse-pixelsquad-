@@ -3,6 +3,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import Container from '../components/ui/Container';
+import ScrollReveal from '../components/ui/ScrollReveal';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 export function AboutPage() {
@@ -75,7 +76,7 @@ export function AboutPage() {
           ========================================================================= */}
       <section className="pt-12 sm:pt-16 lg:pt-20 pb-16 sm:pb-20 lg:pb-24 border-b border-[#E5E7EB]/80">
         <Container>
-          <div className="max-w-[800px] mx-auto text-center">
+          <ScrollReveal className="max-w-[800px] mx-auto text-center">
             <span className="text-[11px] sm:text-xs font-bold tracking-[0.14em] uppercase text-[#42866A] block mb-2 sm:mb-3">
               ABOUT GAUNPULSE
             </span>
@@ -89,18 +90,18 @@ export function AboutPage() {
               infrastructure mapping, simulation, and accessible insights can help rural Nepal
               understand infrastructure challenges and make better-informed decisions.
             </p>
-          </div>
+          </ScrollReveal>
 
           {/* Large Landscape Photograph (village8) */}
-          <div className="mt-8 sm:mt-12 lg:mt-14 max-w-[1100px] mx-auto">
+          <ScrollReveal delay={0.15} className="mt-8 sm:mt-12 lg:mt-14 max-w-[1100px] mx-auto">
             <div className="rounded-[12px] overflow-hidden bg-stone-100 shadow-xs border border-stone-200/60 aspect-[16/9] sm:aspect-[21/10] max-h-[500px]">
               <img
                 src="/images/about/village8.png"
                 alt="Panoramic landscape of a remote mountainous Nepalese village and connecting ridges"
-                className="w-full h-full object-cover object-center"
+                className="w-full h-full object-cover object-center transition-transform duration-700 hover:scale-[1.02]"
               />
             </div>
-          </div>
+          </ScrollReveal>
         </Container>
       </section>
 
@@ -111,7 +112,7 @@ export function AboutPage() {
         <Container>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-14 items-center max-w-[1100px] mx-auto">
             {/* Left Column: Narrative (~55% width) */}
-            <div className="lg:col-span-7 space-y-4 sm:space-y-5 text-left">
+            <ScrollReveal className="lg:col-span-7 space-y-4 sm:space-y-5 text-left">
               <span className="text-[11px] sm:text-xs font-bold tracking-[0.14em] uppercase text-[#42866A] block">
                 OUR BACKGROUND
               </span>
@@ -140,19 +141,19 @@ export function AboutPage() {
                   platform provides shared visibility into repair urgency and community impact.
                 </p>
               </div>
-            </div>
+            </ScrollReveal>
 
             {/* Right Column: Vertical Photograph (village1) (~45% width) */}
-            <div className="lg:col-span-5">
+            <ScrollReveal delay={0.15} className="lg:col-span-5">
               <div className="w-full h-[380px] sm:h-[440px] lg:h-[480px] rounded-[12px] overflow-hidden bg-stone-100 shadow-xs border border-stone-200/60">
                 <img
                   src="/images/about/village1.jpg"
                   alt="Steep mountainous village settlement along a valley ridge in rural Nepal"
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover transition-transform duration-700 hover:scale-[1.02]"
                   loading="lazy"
                 />
               </div>
-            </div>
+            </ScrollReveal>
           </div>
         </Container>
       </section>
@@ -164,21 +165,21 @@ export function AboutPage() {
         <Container>
           <div className="max-w-[1100px] mx-auto">
             {/* Centered Heading */}
-            <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-12">
+            <ScrollReveal className="text-center max-w-2xl mx-auto mb-10 sm:mb-12">
               <span className="text-[11px] sm:text-xs font-bold tracking-[0.14em] uppercase text-[#42866A] block mb-2">
                 GUIDING PURPOSE
               </span>
               <h2 className="text-2xl sm:text-3xl lg:text-[32px] font-extrabold text-[#173D32] tracking-tight">
-                Our Mission & Vision
+                Our Mission &amp; Vision
               </h2>
-            </div>
+            </ScrollReveal>
 
             {/* Two-Column Layout (50% / 50% with ~36px gap, vertically centered) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-[36px] items-center">
               {/* Left Column: Stacked Compact Mission & Vision Cards */}
               <div className="flex flex-col gap-4 sm:gap-[18px]">
                 {/* Mission Card */}
-                <div className="bg-white border border-[#E5E7EB] rounded-[12px] px-7 sm:px-8 py-6 sm:py-[26px] text-left">
+                <ScrollReveal delay={0.08} className="bg-white border border-[#E5E7EB] rounded-[12px] px-7 sm:px-8 py-6 sm:py-[26px] text-left shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm">
                   <span className="text-[11px] font-bold tracking-[0.14em] uppercase text-[#E3AD58] block mb-1.5">
                     OUR PURPOSE
                   </span>
@@ -189,10 +190,10 @@ export function AboutPage() {
                     Help communities identify infrastructure problems, understand their wider impact,
                     and support transparent, evidence-informed local decisions.
                   </p>
-                </div>
+                </ScrollReveal>
 
                 {/* Vision Card */}
-                <div className="bg-white border border-[#E5E7EB] rounded-[12px] px-7 sm:px-8 py-6 sm:py-[26px] text-left">
+                <ScrollReveal delay={0.16} className="bg-white border border-[#E5E7EB] rounded-[12px] px-7 sm:px-8 py-6 sm:py-[26px] text-left shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm">
                   <span className="text-[11px] font-bold tracking-[0.14em] uppercase text-[#E3AD58] block mb-1.5">
                     LOOKING AHEAD
                   </span>
@@ -203,20 +204,20 @@ export function AboutPage() {
                     A future where rural communities can access reliable infrastructure information
                     and participate in decisions that improve connectivity, safety, and everyday life.
                   </p>
-                </div>
+                </ScrollReveal>
               </div>
 
               {/* Right Column: Village Photograph (Compact Height ~420-440px desktop, ~280-320px mobile) */}
-              <div>
+              <ScrollReveal delay={0.2} className="h-full">
                 <div className="w-full h-[280px] sm:h-[320px] lg:h-[430px] rounded-[12px] overflow-hidden bg-stone-100 border border-[#E5E7EB] shadow-xs">
                   <img
                     src="/images/about/village.jpg"
                     alt="Rural village pathway connecting community houses and terraces"
-                    className="w-full h-full object-cover object-center"
+                    className="w-full h-full object-cover object-center transition-transform duration-700 hover:scale-[1.02]"
                     loading="lazy"
                   />
                 </div>
-              </div>
+              </ScrollReveal>
             </div>
           </div>
         </Container>
@@ -229,16 +230,19 @@ export function AboutPage() {
         <Container>
           <div className="max-w-[1220px] mx-auto">
             {/* Centered Heading */}
-            <h2 className="text-[26px] sm:text-[30px] lg:text-[32px] font-bold text-[#173D32] tracking-tight text-center mb-[50px] sm:mb-[52px]">
-              Our Core Principles
-            </h2>
+            <ScrollReveal className="text-center mb-[50px] sm:mb-[52px]">
+              <h2 className="text-[26px] sm:text-[30px] lg:text-[32px] font-bold text-[#173D32] tracking-tight">
+                Our Core Principles
+              </h2>
+            </ScrollReveal>
 
             {/* 5-Column Grid on Desktop with Natural Card Heights */}
             <div className="core-principles-grid">
               {corePrinciples.map((principle, idx) => (
-                <div
+                <ScrollReveal
                   key={idx}
-                  className="bg-white border border-[#E5E7EB] rounded-[10px] p-5 sm:p-[22px] text-left transition-colors duration-150"
+                  delay={idx * 0.08}
+                  className="bg-white border border-[#E5E7EB] rounded-[10px] p-5 sm:p-[22px] text-left transition-all duration-200 hover:-translate-y-1 hover:shadow-sm hover:border-[#173D32]/30"
                 >
                   <h3 className="text-[15px] sm:text-[16px] font-bold text-[#173D32] leading-[1.3]">
                     {principle.title}
@@ -246,7 +250,7 @@ export function AboutPage() {
                   <p className="text-[14px] text-[#64748B] leading-[1.6] mt-3.5 sm:mt-[15px] font-normal">
                     {principle.desc}
                   </p>
-                </div>
+                </ScrollReveal>
               ))}
             </div>
           </div>
@@ -260,7 +264,7 @@ export function AboutPage() {
         <Container>
           <div className="max-w-[1100px] mx-auto">
             {/* Section Heading */}
-            <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-14">
+            <ScrollReveal className="text-center max-w-2xl mx-auto mb-10 sm:mb-14">
               <span className="text-[11px] sm:text-xs font-bold tracking-[0.14em] uppercase text-[#42866A] block mb-2">
                 SYSTEM DESIGN
               </span>
@@ -271,12 +275,12 @@ export function AboutPage() {
                 Clear distinction between the client-side prototype demonstrated today and the proposed
                 production services planned for municipal deployment.
               </p>
-            </div>
+            </ScrollReveal>
 
             {/* Two-Column Comparison */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
               {/* Column 1: Implemented Prototype */}
-              <div className="text-left">
+              <ScrollReveal delay={0.08} className="text-left">
                 <div className="pb-3 border-b border-[#E5E7EB]">
                   <h3 className="text-[17px] sm:text-[18px] font-bold text-[#173D32]">
                     Implemented Prototype
@@ -287,7 +291,7 @@ export function AboutPage() {
                   {implementedTech.map((tech, idx) => (
                     <div
                       key={idx}
-                      className={`py-4 px-3 sm:px-4 ${idx % 2 === 1 ? 'bg-[#F7F8FA]' : 'bg-white'}`}
+                      className={`py-4 px-3 sm:px-4 transition-colors hover:bg-stone-50 ${idx % 2 === 1 ? 'bg-[#F7F8FA]' : 'bg-white'}`}
                     >
                       <h4 className="text-[16px] sm:text-[17px] font-bold text-[#173D32] leading-snug">
                         {tech.name}
@@ -298,13 +302,13 @@ export function AboutPage() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </ScrollReveal>
 
               {/* Column 2: Proposed Backend & AI Architecture */}
-              <div className="text-left">
+              <ScrollReveal delay={0.16} className="text-left">
                 <div className="pb-3 border-b border-[#E5E7EB]">
                   <h3 className="text-[17px] sm:text-[18px] font-bold text-[#173D32]">
-                    Proposed Backend & AI Architecture
+                    Proposed Backend &amp; AI Architecture
                   </h3>
                 </div>
 
@@ -312,7 +316,7 @@ export function AboutPage() {
                   {proposedTech.map((tech, idx) => (
                     <div
                       key={idx}
-                      className={`py-4 px-3 sm:px-4 ${idx % 2 === 1 ? 'bg-[#F7F8FA]' : 'bg-white'}`}
+                      className={`py-4 px-3 sm:px-4 transition-colors hover:bg-stone-50 ${idx % 2 === 1 ? 'bg-[#F7F8FA]' : 'bg-white'}`}
                     >
                       <h4 className="text-[16px] sm:text-[17px] font-bold text-[#173D32] leading-snug">
                         {tech.name}
@@ -323,7 +327,7 @@ export function AboutPage() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </ScrollReveal>
             </div>
           </div>
         </Container>
@@ -334,7 +338,7 @@ export function AboutPage() {
           ========================================================================= */}
       <section className="py-16 sm:py-20 lg:py-24">
         <Container>
-          <div className="max-w-[760px] mx-auto text-center space-y-4">
+          <ScrollReveal className="max-w-[760px] mx-auto text-center space-y-4">
             <span className="text-[11px] sm:text-xs font-bold tracking-[0.14em] uppercase text-[#42866A] block">
               THE TEAM
             </span>
@@ -360,7 +364,7 @@ export function AboutPage() {
                 <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
               </a>
             </div>
-          </div>
+          </ScrollReveal>
         </Container>
       </section>
     </div>

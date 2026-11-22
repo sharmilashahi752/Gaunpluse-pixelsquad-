@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
+import { motion, useReducedMotion } from 'motion/react';
 import Navbar from './Navbar';
 import Footer from './Footer';
 
@@ -8,6 +9,14 @@ export function AppLayout() {
   const isMapPage = location.pathname === '/map';
   const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
   const shouldHideFooter = isMapPage || isAuthPage;
+  const shouldReduceMotion = useReducedMotion();
+
+  // Instant scroll to top on route change (except for map to maintain coordinates/view)
+  useEffect(() => {
+    if (!isMapPage) {
+      window.scrollTo(0, 0);
+    }
+  }, [location.pathname, isMapPage]);
 
   return (
     <div
@@ -18,7 +27,7 @@ export function AppLayout() {
       {/* Sticky Main Navigation */}
       <Navbar />
 
-      {/* Main Page Content */}
+      {/* Main Page Content with Smooth Route Transition */}
       <main
         className={`flex-1 ${
           isMapPage
@@ -31,7 +40,15 @@ export function AppLayout() {
             : undefined
         }
       >
-        <Outlet />
+        <motion.div
+          key={location.pathname}
+          initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, ease: 'easeOut' }}
+          className={isMapPage ? 'w-full h-full' : 'w-full flex-1 flex flex-col'}
+        >
+          <Outlet />
+        </motion.div>
       </main>
 
       {/* Shared Professional Footer (preserved on all pages except full-screen map and auth pages) */}

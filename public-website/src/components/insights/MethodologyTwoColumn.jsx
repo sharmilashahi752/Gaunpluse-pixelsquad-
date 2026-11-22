@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import {
   ChevronDown,
-  ChevronUp,
   Database,
   GitBranch,
   ShieldAlert,
   Layers,
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import ScrollReveal from '../ui/ScrollReveal';
 
 const ACCORDION_ITEMS = [
   {
@@ -50,7 +51,7 @@ const ACCORDION_ITEMS = [
 /**
  * Data Sources and Methodology Two-Column Component
  * - Left column: Clean heading, brief explanation, and prominent demonstration data disclaimer
- * - Right column: 3 interactive accordion items detailing spatial graph modeling, citizen verification, and open cartography
+ * - Right column: 3 interactive accordion items with smooth animated expansion
  */
 export function MethodologyTwoColumn() {
   const [openIds, setOpenIds] = useState(new Set(['method-spatial']));
@@ -69,7 +70,7 @@ export function MethodologyTwoColumn() {
 
   return (
     <section aria-labelledby="methodology-heading" className="text-left">
-      <div className="rounded-[8px] border border-stone-200 bg-[#F7F9F7] p-6 sm:p-8 lg:p-10 shadow-xs">
+      <ScrollReveal className="rounded-[8px] border border-stone-200 bg-[#F7F9F7] p-6 sm:p-8 lg:p-10 shadow-xs">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
           {/* Left Column: Title & Narrative */}
           <div className="lg:col-span-5 space-y-4">
@@ -113,7 +114,7 @@ export function MethodologyTwoColumn() {
                   <button
                     type="button"
                     onClick={() => toggleItem(item.id)}
-                    className="w-full p-4 sm:p-5 flex items-center justify-between text-left hover:bg-stone-50/70 transition-colors focus:outline-none focus:ring-1 focus:ring-[#173D32]"
+                    className="w-full p-4 sm:p-5 flex items-center justify-between text-left hover:bg-stone-50/70 transition-colors focus:outline-none focus:ring-1 focus:ring-[#173D32] cursor-pointer select-none"
                     aria-expanded={isOpen}
                   >
                     <div className="flex items-center gap-3 pr-4">
@@ -131,36 +132,47 @@ export function MethodologyTwoColumn() {
                     </div>
 
                     <div className="text-stone-400 shrink-0">
-                      {isOpen ? (
-                        <ChevronUp className="w-4 h-4 text-[#173D32]" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4" />
-                      )}
+                      <ChevronDown
+                        className={`w-4 h-4 text-[#173D32] transition-transform duration-250 ease-out ${
+                          isOpen ? 'rotate-180 text-[#173D32]' : 'text-stone-400'
+                        }`}
+                      />
                     </div>
                   </button>
 
-                  {isOpen && (
-                    <div className="border-t border-stone-100 p-5 bg-[#FBFBFA] space-y-3.5 text-xs sm:text-sm text-[#1B2923] leading-relaxed">
-                      <div className="space-y-2">
-                        {item.details.map((p, idx) => (
-                          <p key={idx} className="font-normal text-[#1B2923]/85">
-                            {p}
-                          </p>
-                        ))}
-                      </div>
+                  <AnimatePresence initial={false}>
+                    {isOpen && (
+                      <motion.div
+                        key="content"
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.25, ease: 'easeOut' }}
+                        className="overflow-hidden border-t border-stone-100 bg-[#FBFBFA]"
+                      >
+                        <div className="p-5 space-y-3.5 text-xs sm:text-sm text-[#1B2923] leading-relaxed">
+                          <div className="space-y-2">
+                            {item.details.map((p, idx) => (
+                              <p key={idx} className="font-normal text-[#1B2923]/85">
+                                {p}
+                              </p>
+                            ))}
+                          </div>
 
-                      <div className="pt-2.5 border-t border-stone-200/80 flex items-center gap-2 text-xs text-[#64748B]">
-                        <span className="font-semibold text-[#173D32]">Metadata:</span>
-                        <span>{item.note}</span>
-                      </div>
-                    </div>
-                  )}
+                          <div className="pt-2.5 border-t border-stone-200/80 flex items-center gap-2 text-xs text-[#64748B]">
+                            <span className="font-semibold text-[#173D32]">Metadata:</span>
+                            <span>{item.note}</span>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               );
             })}
           </div>
         </div>
-      </div>
+      </ScrollReveal>
     </section>
   );
 }

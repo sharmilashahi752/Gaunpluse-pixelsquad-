@@ -214,4 +214,34 @@ body {
   }
 }
 
+/* =========================================================================
+   Global Micro-Interactions & Reduced-Motion Performance System
+   ========================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Subtle interactive button pressed state */
+button:not(:disabled):active,
+a[role="button"]:not([aria-disabled="true"]):active {
+  transform: scale(0.98);
+  transition: transform 0.12s ease-out;
+}
+
+/* Subtle card lift hover interaction */
+.card-hover-lift {
+  transition: transform 0.2s cubic-bezier(0.25, 0.1, 0.25, 1), box-shadow 0.2s cubic-bezier(0.25, 0.1, 0.25, 1), border-color 0.2s ease-out;
+}
+.card-hover-lift:hover {
+  transform: translateY(-3px);
+}
+
+
 

@@ -174,7 +174,7 @@ export function RegisterPage() {
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-md text-[#94A3B8] hover:text-[#173D32] hover:bg-stone-100 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#173D32]"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-md text-[#94A3B8] hover:text-[#173D32] hover:bg-stone-100 active:scale-95 transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#173D32]"
               >
                 {showPassword ? (
                   <EyeOff className="w-4 h-4" aria-hidden="true" />
@@ -234,7 +234,7 @@ export function RegisterPage() {
         {/* Submit Button */}
         <button
           type="submit"
-          className="w-full h-12 py-3 px-4 rounded-xl bg-[#173D32] hover:bg-[#122F26] text-white text-sm font-semibold transition-colors shadow-xs cursor-pointer focus-visible:outline-2 focus-visible:outline-[#173D32] focus-visible:outline-offset-2 flex items-center justify-center"
+          className="w-full h-12 py-3 px-4 rounded-xl bg-[#173D32] hover:bg-[#122F26] active:scale-[0.98] text-white text-sm font-semibold transition-all shadow-xs cursor-pointer focus-visible:outline-2 focus-visible:outline-[#173D32] focus-visible:outline-offset-2 flex items-center justify-center select-none"
         >
           Create Account
         </button>

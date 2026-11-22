@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useSearchParams, Link, Navigate } from 'react-router-dom';
+import { motion } from 'motion/react';
 import {
   Search,
   MapPin,
@@ -10,6 +11,7 @@ import {
   Filter,
 } from 'lucide-react';
 import Container from '../components/ui/Container';
+import ScrollReveal from '../components/ui/ScrollReveal';
 import { ISSUES } from '../data/demoVillage';
 import { getIssueImage, CATEGORY_TABS, CATEGORY_LABELS } from '../utils/issueImages';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -178,13 +180,20 @@ export function IssuesPage() {
                     key={tab.id}
                     type="button"
                     onClick={() => handleCategorySelect(tab.id)}
-                    className={`pb-3 text-xs sm:text-sm font-semibold tracking-wide whitespace-nowrap transition-colors border-b-2 cursor-pointer ${
+                    className={`relative pb-3 text-xs sm:text-sm font-semibold tracking-wide whitespace-nowrap transition-colors cursor-pointer ${
                       isActive
-                        ? 'border-[#173D32] text-[#173D32]'
-                        : 'border-transparent text-[#485650] hover:text-[#173D32]'
+                        ? 'text-[#173D32]'
+                        : 'text-[#485650] hover:text-[#173D32]'
                     }`}
                   >
                     {tab.label}
+                    {isActive && (
+                      <motion.div
+                        layoutId="activeCategoryUnderline"
+                        className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#173D32]"
+                        transition={{ duration: 0.25, ease: 'easeOut' }}
+                      />
+                    )}
                   </button>
                 );
               })}
@@ -262,7 +271,7 @@ export function IssuesPage() {
           {featuredIssue ? (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
               {/* Left Column: Featured Main Issue (7 cols ~58%) */}
-              <div className="lg:col-span-7 space-y-3.5 text-left">
+              <ScrollReveal className="lg:col-span-7 space-y-3.5 text-left">
                 <Link
                   to={`/issues/${featuredIssue.id}`}
                   className="group block overflow-hidden rounded-[6px] border border-[#E5E7EB] bg-stone-100 aspect-[16/10]"
@@ -326,10 +335,10 @@ export function IssuesPage() {
                     </Link>
                   </div>
                 </div>
-              </div>
+              </ScrollReveal>
 
               {/* Right Column: Vertical List of Secondary Issues (5 cols ~42%) */}
-              <div className="lg:col-span-5 text-left border-t lg:border-t-0 lg:border-l lg:border-[#E5E7EB] pt-6 lg:pt-0 lg:pl-8">
+              <ScrollReveal delay={0.15} className="lg:col-span-5 text-left border-t lg:border-t-0 lg:border-l lg:border-[#E5E7EB] pt-6 lg:pt-0 lg:pl-8">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-[#173D32] pb-2 mb-4 border-b border-[#E5E7EB]">
                   Related Ward Incidents
                 </h3>
@@ -386,7 +395,7 @@ export function IssuesPage() {
                     </div>
                   )}
                 </div>
-              </div>
+              </ScrollReveal>
             </div>
           ) : (
             /* Empty State */

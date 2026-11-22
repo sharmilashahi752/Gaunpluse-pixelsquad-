@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Search,
   X,
@@ -402,18 +403,27 @@ export function MapPage() {
       </div>
 
       {/* 4. Floating Infrastructure Inspector Panel (Right side on desktop, bottom sheet on mobile) */}
-      {inspectorOpen && (
-        <div className="absolute top-auto bottom-0 inset-x-0 sm:inset-x-auto sm:bottom-auto sm:top-4 sm:right-4 z-[1000] w-full sm:w-[360px] md:w-[380px] max-h-[65vh] sm:max-h-[calc(100vh-100px)] overflow-y-auto">
-          <InfrastructureDetails
-            selectedFeature={selectedFeature}
-            onClose={() => {
-              setUserSelectedFeature(null);
-              setInspectorOpen(false);
-            }}
-            onSelectPreset={handleSelectPreset}
-          />
-        </div>
-      )}
+      <AnimatePresence>
+        {inspectorOpen && (
+          <motion.div
+            key="infrastructure-inspector"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            className="absolute top-auto bottom-0 inset-x-0 sm:inset-x-auto sm:bottom-auto sm:top-4 sm:right-4 z-[1000] w-full sm:w-[360px] md:w-[380px] max-h-[65vh] sm:max-h-[calc(100vh-100px)] overflow-y-auto"
+          >
+            <InfrastructureDetails
+              selectedFeature={selectedFeature}
+              onClose={() => {
+                setUserSelectedFeature(null);
+                setInspectorOpen(false);
+              }}
+              onSelectPreset={handleSelectPreset}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Re-open inspector pill if closed on desktop */}
       {!inspectorOpen && (

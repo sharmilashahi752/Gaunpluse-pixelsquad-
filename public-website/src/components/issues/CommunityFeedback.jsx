@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { motion } from 'motion/react';
 import {
   AlertCircle,
   Mic,
@@ -351,10 +352,12 @@ export function CommunityFeedback({ issueTitle = 'this infrastructure issue' }) 
               const isSelected = selectedReaction === reaction.id;
 
               return (
-                <button
+                <motion.button
                   key={reaction.id}
                   type="button"
                   onClick={() => handleToggleReaction(reaction.id)}
+                  whileTap={{ scale: 0.92 }}
+                  whileHover={{ y: -1 }}
                   aria-pressed={isSelected}
                   className={`flex flex-col items-center justify-center py-3 px-2 sm:py-3.5 sm:px-3 rounded-[6px] border text-center transition-all cursor-pointer select-none ${
                     isSelected
@@ -390,7 +393,7 @@ export function CommunityFeedback({ issueTitle = 'this infrastructure issue' }) 
                   >
                     {reaction.count}
                   </span>
-                </button>
+                </motion.button>
               );
             })}
           </div>
@@ -546,7 +549,10 @@ export function CommunityFeedback({ issueTitle = 'this infrastructure issue' }) 
               {recordingState === 'recording' && (
                 <div className="p-2.5 rounded-[4px] bg-[#FEF2F2] border border-[#FCA5A5]/70 flex flex-wrap items-center justify-between gap-2.5 text-xs">
                   <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" />
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-600" />
+                    </span>
                     <span className="font-semibold text-red-700">Recording audio...</span>
                     <span className="font-mono text-xs text-red-700 bg-white px-1.5 py-0.5 rounded-[3px] border border-red-200">
                       {formatDuration(recordingDuration)}
