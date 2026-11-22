@@ -103,13 +103,23 @@ class IssueController extends Controller
         }
 
         $validated = $request->validate([
-            'status' => 'required|in:submitted,under_review,verified,in_progress,resolved,rejected',
+            'status' => 'required|in:submitted,pending_verification,under_review,verified,in_progress,resolved,rejected,more_information_needed',
             'comment' => 'nullable|string|max:1000',
         ]);
 
         DB::transaction(function () use ($issue, $validated, $request, $user) {
             $oldStatus = $issue->status;
-            $issue->update(['status' => $validated['status']]);
+            $newStatus = $validated['status'];
+            
+            $updatePayload = ['status' => $newStatus];
+            if ($newStatus === 'verified') {
+                $updatePayload['verified_by'] = $user?->id;
+                $updatePayload['verified_at'] = now();
+                $updatePayload['verification_notes'] = $request->input('verification_notes', $validated['comment'] ?? null);
+            } elseif ($newStatus === 'rejected') {
+                $updatePayload['rejection_reason'] = $request->input('rejection_reason', $validated['comment'] ?? null);
+            }
+            $issue->update($updatePayload);
 
             $updateData = ['issue_id' => $issue->id];
             if (Schema::hasColumn('issue_updates', 'status')) {
@@ -133,8 +143,14 @@ class IssueController extends Controller
 
             IssueUpdate::create($updateData);
 
+            $actionType = match ($newStatus) {
+                'verified' => 'issue_verified',
+                'rejected' => 'issue_rejected',
+                default => 'issue_status_updated',
+            };
+
             AuditLog::record(
-                actionType: 'issue_status_updated',
+                actionType: $actionType,
                 entityType: 'issue',
                 entityId: $issue->id,
                 summary: "Issue '{$issue->title}' status changed from {$oldStatus} to {$validated['status']}.",
@@ -152,6 +168,6 @@ class IssueController extends Controller
             );
         });
 
-        return new IssueResource($issue->fresh()->load(['village', 'edge', 'updates']));
+        return new IssueResource($issue->fresh()->load(['village', 'edge', 'updates', 'complaint.media']));
     }
 }

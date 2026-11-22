@@ -3,12 +3,16 @@ import {
   AlertCircle,
   AlertTriangle,
   Camera,
+  CheckCircle,
   CheckCircle2,
   Clock,
   ExternalLink,
   Eye,
+  FileText,
   Filter,
+  HelpCircle,
   Image as ImageIcon,
+  Inbox,
   Layers,
   Loader2,
   MapPin,
@@ -17,11 +21,14 @@ import {
   Search,
   ShieldAlert,
   ShieldCheck,
+  Volume2,
   X,
+  XCircle,
 } from 'lucide-react';
 import { Card, CardHeader, EmptyState, FeatureNotice, LiveLabel, PageIntro, StatusBadge } from '../components/ui';
 import { deduplicateVillages, formatVillageLabel } from '../utils/villageUtils';
 import { useVillageSelection } from '../context/VillageSelectionContext';
+import { useAuth } from '../context/AuthContext';
 import { cachedFetchJson, invalidateApiCache } from '../utils/apiCache';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
@@ -55,7 +62,9 @@ const severityTones = {
 
 const statusTones = {
   submitted: 'orange',
+  pending_verification: 'orange',
   under_review: 'orange',
+  more_information_needed: 'orange',
   verified: 'mint',
   in_progress: 'green',
   resolved: 'green',
@@ -63,12 +72,14 @@ const statusTones = {
 };
 
 export default function IssuesPage({ onNavigate }) {
+  const { token, user: authUser } = useAuth();
   const { selectedVillageId, villages: contextVillages } = useVillageSelection();
   const [issues, setIssues] = useState([]);
   const [villages, setVillages] = useState(contextVillages || []);
   const [villageEdges, setVillageEdges] = useState([]);
   const [loadingEdges, setLoadingEdges] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('all'); // 'all' | 'pending_verification'
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterSeverity, setFilterSeverity] = useState('');
@@ -381,20 +392,43 @@ export default function IssuesPage({ onNavigate }) {
     }
   };
 
-  // Handle Status Update
-  const handleUpdateStatus = async () => {
-    if (!selectedIssue || !newStatus) return;
+  // Handle Status Update & Verification Actions
+  const handleUpdateStatus = async (overrideStatus, overrideComment) => {
+    const targetStatus = overrideStatus || newStatus;
+    const targetComment = overrideComment !== undefined ? overrideComment : statusComment;
+    if (!selectedIssue || !targetStatus) return;
+
+    if (targetStatus === 'rejected' && !targetComment.trim()) {
+      setStatusMessage('Error: Please provide a reason for rejecting this report.');
+      return;
+    }
+    if (targetStatus === 'more_information_needed' && !targetComment.trim()) {
+      setStatusMessage('Error: Please provide notes explaining what additional information is required from the resident.');
+      return;
+    }
+
     setUpdatingStatus(true);
     setStatusMessage(null);
+
+    const authToken = token || localStorage.getItem('gaunpulse_auth_token');
+    const headers = {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    };
+
+    const payload = {
+      status: targetStatus,
+      comment: targetComment.trim() || `Status updated to ${targetStatus.replace(/_/g, ' ')}`,
+      verification_notes: targetStatus === 'verified' ? (targetComment.trim() || 'Verified on-site by municipal technical officer.') : undefined,
+      rejection_reason: targetStatus === 'rejected' ? targetComment.trim() : undefined,
+    };
 
     try {
       const res = await fetch(`${API_BASE_URL}/api/issues/${selectedIssue.id}/status`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({
-          status: newStatus,
-          comment: statusComment || `Status updated to ${newStatus}`,
-        }),
+        headers,
+        body: JSON.stringify(payload),
       });
 
       const updated = await res.json();
@@ -402,8 +436,10 @@ export default function IssuesPage({ onNavigate }) {
         throw new Error(updated.message || 'Failed to update status.');
       }
 
-      setStatusMessage('Status updated successfully and logged in database.');
-      setSelectedIssue(updated.data || updated);
+      const updatedData = updated.data || updated;
+      setStatusMessage(`Report status updated to ${targetStatus.replace(/_/g, ' ').toUpperCase()}. Resident notification created.`);
+      setSelectedIssue(updatedData);
+      setNewStatus(updatedData.status);
       invalidateApiCache('api/issues');
       invalidateApiCache('api/dashboard');
       invalidateApiCache('api/reports');
@@ -421,7 +457,18 @@ export default function IssuesPage({ onNavigate }) {
   const getSeverityTone = (sev) => severityTones[(sev || '').toLowerCase()] || severityTones[sev] || 'default';
   const getStatusTone = (st) => statusTones[(st || '').toLowerCase().replace(/[\s-]+/g, '_')] || statusTones[st] || 'default';
 
+  const pendingCount = issues.filter((item) => {
+    const st = norm(item.status);
+    return st === 'pending_verification' || st === 'submitted';
+  }).length;
+
   const filteredIssues = issues.filter((item) => {
+    if (activeTab === 'pending_verification') {
+      const st = norm(item.status);
+      if (st !== 'pending_verification' && st !== 'submitted') {
+        return false;
+      }
+    }
     const matchesSearch =
       (item.title || '').toLowerCase().includes(search.toLowerCase()) ||
       (item.tracking_code || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -464,6 +511,57 @@ export default function IssuesPage({ onNavigate }) {
       <FeatureNotice title="Connected to MySQL Infrastructure Database" icon={ShieldCheck}>
         Showing active records from the municipal database. Newly submitted reports are stored in the <code>issues</code> table and persist across sessions.
       </FeatureNotice>
+
+      {/* Verification Queue & All Issues Tabs */}
+      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '10px', marginBottom: '4px' }}>
+        <button
+          type="button"
+          className={`button ${activeTab === 'all' ? 'button--primary' : 'button--secondary'}`}
+          onClick={() => setActiveTab('all')}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 16px', fontSize: '13px' }}
+        >
+          <Layers size={15} /> All Municipal Issues ({issues.length})
+        </button>
+        <button
+          type="button"
+          className={`button ${activeTab === 'pending_verification' ? 'button--primary' : 'button--secondary'}`}
+          onClick={() => setActiveTab('pending_verification')}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 16px', fontSize: '13px' }}
+        >
+          <Inbox size={15} /> Citizen Reports Awaiting Verification
+          {pendingCount > 0 && (
+            <span style={{
+              background: activeTab === 'pending_verification' ? '#fff' : '#c64f45',
+              color: activeTab === 'pending_verification' ? '#123d30' : '#fff',
+              fontSize: '11px',
+              fontWeight: 800,
+              padding: '2px 8px',
+              borderRadius: '999px',
+            }}>
+              {pendingCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {activeTab === 'pending_verification' && (
+        <div style={{
+          padding: '12px 16px',
+          background: '#fefce8',
+          border: '1px solid #fde047',
+          borderRadius: 'var(--radius-md)',
+          display: 'flex',
+          gap: '12px',
+          alignItems: 'center',
+          color: '#854d0e',
+          fontSize: '13px',
+        }}>
+          <ShieldAlert size={20} style={{ flexShrink: 0, color: '#ca8a04' }} />
+          <div>
+            <strong>Citizen Incident Verification Queue:</strong> These reports were filed directly by citizens via the Citizen Portal and include photographic evidence, audio recordings, or speech-to-text transcripts. They are kept isolated from confirmed infrastructure disruptions until verified on-site by ward or municipal engineers.
+          </div>
+        </div>
+      )}
 
       {/* Filter and Search Bar */}
       <Card>
@@ -510,8 +608,10 @@ export default function IssuesPage({ onNavigate }) {
             style={{ padding: '8px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--surface)', fontSize: '12.5px', color: 'var(--text-primary)' }}
           >
             <option value="">All Statuses</option>
+            <option value="pending_verification">Pending Verification</option>
             <option value="submitted">Submitted</option>
             <option value="under_review">Under Review</option>
+            <option value="more_information_needed">Action Needed</option>
             <option value="verified">Verified</option>
             <option value="in_progress">In Progress</option>
             <option value="resolved">Resolved</option>
@@ -522,10 +622,10 @@ export default function IssuesPage({ onNavigate }) {
       {/* Issues Table */}
       <Card>
         <CardHeader
-          eyebrow="Triage queue"
-          title={`Registered Infrastructure Issues (${filteredIssues.length})`}
-          description="Click any issue row to view complete details, history timeline, and update municipal verification status."
-          action={<LiveLabel text="Live Triage Queue" compact />}
+          eyebrow={activeTab === 'pending_verification' ? 'Verification Queue' : 'Triage queue'}
+          title={activeTab === 'pending_verification' ? `Citizen Reports Awaiting Verification (${filteredIssues.length})` : `Registered Infrastructure Issues (${filteredIssues.length})`}
+          description={activeTab === 'pending_verification' ? 'Review unverified citizen complaints, inspect audio recordings and photographic evidence, and approve or reject.' : 'Click any issue row to view complete details, history timeline, and update municipal verification status.'}
+          action={<LiveLabel text={activeTab === 'pending_verification' ? 'Verification Inbox' : 'Live Triage Queue'} compact />}
         />
 
         {loading ? (
@@ -536,8 +636,8 @@ export default function IssuesPage({ onNavigate }) {
         ) : filteredIssues.length === 0 ? (
           <EmptyState
             icon={AlertTriangle}
-            title="No issues found matching current criteria"
-            description="Try clearing search filters or report a new issue to log municipal records."
+            title={activeTab === 'pending_verification' ? 'No pending citizen reports' : 'No issues found matching current criteria'}
+            description={activeTab === 'pending_verification' ? 'All citizen reports for this workspace have been verified or reviewed.' : 'Try clearing search filters or report a new issue to log municipal records.'}
             action={
               <button
                 type="button"
@@ -558,8 +658,8 @@ export default function IssuesPage({ onNavigate }) {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Issue & Code</th>
-                  <th>Village / Location</th>
+                  <th>Issue & Evidence</th>
+                  <th>Village / Settlement</th>
                   <th>Category</th>
                   <th>Severity</th>
                   <th>Status</th>
@@ -579,10 +679,28 @@ export default function IssuesPage({ onNavigate }) {
                     }}
                   >
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        {item.photo_url && (
-                          <span title="Has photo attachment" style={{ color: '#176342', display: 'inline-flex' }}>
-                            <Camera size={13} />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        {/* Photo indicator */}
+                        {(item.photo_url || (item.complaint?.media && item.complaint.media.some(m => m.media_type === 'image'))) && (
+                          <span title="Has photo attachment" style={{ color: '#176342', display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '11px', background: '#eef6f2', padding: '2px 6px', borderRadius: '4px' }}>
+                            <Camera size={12} />
+                            <span>
+                              {item.complaint?.media ? item.complaint.media.filter(m => m.media_type === 'image').length : 1}
+                            </span>
+                          </span>
+                        )}
+                        {/* Audio indicator */}
+                        {item.complaint?.media && item.complaint.media.some(m => m.media_type === 'audio') && (
+                          <span title="Has voice note" style={{ color: '#0369a1', display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '11px', background: '#e0f2fe', padding: '2px 6px', borderRadius: '4px' }}>
+                            <Volume2 size={12} />
+                            <span>Audio</span>
+                          </span>
+                        )}
+                        {/* Speech Transcript indicator */}
+                        {(item.speech_transcript || item.complaint?.speech_transcript) && (
+                          <span title="Has speech-to-text transcript" style={{ color: '#b45309', display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '11px', background: '#fef3c7', padding: '2px 6px', borderRadius: '4px' }}>
+                            <FileText size={12} />
+                            <span>Transcript</span>
                           </span>
                         )}
                         <strong>{item.title}</strong>
@@ -592,14 +710,14 @@ export default function IssuesPage({ onNavigate }) {
                       </small>
                     </td>
                     <td>
-                      <strong>{item.village?.name || 'Municipal Area'}</strong>
+                      <strong>{item.settlement_name || item.complaint?.settlement_name || item.village?.name || 'Municipal Area'}</strong>
                       <small style={{ display: 'block', color: 'var(--text-secondary)' }}>
-                        {item.village?.municipality || 'Municipal Workspace'}
+                        {item.village?.municipality || 'Municipal Workspace'} {item.ward_no || item.village?.ward_no || item.complaint?.ward_number ? `· Ward ${item.ward_no || item.village?.ward_no || item.complaint?.ward_number}` : ''}
                       </small>
                     </td>
                     <td>
                       <span style={{ fontSize: '12px', fontWeight: '500' }}>
-                        {(item.category || '').replace('_', ' ')}
+                        {(item.category || '').replace(/_/g, ' ')}
                       </span>
                     </td>
                     <td>
@@ -625,7 +743,15 @@ export default function IssuesPage({ onNavigate }) {
                           setStatusMessage(null);
                         }}
                       >
-                        <Eye size={13} /> View
+                        {['pending_verification', 'submitted'].includes(norm(item.status)) ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#b45309', fontWeight: 600 }}>
+                            <ShieldAlert size={12} /> Review
+                          </span>
+                        ) : (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <Eye size={12} /> View
+                          </span>
+                        )}
                       </button>
                     </td>
                   </tr>
@@ -982,79 +1108,215 @@ export default function IssuesPage({ onNavigate }) {
               <div style={{ padding: '14px', background: 'var(--surface-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
                 <p style={{ margin: '0 0 8px', lineHeight: '1.5' }}>{selectedIssue.description}</p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '8px' }}>
-                  <span><strong>Village:</strong> {selectedIssue.village?.name || 'Municipal Area'}</span>
+                  <span><strong>Village / Settlement:</strong> {selectedIssue.settlement_name || selectedIssue.complaint?.settlement_name || selectedIssue.village?.name || 'Municipal Area'}</span>
+                  <span><strong>Ward:</strong> Ward {selectedIssue.ward_no || selectedIssue.village?.ward_no || selectedIssue.complaint?.ward_number || 'N/A'}</span>
                   {selectedIssue.edge && <span><strong>Asset:</strong> {selectedIssue.edge.name}</span>}
                   <span style={{ fontVariantNumeric: 'tabular-nums' }}><strong>Coordinates:</strong> {selectedIssue.latitude}, {selectedIssue.longitude}</span>
-                  {selectedIssue.reporter_name && <span><strong>Reporter:</strong> {selectedIssue.reporter_name} ({selectedIssue.reporter_phone || 'Verified'})</span>}
+                  {selectedIssue.reporter_name && <span><strong>Reporter:</strong> {selectedIssue.reporter_name} ({selectedIssue.reporter_phone || 'Resident'})</span>}
                 </div>
 
-                {/* Display Photo Evidence if available */}
-                {selectedIssue.photo_url && (
+                {/* Speech-to-Text Transcription Box */}
+                {(selectedIssue.speech_transcript || selectedIssue.complaint?.speech_transcript) && (
+                  <div style={{ marginTop: '12px', padding: '12px 14px', background: '#f8fafc', borderLeft: '4px solid #123d30', borderRadius: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#123d30', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
+                      <FileText size={14} /> Citizen Speech Transcription (Nepali / English via Web Speech)
+                    </div>
+                    <p style={{ margin: 0, fontStyle: 'italic', fontSize: '13px', color: '#1e293b', lineHeight: 1.6 }}>
+                      "{selectedIssue.speech_transcript || selectedIssue.complaint?.speech_transcript}"
+                    </p>
+                  </div>
+                )}
+
+                {/* Attached Audio Evidence (Voice Recording) */}
+                {selectedIssue.complaint?.media && selectedIssue.complaint.media.some((m) => m.media_type === 'audio') && (
+                  <div style={{ marginTop: '12px', padding: '12px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 'var(--radius-md)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#166534', fontSize: '12.5px', fontWeight: 700, marginBottom: '8px' }}>
+                      <Volume2 size={16} /> Attached Citizen Voice Recording
+                    </div>
+                    {selectedIssue.complaint.media.filter((m) => m.media_type === 'audio').map((audioItem) => (
+                      <div key={audioItem.id} style={{ marginBottom: '6px' }}>
+                        <small style={{ display: 'block', marginBottom: '4px', color: 'var(--text-secondary)' }}>
+                          {audioItem.original_name} {audioItem.file_size ? `(${Math.round(audioItem.file_size / 1024)} KB)` : ''}
+                        </small>
+                        <audio controls src={audioItem.url} style={{ width: '100%', height: '36px' }} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Multi-Photo Evidence Gallery */}
+                {((selectedIssue.complaint?.media && selectedIssue.complaint.media.some((m) => m.media_type === 'image')) || selectedIssue.photo_url) && (
                   <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
-                    <strong style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
+                    <strong style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>
                       Attached Photographic Evidence:
                     </strong>
-                    <a href={selectedIssue.photo_url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block' }}>
-                      <img
-                        src={selectedIssue.photo_url}
-                        alt={selectedIssue.title}
-                        style={{
-                          maxHeight: '200px',
-                          maxWidth: '100%',
-                          borderRadius: 'var(--radius-md)',
-                          border: '1px solid var(--border)',
-                          objectFit: 'cover',
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
-                        }}
-                      />
-                    </a>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px' }}>
+                      {selectedIssue.complaint?.media && selectedIssue.complaint.media.filter((m) => m.media_type === 'image').length > 0 ? (
+                        selectedIssue.complaint.media.filter((m) => m.media_type === 'image').map((mediaItem) => (
+                          <a key={mediaItem.id} href={mediaItem.url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', textAlign: 'center' }}>
+                            <img
+                              src={mediaItem.url}
+                              alt={mediaItem.original_name}
+                              style={{
+                                width: '100%',
+                                height: '90px',
+                                borderRadius: 'var(--radius-md)',
+                                border: '1px solid var(--border)',
+                                objectFit: 'cover',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.06)',
+                              }}
+                            />
+                            <small style={{ display: 'block', fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {mediaItem.original_name}
+                            </small>
+                          </a>
+                        ))
+                      ) : selectedIssue.photo_url ? (
+                        <a href={selectedIssue.photo_url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block' }}>
+                          <img
+                            src={selectedIssue.photo_url}
+                            alt={selectedIssue.title}
+                            style={{
+                              maxHeight: '160px',
+                              maxWidth: '100%',
+                              borderRadius: 'var(--radius-md)',
+                              border: '1px solid var(--border)',
+                              objectFit: 'cover',
+                              boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
+                            }}
+                          />
+                        </a>
+                      ) : null}
+                    </div>
                   </div>
                 )}
               </div>
 
-              {/* Status Update Action Box */}
+              {/* Status Update & Municipal Verification Panel */}
               <div style={{ padding: '16px', background: 'var(--surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-                <h4 style={{ margin: '0 0 10px', color: 'var(--text-primary)', fontSize: '13.5px', fontWeight: 600 }}>Update Issue Status & Action History</h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <h4 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '13.5px', fontWeight: 600 }}>
+                    Municipal Verification & Lifecycle Actions
+                  </h4>
+                  <StatusBadge tone={statusTones[selectedIssue.status]}>
+                    {(selectedIssue.status || '').replace(/_/g, ' ')}
+                  </StatusBadge>
+                </div>
+
                 {statusMessage && (
-                  <div style={{ padding: '8px 12px', background: 'var(--success-bg)', border: '1px solid var(--success-border)', borderRadius: 'var(--radius-sm)', fontSize: '12px', color: 'var(--success)', marginBottom: '10px' }}>
+                  <div style={{ padding: '8px 12px', background: statusMessage.startsWith('Error') ? 'var(--danger-bg)' : 'var(--success-bg)', border: `1px solid ${statusMessage.startsWith('Error') ? 'rgba(198,79,69,0.3)' : 'var(--success-border)'}`, borderRadius: 'var(--radius-sm)', fontSize: '12px', color: statusMessage.startsWith('Error') ? 'var(--danger)' : 'var(--success)', marginBottom: '10px' }}>
                     {statusMessage}
                   </div>
                 )}
-                <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr auto', gap: '10px', alignItems: 'end' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>New Status:</label>
+
+                {/* Existing Verification Metadata if already verified or rejected */}
+                {(selectedIssue.verified_at || selectedIssue.rejection_reason) && (
+                  <div style={{ padding: '10px 12px', background: 'var(--surface-subtle)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', fontSize: '12px', marginBottom: '12px' }}>
+                    {selectedIssue.verified_at && (
+                      <div style={{ color: '#166534', marginBottom: selectedIssue.verification_notes ? '4px' : 0 }}>
+                        <strong>✓ Verified On:</strong> {new Date(selectedIssue.verified_at).toLocaleString()}
+                        {selectedIssue.verification_notes && (
+                          <div style={{ color: 'var(--text-primary)', marginTop: '2px' }}>
+                            <strong>Notes:</strong> {selectedIssue.verification_notes}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {selectedIssue.rejection_reason && (
+                      <div style={{ color: '#991b1b' }}>
+                        <strong>✕ Closed / Rejection Reason:</strong> {selectedIssue.rejection_reason}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Quick Verification Actions for Pending Reports */}
+                {['pending_verification', 'submitted', 'more_information_needed'].includes(norm(selectedIssue.status)) && (
+                  <div style={{ marginBottom: '14px', padding: '12px', background: '#f8fafc', borderRadius: 'var(--radius-sm)', border: '1px dashed #cbd5e1' }}>
+                    <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>
+                      ON-SITE VERIFICATION ACTION (WARD & MUNICIPAL ENGINEERS):
+                    </span>
+                    <p style={{ margin: '0 0 10px', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                      Unverified reports remain isolated from confirmed incident models. Confirming this report promotes it to active status across Simulation, Prioritization, and Action Plan modules.
+                    </p>
+                    <div style={{ marginBottom: '10px' }}>
+                      <input
+                        type="text"
+                        placeholder="Verification inspection notes, requested resident details, or rejection reason..."
+                        value={statusComment}
+                        onChange={(e) => setStatusComment(e.target.value)}
+                        style={{ width: '100%', padding: '7px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', fontSize: '12px' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        className="button"
+                        onClick={() => handleUpdateStatus('verified')}
+                        disabled={updatingStatus}
+                        style={{ background: '#166534', color: '#fff', fontSize: '12px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      >
+                        <CheckCircle2 size={14} /> Verify Report (Confirm Disruption)
+                      </button>
+                      <button
+                        type="button"
+                        className="button"
+                        onClick={() => handleUpdateStatus('more_information_needed')}
+                        disabled={updatingStatus}
+                        style={{ background: '#ca8a04', color: '#fff', fontSize: '12px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      >
+                        <HelpCircle size={14} /> Request More Info
+                      </button>
+                      <button
+                        type="button"
+                        className="button"
+                        onClick={() => handleUpdateStatus('rejected')}
+                        disabled={updatingStatus}
+                        style={{ background: '#b91c1c', color: '#fff', fontSize: '12px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      >
+                        <XCircle size={14} /> Reject Report
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Standard Status Dropdown for Full Lifecycle */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-secondary)' }}>
+                    Update Lifecycle Status:
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '170px 1fr auto', gap: '10px', alignItems: 'end' }}>
                     <select
                       value={newStatus}
                       onChange={(e) => setNewStatus(e.target.value)}
                       style={{ width: '100%', padding: '7px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: '#fff', fontSize: '12.5px' }}
                     >
+                      <option value="pending_verification">Pending Verification</option>
                       <option value="submitted">Submitted</option>
                       <option value="under_review">Under Review</option>
-                      <option value="verified">Verified (Confirmed on site)</option>
-                      <option value="in_progress">In Progress (Work underway)</option>
-                      <option value="resolved">Resolved (Repairs completed)</option>
-                      <option value="rejected">Rejected (Not actionable)</option>
+                      <option value="verified">Verified (Confirmed On-Site)</option>
+                      <option value="more_information_needed">More Information Needed</option>
+                      <option value="in_progress">In Progress (Work Underway)</option>
+                      <option value="resolved">Resolved (Repairs Completed)</option>
+                      <option value="rejected">Rejected (Not Actionable)</option>
                     </select>
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Log Comment / Notes:</label>
                     <input
                       type="text"
-                      placeholder="e.g. Inspection conducted by municipal technical officer"
+                      placeholder="Audit log comment or engineer remarks..."
                       value={statusComment}
                       onChange={(e) => setStatusComment(e.target.value)}
                       style={{ width: '100%', padding: '7px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', fontSize: '12.5px' }}
                     />
+                    <button
+                      type="button"
+                      className="button button--primary"
+                      onClick={() => handleUpdateStatus()}
+                      disabled={updatingStatus}
+                      style={{ height: '35px', fontSize: '12px' }}
+                    >
+                      {updatingStatus ? <Loader2 className="animate-spin" size={14} /> : 'Save Update'}
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    className="button button--primary"
-                    onClick={handleUpdateStatus}
-                    disabled={updatingStatus}
-                    style={{ height: '35px', fontSize: '12px' }}
-                  >
-                    {updatingStatus ? <Loader2 className="animate-spin" size={14} /> : 'Save Update'}
-                  </button>
                 </div>
               </div>
 

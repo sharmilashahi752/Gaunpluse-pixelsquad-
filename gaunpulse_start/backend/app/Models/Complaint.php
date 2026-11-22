@@ -14,18 +14,24 @@ class Complaint extends Model
         'complaint_number',
         'user_id',
         'issue_id',
+        'municipality_id',
         'village_id',
+        'settlement_name',
         'ward_number',
         'title',
         'category',
         'custom_category',
         'description',
+        'speech_transcript',
         'contact_number',
         'latitude',
         'longitude',
         'status',
         'priority',
         'official_response',
+        'verified_by',
+        'verified_at',
+        'rejection_reason',
         'submitted_at',
     ];
 
@@ -35,12 +41,23 @@ class Complaint extends Model
             'latitude' => 'float',
             'longitude' => 'float',
             'submitted_at' => 'datetime',
+            'verified_at' => 'datetime',
         ];
     }
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function verifier(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'verified_by');
+    }
+
+    public function municipality(): BelongsTo
+    {
+        return $this->belongsTo(Municipality::class);
     }
 
     public function issue(): BelongsTo

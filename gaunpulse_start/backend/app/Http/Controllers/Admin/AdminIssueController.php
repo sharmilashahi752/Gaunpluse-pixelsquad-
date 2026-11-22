@@ -16,25 +16,42 @@ class AdminIssueController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Issue::with(['village', 'edge', 'reporter', 'priorityScore', 'complaint'])->latest();
+        $query = Issue::with(['village', 'edge', 'reporter', 'priorityScore', 'complaint.media', 'updates.user'])->latest();
         $user = $request->user();
 
         // Multi-municipality & ward scoping
         if ($user && $user->isStaff() && !$user->isSystemAdmin()) {
             if ($user->isWardOfficer()) {
-                $query->whereHas('village', function ($q) use ($user) {
-                    $q->where('municipality_id', (string) $user->municipality_id)
-                      ->where('ward_no', (string) $user->ward_number);
+                $query->where(function ($q) use ($user) {
+                    $q->where(function ($sub) use ($user) {
+                        $sub->where('issues.municipality_id', (string) $user->municipality_id)
+                            ->where('issues.ward_no', (string) $user->ward_number);
+                    })->orWhereHas('village', function ($v) use ($user) {
+                        $v->where('municipality_id', (string) $user->municipality_id)
+                          ->where('ward_no', (string) $user->ward_number);
+                    });
                 });
             } elseif ($user->isMunicipalityAdmin()) {
-                $query->whereHas('village', function ($q) use ($user) {
-                    $q->where('municipality_id', (string) $user->municipality_id);
+                $query->where(function ($q) use ($user) {
+                    $q->where('issues.municipality_id', (string) $user->municipality_id)
+                      ->orWhereHas('village', function ($v) use ($user) {
+                          $v->where('municipality_id', (string) $user->municipality_id);
+                      });
                 });
             }
         } elseif ($request->filled('municipality_id')) {
-            $query->whereHas('village', function ($q) use ($request) {
-                $q->where('municipality_id', (string) $request->input('municipality_id'));
+            $mId = $request->input('municipality_id');
+            $query->where(function ($q) use ($mId) {
+                $q->where('issues.municipality_id', (string) $mId)
+                  ->orWhereHas('village', function ($v) use ($mId) {
+                      $v->where('municipality_id', (string) $mId);
+                  });
             });
+        }
+
+        // Pending Verification Queue Filter
+        if ($request->boolean('pending_only') || $request->input('queue') === 'pending') {
+            $query->whereIn('status', ['submitted', 'pending_verification']);
         }
 
         foreach (['category', 'severity', 'status', 'village_id'] as $filter) {
@@ -48,48 +65,64 @@ class AdminIssueController extends Controller
     public function show(Request $request, Issue $issue)
     {
         $user = $request->user();
-        if ($user && $user->isStaff() && !$user->isSystemAdmin() && $issue->village) {
+        $issueMuniId = $issue->municipality_id ?? $issue->village?->municipality_id;
+        $issueWardNo = $issue->ward_no ?? $issue->village?->ward_no;
+
+        if ($user && $user->isStaff() && !$user->isSystemAdmin()) {
             if ($user->isMunicipalityAdmin()) {
-                abort_unless((string) $issue->village->municipality_id === (string) $user->municipality_id, 403, 'Cross-municipality access denied.');
+                abort_unless((string) $issueMuniId === (string) $user->municipality_id, 403, 'Cross-municipality access denied.');
             } elseif ($user->isWardOfficer()) {
                 abort_unless(
-                    (string) $issue->village->municipality_id === (string) $user->municipality_id &&
-                    (string) $issue->village->ward_no === (string) $user->ward_number,
+                    (string) $issueMuniId === (string) $user->municipality_id &&
+                    (string) $issueWardNo === (string) $user->ward_number,
                     403,
                     'Cross-ward access denied.'
                 );
             }
         }
 
-        return new IssueResource($issue->load(['village', 'edge', 'reporter', 'updates.user', 'priorityScore', 'complaint']));
+        return new IssueResource($issue->load(['village', 'edge', 'reporter', 'updates.user', 'priorityScore', 'complaint.media']));
     }
 
     public function updateStatus(UpdateIssueStatusRequest $request, Issue $issue)
     {
         $user = $request->user();
-        if ($user && $user->isStaff() && !$user->isSystemAdmin() && $issue->village) {
+        $issueMuniId = $issue->municipality_id ?? $issue->village?->municipality_id;
+        $issueWardNo = $issue->ward_no ?? $issue->village?->ward_no;
+
+        if ($user && $user->isStaff() && !$user->isSystemAdmin()) {
             if ($user->isMunicipalityAdmin()) {
-                abort_unless((string) $issue->village->municipality_id === (string) $user->municipality_id, 403, 'Cross-municipality issue modification denied.');
+                abort_unless((string) $issueMuniId === (string) $user->municipality_id, 403, 'Cross-municipality issue modification denied.');
             } elseif ($user->isWardOfficer()) {
                 abort_unless(
-                    (string) $issue->village->municipality_id === (string) $user->municipality_id &&
-                    (string) $issue->village->ward_no === (string) $user->ward_number,
+                    (string) $issueMuniId === (string) $user->municipality_id &&
+                    (string) $issueWardNo === (string) $user->ward_number,
                     403,
                     'Cross-ward issue modification denied.'
                 );
             }
         }
 
-        DB::transaction(function () use ($request, $issue, $user) {
+        DB::transaction(function () use ($request, $issue, $user, $issueMuniId) {
             $old = $issue->status;
-            $issue->update(['status' => $request->status]);
+            $newStatus = $request->status;
+
+            $updatePayload = ['status' => $newStatus];
+            if ($newStatus === 'verified') {
+                $updatePayload['verified_by'] = $user?->id;
+                $updatePayload['verified_at'] = now();
+                $updatePayload['verification_notes'] = $request->input('verification_notes', $request->comment);
+            } elseif ($newStatus === 'rejected') {
+                $updatePayload['rejection_reason'] = $request->input('rejection_reason', $request->comment);
+            }
+            $issue->update($updatePayload);
 
             $updateData = ['issue_id' => $issue->id];
             if (\Illuminate\Support\Facades\Schema::hasColumn('issue_updates', 'status')) {
-                $updateData['status'] = $request->status;
+                $updateData['status'] = $newStatus;
             }
             if (\Illuminate\Support\Facades\Schema::hasColumn('issue_updates', 'comment')) {
-                $updateData['comment'] = $request->comment;
+                $updateData['comment'] = $request->comment ?? $request->verification_notes ?? $request->rejection_reason;
             }
             if (\Illuminate\Support\Facades\Schema::hasColumn('issue_updates', 'updated_by')) {
                 $updateData['updated_by'] = $user?->name ?? 'Municipal Officer';
@@ -98,32 +131,44 @@ class AdminIssueController extends Controller
                 $updateData['old_status'] = $old;
             }
             if (\Illuminate\Support\Facades\Schema::hasColumn('issue_updates', 'new_status')) {
-                $updateData['new_status'] = $request->status;
+                $updateData['new_status'] = $newStatus;
             }
             if (\Illuminate\Support\Facades\Schema::hasColumn('issue_updates', 'user_id')) {
                 $updateData['user_id'] = $user?->id ?? 1;
             }
             IssueUpdate::create($updateData);
 
+            $actionType = match ($newStatus) {
+                'verified' => 'issue_verified',
+                'rejected' => 'issue_rejected',
+                default => 'issue_status_updated',
+            };
+
             AuditLog::record(
-                actionType: 'issue_status_updated',
+                actionType: $actionType,
                 entityType: 'issue',
                 entityId: $issue->id,
-                summary: "Admin updated issue '{$issue->title}' to {$request->status}.",
-                details: ['old_status' => $old, 'new_status' => $request->status, 'comment' => $request->comment],
+                summary: "Staff {$user?->name} marked issue #{$issue->id} as {$newStatus}.",
+                details: [
+                    'old_status' => $old,
+                    'new_status' => $newStatus,
+                    'comment' => $request->comment,
+                    'verification_notes' => $request->verification_notes,
+                    'rejection_reason' => $request->rejection_reason,
+                ],
                 villageId: $issue->village_id,
-                municipalityId: $issue->village?->municipality_id ? (int) $issue->village->municipality_id : null,
+                municipalityId: $issueMuniId ? (int) $issueMuniId : null,
                 actor: $user
             );
 
             CitizenPortalController::syncIssueStatusToComplaint(
                 $issue,
-                $request->status,
-                $request->comment,
+                $newStatus,
+                $request->comment ?? $request->verification_notes ?? $request->rejection_reason,
                 $user?->id
             );
         });
 
-        return new IssueResource($issue->fresh()->load(['village', 'edge', 'updates.user', 'complaint']));
+        return new IssueResource($issue->fresh()->load(['village', 'edge', 'updates.user', 'complaint.media']));
     }
 }

@@ -124,9 +124,10 @@ Route::prefix('reports')->group(function () {
 
 // Public Dashboard Real-Time Statistics
 Route::get('/dashboard/stats', function () {
-    $activeCount = Issue::whereNotIn('status', ['resolved', 'rejected'])->count();
-    $criticalCount = Issue::where('severity', 'critical')->whereNotIn('status', ['resolved', 'rejected'])->count();
+    $activeCount = Issue::whereNotIn('status', ['resolved', 'rejected', 'pending_verification'])->count();
+    $criticalCount = Issue::where('severity', 'critical')->whereNotIn('status', ['resolved', 'rejected', 'pending_verification'])->count();
     $resolvedCount = Issue::where('status', 'resolved')->count();
+    $pendingVerificationCount = Issue::whereIn('status', ['submitted', 'pending_verification'])->count();
     $totalHouseholds = SettlementGroup::sum('households') ?: 186;
 
     return response()->json([
@@ -135,6 +136,7 @@ Route::get('/dashboard/stats', function () {
         'critical_disruptions' => $criticalCount,
         'affected_households' => $totalHouseholds,
         'resolved_issues' => $resolvedCount,
+        'pending_verification' => $pendingVerificationCount,
         'total_action_plans' => ActionPlan::count(),
         'action_plans_in_progress' => ActionPlan::where('status', 'in_progress')->count(),
         'community_voices_count' => CommunityFeedback::count(),

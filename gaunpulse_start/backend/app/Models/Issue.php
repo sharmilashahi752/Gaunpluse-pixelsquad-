@@ -16,12 +16,23 @@ class Issue extends Model
         return [
             'latitude' => 'float',
             'longitude' => 'float',
+            'verified_at' => 'datetime',
         ];
     }
 
     public function village(): BelongsTo
     {
         return $this->belongsTo(Village::class);
+    }
+
+    public function municipality(): BelongsTo
+    {
+        return $this->belongsTo(Municipality::class);
+    }
+
+    public function verifier(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'verified_by');
     }
 
     public function edge(): BelongsTo
