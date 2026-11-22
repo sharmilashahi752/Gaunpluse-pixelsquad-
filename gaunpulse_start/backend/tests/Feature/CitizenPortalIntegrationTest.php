@@ -140,7 +140,7 @@ class CitizenPortalIntegrationTest extends TestCase
             'village_id' => $village->id,
             'category' => 'damaged_road', // Mapped category
             'severity' => 'critical',     // Inferred severity for Landslide
-            'status' => 'submitted',
+            'status' => 'pending_verification',
         ]);
     }
 
@@ -169,7 +169,7 @@ class CitizenPortalIntegrationTest extends TestCase
             'title' => 'Broken drinking water tap line',
             'category' => 'water_supply',
             'severity' => 'high',
-            'status' => 'submitted',
+            'status' => 'pending_verification',
             'description' => 'Pipe broke near main ward junction',
             'latitude' => 28.9242,
             'longitude' => 81.7125,
@@ -236,7 +236,7 @@ class CitizenPortalIntegrationTest extends TestCase
             'title' => 'Minor pothole',
             'category' => 'damaged_road',
             'severity' => 'low',
-            'status' => 'submitted',
+            'status' => 'pending_verification',
             'description' => 'Temporary pothole',
             'latitude' => 28.0,
             'longitude' => 84.0,

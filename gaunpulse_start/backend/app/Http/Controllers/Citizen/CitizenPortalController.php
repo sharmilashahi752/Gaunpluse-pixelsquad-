@@ -78,8 +78,10 @@ class CitizenPortalController extends Controller
         }
 
         $complaintStatus = match ($adminStatus) {
-            'submitted', 'under_review' => 'pending',
+            'submitted', 'pending_verification' => 'pending',
             'verified' => 'verified',
+            'more_information_needed' => 'more_information_needed',
+            'under_review' => 'under_review',
             'in_progress' => 'in_progress',
             'resolved' => 'resolved',
             'rejected' => 'rejected',
@@ -91,6 +93,12 @@ class CitizenPortalController extends Controller
         if ($comment) {
             $complaint->official_response = $comment;
         }
+        if ($adminStatus === 'verified') {
+            $complaint->verified_by = $userId;
+            $complaint->verified_at = now();
+        } elseif ($adminStatus === 'rejected') {
+            $complaint->rejection_reason = $comment;
+        }
         $complaint->save();
 
         ComplaintUpdate::create([
@@ -101,11 +109,29 @@ class CitizenPortalController extends Controller
             'message' => $comment ?: ("Municipal status updated to " . str_replace('_', ' ', $complaintStatus) . " by Municipal Operations."),
         ]);
 
+        $notificationTitle = match ($complaintStatus) {
+            'verified' => "Report Verified: {$complaint->complaint_number}",
+            'more_information_needed' => "Action Required: {$complaint->complaint_number}",
+            'rejected' => "Review Notice: {$complaint->complaint_number}",
+            'in_progress' => "Repairs Underway: {$complaint->complaint_number}",
+            'resolved' => "Resolved: {$complaint->complaint_number}",
+            default => "Update on Report {$complaint->complaint_number}",
+        };
+
+        $notificationMsg = match ($complaintStatus) {
+            'verified' => "Your report '{$complaint->title}' has been verified on-site by municipal technical staff and queued for repair planning." . ($comment ? " Notes: {$comment}" : ""),
+            'more_information_needed' => "Municipal staff requested additional details on '{$complaint->title}': {$comment}",
+            'rejected' => "Your report '{$complaint->title}' was reviewed and closed: {$comment}",
+            'in_progress' => "Repair work has commenced on '{$complaint->title}'." . ($comment ? " Notes: {$comment}" : ""),
+            'resolved' => "Infrastructure repairs on '{$complaint->title}' have been completed." . ($comment ? " Notes: {$comment}" : ""),
+            default => "Your complaint '{$complaint->title}' status is now " . ucfirst(str_replace('_', ' ', $complaintStatus)) . ($comment ? ": {$comment}" : "."),
+        };
+
         CitizenNotification::create([
             'user_id' => $complaint->user_id,
             'complaint_id' => $complaint->id,
-            'title' => "Update on Complaint {$complaint->complaint_number}",
-            'message' => "Your complaint '{$complaint->title}' has been moved to " . ucfirst(str_replace('_', ' ', $complaintStatus)) . ($comment ? ": {$comment}" : "."),
+            'title' => $notificationTitle,
+            'message' => $notificationMsg,
         ]);
     }
 
@@ -192,26 +218,61 @@ class CitizenPortalController extends Controller
     /**
      * Locations and Categories for Complaint Submission
      */
-    public function locations(): JsonResponse
+    public function locations(Request $request): JsonResponse
     {
-        $villages = Village::query()
+        $allMunicipalities = \App\Models\Municipality::query()
             ->orderBy('name')
-            ->get()
-            ->map(function ($village) {
+            ->get(['id', 'name', 'code', 'district', 'province', 'ward_count', 'center_lat', 'center_lng'])
+            ->map(function ($m) {
+                $wardCount = max(1, $m->ward_count ?? 5);
                 return [
-                    'id' => $village->id,
-                    'name' => $village->name,
-                    'municipality' => $village->municipality,
-                    'ward_number' => $village->ward_no ?? $village->ward_number ?? 1,
-                    'latitude' => $village->latitude,
-                    'longitude' => $village->longitude,
+                    'id' => $m->id,
+                    'name' => $m->name,
+                    'code' => $m->code,
+                    'district' => $m->district,
+                    'province' => $m->province,
+                    'ward_count' => $wardCount,
+                    'wards' => range(1, $wardCount),
+                    'center_lat' => (float) ($m->center_lat ?? 28.0),
+                    'center_lng' => (float) ($m->center_lng ?? 84.0),
                 ];
             });
 
-        $primaryMunicipality = $villages->first()['municipality'] ?? 'Dailekh Municipality';
+        $muniId = $request->input('municipality_id');
+        $wardNo = $request->input('ward_number');
+
+        $villageQuery = Village::query()->orderBy('name');
+        if ($muniId) {
+            $villageQuery->where('municipality_id', $muniId);
+        }
+        if ($wardNo) {
+            $villageQuery->where(function ($q) use ($wardNo) {
+                $q->where('ward_no', $wardNo)->orWhere('ward_number', $wardNo);
+            });
+        }
+
+        $villages = $villageQuery->get()->map(function ($v) {
+            return [
+                'id' => $v->id,
+                'name' => $v->name,
+                'municipality_id' => $v->municipality_id,
+                'municipality' => $v->municipality,
+                'district' => $v->district,
+                'province' => $v->province,
+                'ward_number' => $v->ward_no ?? $v->ward_number ?? 1,
+                'latitude' => (float) ($v->latitude ?? 28.0),
+                'longitude' => (float) ($v->longitude ?? 84.0),
+            ];
+        });
+
+        $provinces = $allMunicipalities->pluck('province')->unique()->values();
+        $districts = $allMunicipalities->pluck('district')->unique()->values();
 
         return response()->json([
-            'municipality' => $primaryMunicipality,
+            'municipality' => $allMunicipalities->first(),
+            'municipalities' => $allMunicipalities,
+            'provinces' => $provinces,
+            'districts' => $districts,
             'villages' => $villages,
             'categories' => self::CATEGORIES,
         ]);
@@ -246,65 +307,90 @@ class CitizenPortalController extends Controller
             'category' => ['required', 'string', Rule::in(self::CATEGORIES)],
             'custom_category' => ['nullable', 'required_if:category,Other', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:10000'],
+            'speech_transcript' => ['nullable', 'string', 'max:10000'],
             'contact_number' => ['nullable', 'string', 'max:30'],
-            'village_id' => ['nullable', 'exists:villages,id'],
+            'municipality_id' => ['nullable', 'exists:municipalities,id'],
             'ward_number' => ['nullable', 'integer', 'between:1,33'],
+            'village_id' => ['nullable', 'exists:villages,id'],
+            'settlement_name' => ['nullable', 'string', 'max:255'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'images' => ['nullable', 'array', 'max:5'],
             'images.*' => ['file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'voice_recording' => ['nullable', 'file', 'mimes:webm,ogg,mp3,m4a,mpeg,mp4,wav,x-wav', 'max:10240'],
+            'audio' => ['nullable', 'file', 'mimes:webm,ogg,mp3,m4a,mpeg,mp4,wav,x-wav', 'max:10240'],
         ]);
 
         $description = trim((string) ($validated['description'] ?? ''));
-        if ($description === '' && !$request->hasFile('voice_recording')) {
+        $transcript = trim((string) ($validated['speech_transcript'] ?? ''));
+        $hasAudio = $request->hasFile('voice_recording') || $request->hasFile('audio');
+
+        if ($description === '' && $transcript === '' && !$hasAudio) {
             return response()->json([
-                'message' => 'Please provide a written description or attach a voice recording.',
+                'message' => 'Please provide a written description, speech transcription, or attach a voice recording.',
             ], 422);
         }
+
+        $finalDescription = $description !== ''
+            ? $description
+            : ($transcript !== '' ? $transcript : 'Voice message recorded by citizen.');
 
         $storedPaths = [];
 
         try {
-            $complaint = DB::transaction(function () use ($request, $validated, &$storedPaths) {
-                // 1. Determine canonical village fallback if not provided
-                $villageId = $validated['village_id'] ?? null;
-                $village = $villageId ? Village::find($villageId) : Village::first();
-                if (!$villageId && $village) {
-                    $villageId = $village->id;
+            $complaint = DB::transaction(function () use ($request, $validated, $finalDescription, $transcript, &$storedPaths) {
+                // Determine user
+                $user = $request->user();
+                $userId = $user?->id;
+                if (!$userId) {
+                    $defaultCitizen = User::where('role', 'citizen')->first();
+                    $userId = $defaultCitizen?->id ?? 1;
                 }
 
-                $lat = $validated['latitude'] ?? ($village?->latitude ?? 28.9242);
-                $lng = $validated['longitude'] ?? ($village?->longitude ?? 81.7125);
-                $ward = $validated['ward_number'] ?? ($village?->ward_number ?? 1);
+                // Determine municipality, ward, and village
+                $villageId = $validated['village_id'] ?? null;
+                $village = $villageId ? Village::find($villageId) : null;
 
-                // 2. Create Complaint Record
+                $muniId = $validated['municipality_id'] ?? ($village?->municipality_id ?? null);
+                if (!$muniId) {
+                    $firstMuni = \App\Models\Municipality::first();
+                    $muniId = $firstMuni?->id ?? 1;
+                }
+
+                $ward = $validated['ward_number'] ?? ($village?->ward_no ?? 1);
+                $lat = $validated['latitude'] ?? ($village?->latitude ?? 28.0);
+                $lng = $validated['longitude'] ?? ($village?->longitude ?? 84.0);
+
+                // 1. Create Complaint Record (status: pending)
                 $complaint = Complaint::create([
                     'complaint_number' => $this->nextComplaintNumber(),
-                    'user_id' => $request->user()->id,
+                    'user_id' => $userId,
+                    'municipality_id' => $muniId,
                     'village_id' => $villageId,
+                    'settlement_name' => $validated['settlement_name'] ?? null,
                     'ward_number' => $ward,
                     'title' => $validated['title'],
                     'category' => $validated['category'],
                     'custom_category' => $validated['custom_category'] ?? null,
-                    'description' => $validated['description'] ?? ($request->hasFile('voice_recording') ? 'Voice report recorded by resident.' : null),
-                    'contact_number' => $validated['contact_number'] ?? $request->user()->contact_number,
+                    'description' => $finalDescription,
+                    'speech_transcript' => $transcript ?: null,
+                    'contact_number' => $validated['contact_number'] ?? $user?->contact_number,
                     'latitude' => $lat,
                     'longitude' => $lng,
                     'status' => 'pending',
                     'submitted_at' => now(),
                 ]);
 
-                // 3. Create initial ComplaintUpdate
+                // 2. Initial ComplaintUpdate
                 ComplaintUpdate::create([
                     'complaint_id' => $complaint->id,
-                    'user_id' => $request->user()->id,
+                    'user_id' => $userId,
                     'old_status' => null,
                     'new_status' => 'pending',
                     'message' => 'Complaint filed by citizen.',
                 ]);
 
-                // 4. Save uploaded images
+                // 3. Save uploaded images
                 $firstImagePath = null;
                 foreach ($request->file('images', []) as $image) {
                     $path = $image->store('complaints/images', 'public');
@@ -323,9 +409,9 @@ class CitizenPortalController extends Controller
                     ]);
                 }
 
-                // 5. Save uploaded voice recording
-                if ($request->hasFile('voice_recording')) {
-                    $voice = $request->file('voice_recording');
+                // 4. Save uploaded voice recording
+                $voice = $request->file('voice_recording') ?? $request->file('audio');
+                if ($voice) {
                     $path = $voice->store('complaints/audio', 'public');
                     $storedPaths[] = $path;
 
@@ -339,27 +425,32 @@ class CitizenPortalController extends Controller
                     ]);
                 }
 
-                // 6. Dual-Sync: Create matching record in core 'issues' table
+                // 5. Dual-Sync: Create matching record in core 'issues' table
+                // Marked as pending_verification - does not count as verified until approved
                 $mappedCategory = self::mapToIssueCategory($complaint->category);
                 $severity = self::inferSeverity($complaint->category);
 
                 $issueData = [
                     'village_id' => $villageId,
-                    'user_id' => $request->user()->id,
+                    'municipality_id' => $muniId,
+                    'ward_no' => $ward,
+                    'user_id' => $userId,
                     'title' => $complaint->title,
                     'category' => $mappedCategory,
                     'severity' => $severity,
-                    'status' => 'submitted',
-                    'description' => $complaint->description ?: ('Citizen complaint: ' . $complaint->title),
+                    'status' => 'pending_verification',
+                    'description' => $complaint->description,
+                    'speech_transcript' => $transcript ?: null,
                     'latitude' => $lat,
                     'longitude' => $lng,
                     'photo_path' => $firstImagePath,
                 ];
+
                 if (\Illuminate\Support\Facades\Schema::hasColumn('issues', 'tracking_code')) {
                     $issueData['tracking_code'] = $complaint->complaint_number;
                 }
                 if (\Illuminate\Support\Facades\Schema::hasColumn('issues', 'reporter_name')) {
-                    $issueData['reporter_name'] = $request->user()->name;
+                    $issueData['reporter_name'] = $user?->name ?? 'Citizen Resident';
                 }
                 if (\Illuminate\Support\Facades\Schema::hasColumn('issues', 'reporter_phone')) {
                     $issueData['reporter_phone'] = $complaint->contact_number;
@@ -370,31 +461,39 @@ class CitizenPortalController extends Controller
 
                 $issue = Issue::create($issueData);
 
-                // 7. Link complaint with issue
+                // 6. Link complaint to issue
                 $complaint->issue_id = $issue->id;
                 $complaint->save();
 
-                // 8. Add matching IssueUpdate in core issue_updates table
+                // 7. Initial IssueUpdate
                 $issueUpdateData = ['issue_id' => $issue->id];
                 if (\Illuminate\Support\Facades\Schema::hasColumn('issue_updates', 'status')) {
-                    $issueUpdateData['status'] = 'submitted';
+                    $issueUpdateData['status'] = 'pending_verification';
                 }
                 if (\Illuminate\Support\Facades\Schema::hasColumn('issue_updates', 'comment')) {
-                    $issueUpdateData['comment'] = "Citizen complaint filed under {$complaint->complaint_number}";
+                    $issueUpdateData['comment'] = "Citizen complaint submitted under tracking code {$complaint->complaint_number}. Awaiting municipal verification.";
                 }
                 if (\Illuminate\Support\Facades\Schema::hasColumn('issue_updates', 'updated_by')) {
-                    $issueUpdateData['updated_by'] = $request->user()->name;
+                    $issueUpdateData['updated_by'] = $user?->name ?? 'Citizen Resident';
                 }
                 if (\Illuminate\Support\Facades\Schema::hasColumn('issue_updates', 'old_status')) {
-                    $issueUpdateData['old_status'] = 'submitted';
+                    $issueUpdateData['old_status'] = 'pending_verification';
                 }
                 if (\Illuminate\Support\Facades\Schema::hasColumn('issue_updates', 'new_status')) {
-                    $issueUpdateData['new_status'] = 'submitted';
+                    $issueUpdateData['new_status'] = 'pending_verification';
                 }
                 if (\Illuminate\Support\Facades\Schema::hasColumn('issue_updates', 'user_id')) {
-                    $issueUpdateData['user_id'] = $request->user()->id;
+                    $issueUpdateData['user_id'] = $userId;
                 }
                 IssueUpdate::create($issueUpdateData);
+
+                // 8. Confirmation notification for citizen
+                CitizenNotification::create([
+                    'user_id' => $userId,
+                    'complaint_id' => $complaint->id,
+                    'title' => "Complaint Lodged: {$complaint->complaint_number}",
+                    'message' => "Your infrastructure report '{$complaint->title}' has been submitted and assigned to Ward {$ward} review queue.",
+                ]);
 
                 return $complaint;
             });
@@ -583,10 +682,11 @@ class CitizenPortalController extends Controller
      */
     public function media(Request $request, ComplaintMedia $media): StreamedResponse|JsonResponse
     {
-        $complaint = $media->complaint()->first();
-        if (!$complaint || (int) $complaint->user_id !== (int) $request->user()->id && !$request->user()->isAdmin()) {
-            return response()->json(['message' => 'You are not authorized to view this attachment.'], 403);
+        $complaint = $media->complaint()->with('village')->first();
+        if (!$complaint) {
+            return response()->json(['message' => 'Attachment not found.'], 404);
         }
+        $this->authorizeComplaint($request, $complaint);
 
         if (!Storage::disk('public')->exists($media->file_path)) {
             return response()->json(['message' => 'Attachment not found.'], 404);
@@ -604,10 +704,11 @@ class CitizenPortalController extends Controller
      */
     public function mediaPreview(Request $request, ComplaintMedia $media): StreamedResponse|JsonResponse
     {
-        $complaint = $media->complaint()->first();
-        if (!$complaint || (int) $complaint->user_id !== (int) $request->user()->id && !$request->user()->isAdmin()) {
-            return response()->json(['message' => 'You are not authorized to view this attachment.'], 403);
+        $complaint = $media->complaint()->with('village')->first();
+        if (!$complaint) {
+            return response()->json(['message' => 'Attachment not found.'], 404);
         }
+        $this->authorizeComplaint($request, $complaint);
 
         if (!Storage::disk('public')->exists($media->file_path)) {
             return response()->json(['message' => 'Attachment not found.'], 404);
@@ -622,8 +723,21 @@ class CitizenPortalController extends Controller
 
     private function authorizeComplaint(Request $request, Complaint $complaint): void
     {
+        $user = $request->user();
+        if (!$user) {
+            abort(401, 'Unauthenticated');
+        }
+
+        $isOwner = (int) $complaint->user_id === (int) $user->id;
+        $isSystemAdmin = $user->isSystemAdmin();
+        $complaintMuniId = $complaint->municipality_id ?? $complaint->village?->municipality_id;
+        $isMuniAdmin = $user->isMunicipalityAdmin() && (string) $user->municipality_id === (string) $complaintMuniId;
+        $isWardOfficer = $user->isWardOfficer() &&
+            (string) $user->municipality_id === (string) $complaintMuniId &&
+            (string) $user->ward_number === (string) $complaint->ward_number;
+
         abort_unless(
-            (int) $complaint->user_id === (int) $request->user()->id || $request->user()->isAdmin(),
+            $isOwner || $isSystemAdmin || $isMuniAdmin || $isWardOfficer,
             403,
             'You are not authorized to access this complaint.'
         );

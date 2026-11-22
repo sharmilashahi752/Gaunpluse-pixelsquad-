@@ -79,6 +79,7 @@ export default function MyComplaints({ selectedComplaintId, onSelectComplaint })
           <option value="all">All Statuses</option>
           <option value="pending">Pending Review</option>
           <option value="verified">Verified</option>
+          <option value="more_information_needed">Action Needed (More Info)</option>
           <option value="in_progress">In Progress</option>
           <option value="resolved">Resolved</option>
           <option value="withdrawn">Withdrawn</option>
@@ -207,6 +208,7 @@ function ComplaintDetails({ complaintId, onUpdated }) {
 
   const reached = (complaint.updates || []).map((update) => update.new_status).filter(Boolean);
   const stopped = ['rejected', 'withdrawn'].includes(complaint.status);
+  const needsMoreInfo = complaint.status === 'more_information_needed';
 
   return (
     <div className="complaint-detail">
@@ -219,6 +221,23 @@ function ComplaintDetails({ complaintId, onUpdated }) {
       </div>
 
       {error && <p className="citizen-message error">{error}</p>}
+
+      {/* Action Required Banner for more_information_needed */}
+      {needsMoreInfo && (
+        <section className="citizen-card" style={{ background: '#fefce8', border: '1px solid #fde047', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+            <AlertTriangle size={24} style={{ color: '#ca8a04', flexShrink: 0, marginTop: '2px' }} />
+            <div>
+              <h3 style={{ margin: '0 0 4px', color: '#854d0e', fontSize: '15px', fontWeight: 700 }}>
+                Municipal Action Required: Additional Information Needed
+              </h3>
+              <p style={{ margin: '0 0 8px', color: '#713f12', fontSize: '13.5px', lineHeight: 1.5 }}>
+                {complaint.official_response || 'Municipal engineering staff reviewed your report and requested further details to conduct on-site verification.'}
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Progress Timeline */}
       <section className="citizen-card live-timeline-card">
@@ -258,7 +277,7 @@ function ComplaintDetails({ complaintId, onUpdated }) {
       </section>
 
       {/* Official Response Banner if available */}
-      {complaint.official_response && (
+      {complaint.official_response && !needsMoreInfo && (
         <section className="citizen-card official-response-card">
           <div className="card-header-flex">
             <h2>
@@ -284,8 +303,8 @@ function ComplaintDetails({ complaintId, onUpdated }) {
           <strong>Ward {complaint.ward_number || 'N/A'}</strong>
         </article>
         <article>
-          <span>Village / Centroid</span>
-          <strong>{complaint.village?.name || 'Local Ward Area'}</strong>
+          <span>Village / Settlement</span>
+          <strong>{complaint.settlement_name || complaint.village?.name || 'Local Ward Area'}</strong>
         </article>
         <article>
           <span>Submitted At</span>
@@ -309,33 +328,57 @@ function ComplaintDetails({ complaintId, onUpdated }) {
         </section>
       )}
 
+      {/* Voice Transcript if present */}
+      {complaint.speech_transcript && (
+        <section className="citizen-card form-section">
+          <h2>Voice Note Transcription (Speech-to-Text)</h2>
+          <p style={{
+            margin: 0,
+            padding: '12px 16px',
+            background: '#f8fafc',
+            borderLeft: '4px solid #123d30',
+            borderRadius: '4px',
+            fontStyle: 'italic',
+            fontSize: '13.5px',
+            color: '#1e293b',
+            lineHeight: 1.6
+          }}>
+            "{complaint.speech_transcript}"
+          </p>
+        </section>
+      )}
+
       {/* Attached Media (Photos and Audio) */}
       {complaint.media && complaint.media.length > 0 && (
         <section className="citizen-card form-section">
-          <h2>Attached Evidence</h2>
+          <h2>Attached Evidence ({complaint.media.length} files)</h2>
           <div className="media-gallery-grid">
             {complaint.media.map((item) => {
               if (item.media_type === 'image') {
+                const imgUrl = item.url || `/storage/${item.file_path}`;
                 return (
                   <div key={item.id} className="media-gallery-item">
-                    <img
-                      src={`/storage/${item.file_path}`}
-                      alt={item.original_name}
-                      onError={(e) => {
-                        e.target.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24"><text y="50%" x="50%" text-anchor="middle" font-size="10">Image</text></svg>';
-                      }}
-                    />
+                    <a href={imgUrl} target="_blank" rel="noopener noreferrer">
+                      <img
+                        src={imgUrl}
+                        alt={item.original_name}
+                        onError={(e) => {
+                          e.target.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24"><text y="50%" x="50%" text-anchor="middle" font-size="10">Image</text></svg>';
+                        }}
+                      />
+                    </a>
                     <span>{item.original_name}</span>
                   </div>
                 );
               }
               if (item.media_type === 'audio') {
+                const audioUrl = item.url || `/storage/${item.file_path}`;
                 return (
                   <div key={item.id} className="audio-evidence-item">
                     <Volume2 size={20} />
-                    <div>
+                    <div style={{ width: '100%' }}>
                       <strong>Voice Complaint: {item.original_name}</strong>
-                      <audio controls src={`/storage/${item.file_path}`} />
+                      <audio controls src={audioUrl} style={{ width: '100%', marginTop: '6px' }} />
                     </div>
                   </div>
                 );
