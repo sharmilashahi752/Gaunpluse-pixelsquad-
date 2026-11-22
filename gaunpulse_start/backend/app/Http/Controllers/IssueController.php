@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Citizen\CitizenPortalController;
 use App\Http\Requests\StoreIssueRequest;
 use App\Http\Resources\IssueResource;
 use App\Models\Issue;
@@ -82,6 +83,13 @@ class IssueController extends Controller
             }
 
             IssueUpdate::create($updateData);
+
+            CitizenPortalController::syncIssueStatusToComplaint(
+                $issue,
+                $validated['status'],
+                $validated['comment'] ?? null,
+                $request->user()?->id
+            );
         });
 
         return new IssueResource($issue->fresh()->load(['village', 'edge', 'updates']));

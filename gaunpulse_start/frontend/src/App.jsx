@@ -9,6 +9,7 @@ import SimulationsPage from './pages/SimulationsPage';
 import VillageMapPage from './pages/VillageMapPage';
 import VillageDataPage from './pages/VillageDataPage';
 import ReportsInsightsPage from './pages/ReportsInsightsPage';
+import CitizenPortal from './citizen/CitizenPortal';
 import { navigationItems } from './data/demoData';
 import { VillageSelectionProvider } from './context/VillageSelectionContext';
 
@@ -22,6 +23,7 @@ const pages = {
   'reports-insights': ReportsInsightsPage,
   'ai-agent': AIAgentPage,
   'village-data': VillageDataPage,
+  citizen: CitizenPortal,
 };
 
 const validPages = new Set(navigationItems.map(({ id }) => id));
@@ -48,6 +50,10 @@ export default function App() {
     setActivePage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  if (activePage === 'citizen') {
+    return <CitizenPortal onSwitchToAdmin={() => navigate('dashboard')} />;
+  }
 
   const ActivePage = pages[activePage] || DashboardPage;
 

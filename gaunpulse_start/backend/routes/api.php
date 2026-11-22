@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\PriorityController;
 use App\Http\Controllers\Admin\SimulationController as AdminSimulationController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\Citizen\CitizenPortalController;
 use App\Http\Controllers\CommunityFeedbackController;
 use App\Http\Controllers\IssueController;
 use App\Http\Controllers\LocationController;
@@ -151,4 +152,46 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
         Route::post('/simulations/compare', [SimulationController::class, 'compare']);
         Route::get('/priorities', PriorityController::class);
     });
+});
+
+// Citizen Portal Endpoints (Phase 4 & Citizen Integration)
+Route::prefix('citizen')->group(function () {
+    Route::post('/register', [CitizenPortalController::class, 'register'])->middleware('throttle:10,1');
+    Route::post('/login', [CitizenPortalController::class, 'login'])->middleware('throttle:15,1');
+    Route::get('/locations', [CitizenPortalController::class, 'locations']);
+
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('/logout', [CitizenPortalController::class, 'logout']);
+        Route::get('/me', [CitizenPortalController::class, 'me']);
+        Route::get('/dashboard', [CitizenPortalController::class, 'dashboard']);
+
+        Route::get('/complaints', [CitizenPortalController::class, 'index']);
+        Route::post('/complaints', [CitizenPortalController::class, 'store'])->middleware('throttle:30,1');
+        Route::get('/complaints/{complaint}', [CitizenPortalController::class, 'show']);
+        Route::put('/complaints/{complaint}', [CitizenPortalController::class, 'update']);
+        Route::post('/complaints/{complaint}/withdraw', [CitizenPortalController::class, 'withdraw']);
+        Route::get('/complaints/{complaint}/tracking', [CitizenPortalController::class, 'tracking']);
+
+        Route::get('/notifications', [CitizenPortalController::class, 'notifications']);
+        Route::patch('/notifications/{notification}/read', [CitizenPortalController::class, 'markNotificationRead']);
+
+        Route::get('/media/{media}', [CitizenPortalController::class, 'media']);
+        Route::get('/media/{media}/preview', [CitizenPortalController::class, 'mediaPreview']);
+    });
+});
+
+// Citizen Portal Direct Aliases (for source component compatibility)
+Route::post('/auth/register', [CitizenPortalController::class, 'register'])->middleware('throttle:10,1');
+Route::post('/auth/login', [CitizenPortalController::class, 'login'])->middleware('throttle:15,1');
+Route::get('/complaint-locations', [CitizenPortalController::class, 'locations']);
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/auth/logout', [CitizenPortalController::class, 'logout']);
+    Route::get('/auth/me', [CitizenPortalController::class, 'me']);
+    Route::get('/user/dashboard', [CitizenPortalController::class, 'dashboard']);
+    Route::get('/my-complaints', [CitizenPortalController::class, 'index']);
+    Route::post('/complaints', [CitizenPortalController::class, 'store'])->middleware('throttle:30,1');
+    Route::get('/complaints/{complaint}', [CitizenPortalController::class, 'show']);
+    Route::post('/complaints/{complaint}/withdraw', [CitizenPortalController::class, 'withdraw']);
+    Route::get('/notifications', [CitizenPortalController::class, 'notifications']);
 });

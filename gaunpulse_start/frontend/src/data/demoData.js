@@ -23,6 +23,7 @@ export const navigationItems = [
   { id: 'reports-insights', label: 'Reports & Insights', icon: ChartNoAxesColumn },
   { id: 'ai-agent', label: 'AI Agent', icon: Bot },
   { id: 'village-data', label: 'Village Data Manager', icon: Building2 },
+  { id: 'citizen', label: 'Citizen Portal', icon: Users, badge: 'Live' },
 ];
 
 export const pageMeta = Object.fromEntries(

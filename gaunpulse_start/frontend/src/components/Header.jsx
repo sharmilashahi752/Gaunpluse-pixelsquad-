@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Bell, Check, ChevronDown, Menu, Search, ShieldCheck, User, X } from 'lucide-react';
+import { Bell, Check, ChevronDown, Menu, Search, ShieldCheck, User, Users, X } from 'lucide-react';
 
 export default function Header({ title, onMenuClick }) {
   const [showNotifications, setShowNotifications] = useState(false);
@@ -31,6 +31,39 @@ export default function Header({ title, onMenuClick }) {
       </div>
 
       <div className="topbar__actions">
+        <button
+          type="button"
+          className="citizen-portal-pill-btn"
+          onClick={() => {
+            window.location.hash = '#/citizen';
+          }}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: '#123D30',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '8px',
+            padding: '7px 12px',
+            fontSize: '12px',
+            fontWeight: 700,
+            cursor: 'pointer',
+            letterSpacing: '0.01em',
+            transition: 'background 0.15s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#1e5a44';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = '#123D30';
+          }}
+          title="Switch to Citizen Public Complaint & Tracking Portal"
+        >
+          <Users size={14} />
+          <span>Citizen Portal</span>
+        </button>
+
         <label className="header-search">
           <span className="sr-only">Search workspace</span>
           <Search size={17} aria-hidden="true" />
