@@ -30,6 +30,36 @@ class WorkspaceController extends Controller
         // 1. System administrators can access any municipality or switch
         if ($user->isSystemAdmin()) {
             $requestedId = $request->input('municipality_id') ?? $request->header('X-Municipality-Id') ?? $user->municipality_id;
+
+            if ($requestedId === 'all') {
+                $allVillages = Village::query()->orderBy('name')->get();
+                $allVillageIds = $allVillages->pluck('id')->toArray();
+                $activeIssuesCount = Issue::query()
+                    ->whereIn('village_id', $allVillageIds)
+                    ->whereNotIn('status', ['resolved', 'rejected'])
+                    ->count();
+
+                return response()->json([
+                    'municipality' => [
+                        'id' => 'all',
+                        'name' => 'All Municipalities (Nationwide)',
+                        'district' => 'All Districts',
+                        'province' => 'All Provinces',
+                        'ward_count' => 33,
+                    ],
+                    'status' => 'active',
+                    'wards' => range(1, 9),
+                    'villages' => $allVillages,
+                    'active_issues_count' => $activeIssuesCount,
+                    'ward_officers' => [],
+                    'ward_officers_count' => 0,
+                    'user_role' => $user->role,
+                    'user_ward' => null,
+                    'can_switch_workspace' => true,
+                    'all_municipalities' => $allMunicipalities,
+                ]);
+            }
+
             $municipality = $requestedId ? Municipality::find($requestedId) : $allMunicipalities->first();
 
             if (!$municipality) {

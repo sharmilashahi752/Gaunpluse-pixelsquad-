@@ -2,11 +2,16 @@
  * GaunPulse High-Performance Client-Side In-Memory Cache with SWR
  * (Stale-While-Revalidate) & Concurrent Request Deduplication.
  *
- * Speeds up page transitions from ~1-3s to 0ms.
+ * Scoped by authentication token to prevent cross-session cache pollution.
  */
 
 const cacheStore = new Map();
 const inFlightRequests = new Map();
+
+function getCacheKey(url, token) {
+  const tokenScope = token ? token.slice(-16) : 'anon';
+  return `${tokenScope}:${url}`;
+}
 
 /**
  * Fetch JSON with in-memory caching and request deduplication.
@@ -46,8 +51,9 @@ export async function cachedFetchJson(
     return res.json();
   }
 
+  const cacheKey = getCacheKey(url, token);
   const now = Date.now();
-  const cached = cacheStore.get(url);
+  const cached = cacheStore.get(cacheKey);
 
   // 1. Fresh cache hit: return immediately with 0ms delay
   if (!force && cached && now - cached.timestamp < ttlMs) {
@@ -56,13 +62,13 @@ export async function cachedFetchJson(
 
   // 2. Stale cache hit with SWR callback: return stale data immediately and revalidate in background
   if (!force && cached && onBackgroundUpdate) {
-    triggerBackgroundRevalidation(url, options, ttlMs, onBackgroundUpdate);
+    triggerBackgroundRevalidation(url, effectiveOptions, cacheKey, ttlMs, onBackgroundUpdate);
     return cached.data;
   }
 
   // 3. Request deduplication: reuse in-flight promise if identical request is already underway
-  if (inFlightRequests.has(url)) {
-    return inFlightRequests.get(url);
+  if (inFlightRequests.has(cacheKey)) {
+    return inFlightRequests.get(cacheKey);
   }
 
   // 4. Fresh network fetch
@@ -77,53 +83,55 @@ export async function cachedFetchJson(
         throw err;
       }
       const data = await res.json();
-      cacheStore.set(url, { data, timestamp: Date.now() });
+      cacheStore.set(cacheKey, { data, timestamp: Date.now() });
       return data;
     } finally {
-      inFlightRequests.delete(url);
+      inFlightRequests.delete(cacheKey);
     }
   })();
 
-  inFlightRequests.set(url, fetchPromise);
+  inFlightRequests.set(cacheKey, fetchPromise);
   return fetchPromise;
 }
 
 /**
  * Background revalidation trigger for SWR
  */
-function triggerBackgroundRevalidation(url, options, ttlMs, onBackgroundUpdate) {
-  if (inFlightRequests.has(url)) return;
+function triggerBackgroundRevalidation(url, effectiveOptions, cacheKey, ttlMs, onBackgroundUpdate) {
+  if (inFlightRequests.has(cacheKey)) return;
 
   const bgPromise = (async () => {
     try {
-      const res = await fetch(url, options);
+      const res = await fetch(url, effectiveOptions);
       if (!res.ok) return;
       const freshData = await res.json();
-      cacheStore.set(url, { data: freshData, timestamp: Date.now() });
+      cacheStore.set(cacheKey, { data: freshData, timestamp: Date.now() });
       if (typeof onBackgroundUpdate === 'function') {
         onBackgroundUpdate(freshData);
       }
     } catch {
       // Swallowed silently so background refresh doesn't disrupt user
     } finally {
-      inFlightRequests.delete(url);
+      inFlightRequests.delete(cacheKey);
     }
   })();
 
-  inFlightRequests.set(url, bgPromise);
+  inFlightRequests.set(cacheKey, bgPromise);
 }
 
 /**
  * Get synchronously from cache if present (even if stale), else null.
  */
 export function getFromCache(url) {
-  const entry = cacheStore.get(url);
+  const token = typeof window !== 'undefined' ? window.localStorage?.getItem('gaunpulse_auth_token') : null;
+  const cacheKey = getCacheKey(url, token);
+  const entry = cacheStore.get(cacheKey);
   return entry ? entry.data : null;
 }
 
 /**
  * Invalidate cache entries matching a substring or RegExp.
- * Use after mutations (e.g. creating issues, updating action plans, adding villages).
+ * Use after mutations (e.g. creating issues, updating action plans, adding villages, switching municipality, logging in/out).
  */
 export function invalidateApiCache(pattern) {
   if (!pattern) {

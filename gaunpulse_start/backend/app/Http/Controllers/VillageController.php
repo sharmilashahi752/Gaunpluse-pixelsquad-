@@ -33,9 +33,11 @@ class VillageController extends Controller
             if ($user->isWardOfficer() && $user->ward_number) {
                 $query->where('ward_no', (string) $user->ward_number);
             }
-        } elseif ($request->filled('municipality_id')) {
+        } elseif ($request->filled('municipality_id') && $request->input('municipality_id') !== 'all') {
             $query->where('municipality_id', (string) $request->input('municipality_id'));
-        } elseif ($request->filled('municipality')) {
+        } elseif ($request->header('X-Municipality-Id') && $request->header('X-Municipality-Id') !== 'all') {
+            $query->where('municipality_id', (string) $request->header('X-Municipality-Id'));
+        } elseif ($request->filled('municipality') && $request->query('municipality') !== 'all') {
             $muni = $request->query('municipality');
             $query->where(function ($q) use ($muni) {
                 $q->where('municipality', $muni)
@@ -44,8 +46,12 @@ class VillageController extends Controller
             });
         }
 
-        // Status filter (e.g. 'active', 'draft', 'all')
-        if ($request->filled('status') && $request->query('status') !== 'all') {
+        // Role-based status filtering: Citizens and public can only see 'active' (publicly permitted) villages.
+        // Staff (system_admin, municipality_admin, ward_officer) can inspect draft, active, and archived records.
+        $isStaff = $user && $user->isStaff();
+        if (!$isStaff) {
+            $query->where('status', 'active');
+        } elseif ($request->filled('status') && $request->query('status') !== 'all') {
             if (Schema::hasColumn('villages', 'status')) {
                 $query->where('status', $request->query('status'));
             }

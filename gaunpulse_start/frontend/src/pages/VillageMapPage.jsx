@@ -147,14 +147,14 @@ export default function VillageMapPage() {
   // 1. Initial Load: Villages, Provinces, and Administrative Hierarchy Audit
   useEffect(() => {
     loadVillages();
-    cachedFetchJson('http://127.0.0.1:8000/api/locations/provinces', {}, { ttlMs: 600000 })
+    cachedFetchJson('/api/locations/provinces', {}, { ttlMs: 600000 })
       .then((data) => {
         if (Array.isArray(data)) setProvinces(data);
       })
       .catch((err) => console.error('Failed to load provinces:', err));
 
     // Audit administrative hierarchy integrity
-    cachedFetchJson('http://127.0.0.1:8000/api/villages/audit-hierarchy', {}, { ttlMs: 120000 })
+    cachedFetchJson('/api/villages/audit-hierarchy', {}, { ttlMs: 120000 })
       .then((data) => {
         if (data?.inconsistent_count > 0) {
           setHierarchyAudit(data);
@@ -164,7 +164,11 @@ export default function VillageMapPage() {
   }, []);
 
   const loadVillages = async (force = false) => {
-    if (contextVillages && contextVillages.length > 0 && !force) {
+    if (force) {
+      await refreshVillages();
+      return;
+    }
+    if (contextVillages && contextVillages.length > 0) {
       setVillages(contextVillages);
       if (!selectedVillageId) {
         setSelectedVillageId(contextVillages[0].id);
@@ -173,9 +177,9 @@ export default function VillageMapPage() {
     }
 
     try {
-      const data = await cachedFetchJson('http://127.0.0.1:8000/api/villages', {}, {
+      const data = await cachedFetchJson('/api/villages', {}, {
         force,
-        ttlMs: 120000,
+        ttlMs: 60000,
         onBackgroundUpdate: (fresh) => {
           if (Array.isArray(fresh)) setVillages(fresh);
         },
@@ -899,10 +903,18 @@ export default function VillageMapPage() {
             <button
               type="button"
               className={`button ${isNationwideView ? 'button--primary' : 'button--secondary'}`}
-              onClick={() => {
+              onClick={async () => {
                 setIsNationwideView(true);
                 setSelectedLocationMarker(null);
                 showNotification('Showing all registered villages across Nepal.');
+                try {
+                  const allData = await cachedFetchJson('/api/villages?municipality_id=all', {}, { force: true, ttlMs: 60000 });
+                  if (Array.isArray(allData) && allData.length > 0) {
+                    setVillages(allData);
+                  }
+                } catch (err) {
+                  console.error('Failed to load nationwide villages:', err);
+                }
               }}
             >
               <Globe size={15} /> View All Nepal
@@ -913,7 +925,8 @@ export default function VillageMapPage() {
               onChange={(e) => {
                 if (e.target.value) {
                   setIsNationwideView(false);
-                  setSelectedVillageId(Number(e.target.value));
+                  const newId = Number(e.target.value);
+                  setSelectedVillageId(newId);
                   setSelectedLocationMarker(null);
                 }
               }}
@@ -926,6 +939,7 @@ export default function VillageMapPage() {
                 fontWeight: '600',
                 color: 'var(--text-primary)',
               }}
+              aria-label="Select saved village"
             >
               <option value="" disabled>-- Select Saved Village --</option>
               {deduplicateVillages(villages).map((v) => (

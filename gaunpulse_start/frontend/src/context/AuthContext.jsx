@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { invalidateApiCache } from '../utils/apiCache';
 
 const TOKEN_KEY = 'gaunpulse_auth_token';
 const USER_KEY = 'gaunpulse_auth_user';
@@ -208,8 +209,12 @@ export function AuthProvider({ children }) {
       if (receivedUser?.municipality_id) {
         setActiveMunicipalityIdState(receivedUser.municipality_id);
         localStorage.setItem(MUNICIPALITY_KEY, String(receivedUser.municipality_id));
+      } else if (receivedUser?.role === 'system_admin') {
+        setActiveMunicipalityIdState('all');
+        localStorage.setItem(MUNICIPALITY_KEY, 'all');
       }
 
+      invalidateApiCache();
       await fetchWorkspace(receivedToken);
 
       return { success: true, user: receivedUser, role: data.role, redirect_route: data.redirect_route };
@@ -247,6 +252,7 @@ export function AuthProvider({ children }) {
       localStorage.removeItem('gaunpulse_citizen_user');
       localStorage.removeItem(MUNICIPALITY_KEY);
       sessionStorage.clear();
+      invalidateApiCache();
 
       // 3. Prevent back navigation from restoring session
       const publicBase = import.meta.env.VITE_PUBLIC_URL || 'http://localhost:5173';
@@ -320,15 +326,17 @@ export function AuthProvider({ children }) {
 
   // Switch municipality (system admin only)
   const switchMunicipality = useCallback((muniId) => {
-    const id = Number(muniId);
+    const id = muniId === 'all' ? 'all' : Number(muniId);
     setActiveMunicipalityIdState(id);
     localStorage.setItem(MUNICIPALITY_KEY, String(id));
+    invalidateApiCache('api/villages');
+    invalidateApiCache('api/workspace');
   }, []);
 
   // Compute active municipality
   const activeMunicipality = useMemo(() => {
-    if (!municipalities || municipalities.length === 0) {
-      return user?.municipality || null;
+    if (activeMunicipalityId === 'all') {
+      return { id: 'all', name: 'All Municipalities (Nationwide)', district: 'All Districts', province: 'All Provinces' };
     }
 
     if (activeMunicipalityId) {
@@ -339,6 +347,10 @@ export function AuthProvider({ children }) {
     if (user?.municipality_id) {
       const userMuni = municipalities.find((m) => m.id === user.municipality_id);
       if (userMuni) return userMuni;
+    }
+
+    if (user?.role === 'system_admin') {
+      return { id: 'all', name: 'All Municipalities (Nationwide)', district: 'All Districts', province: 'All Provinces' };
     }
 
     return municipalities[0] || null;

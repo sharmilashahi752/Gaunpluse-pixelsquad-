@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { cachedFetchJson, invalidateApiCache } from '../utils/apiCache';
+import { useAuth } from './AuthContext';
 
 const STORAGE_KEY = 'gaunpulse.selectedVillageId';
 const VillageSelectionContext = createContext(null);
@@ -18,6 +19,11 @@ function readPersistedVillageId() {
 }
 
 export function VillageSelectionProvider({ children }) {
+  const auth = useAuth();
+  const token = auth?.token ?? null;
+  const isSystemAdmin = auth?.isSystemAdmin ?? false;
+  const activeMunicipalityId = auth?.activeMunicipalityId ?? null;
+
   const [selectedVillageId, setSelectedVillageIdState] = useState(readPersistedVillageId);
   const [villages, setVillages] = useState([]);
   const [loadingVillages, setLoadingVillages] = useState(true);
@@ -25,9 +31,16 @@ export function VillageSelectionProvider({ children }) {
   const fetchVillages = useCallback(async (force = false) => {
     try {
       if (force) invalidateApiCache('api/villages');
-      const data = await cachedFetchJson(`${API_BASE}/villages`, {}, {
+
+      let url = `${API_BASE}/villages`;
+      // If system admin explicitly selected a specific municipality workspace, scope query
+      if (isSystemAdmin && activeMunicipalityId && activeMunicipalityId !== 'all') {
+        url = `${API_BASE}/villages?municipality_id=${activeMunicipalityId}`;
+      }
+
+      const data = await cachedFetchJson(url, {}, {
         force,
-        ttlMs: 120000,
+        ttlMs: 60000,
         onBackgroundUpdate: (fresh) => {
           if (Array.isArray(fresh)) setVillages(fresh);
         },
@@ -36,15 +49,16 @@ export function VillageSelectionProvider({ children }) {
         setVillages(data);
       }
     } catch (err) {
-      console.error('Failed to load global villages list:', err);
+      console.error('Failed to load villages list:', err);
     } finally {
       setLoadingVillages(false);
     }
-  }, []);
+  }, [isSystemAdmin, activeMunicipalityId]);
 
+  // Re-fetch on mount and whenever authentication session, role, or active municipality workspace changes
   useEffect(() => {
-    fetchVillages();
-  }, [fetchVillages]);
+    fetchVillages(true);
+  }, [token, activeMunicipalityId, isSystemAdmin, fetchVillages]);
 
   const selectedVillage = useMemo(() => {
     if (selectedVillageId === 'demo-sundar-gaun') {
@@ -65,12 +79,18 @@ export function VillageSelectionProvider({ children }) {
     return found || villages[0];
   }, [villages, selectedVillageId]);
 
-  // Ensure selectedVillageId defaults to first valid village if unselected or invalid
+  // Ensure selectedVillageId defaults to first valid village if unselected or if current selection is outside permissions
   useEffect(() => {
     if (villages.length > 0 && selectedVillageId !== 'demo-sundar-gaun') {
       const exists = villages.some((v) => Number(v.id) === Number(selectedVillageId));
       if (!exists) {
-        setSelectedVillageIdState(villages[0].id);
+        const nextId = villages[0].id;
+        setSelectedVillageIdState(nextId);
+        try {
+          window.localStorage.setItem(STORAGE_KEY, String(nextId));
+        } catch {
+          // Persistence optional
+        }
       }
     }
   }, [villages, selectedVillageId]);
@@ -95,7 +115,7 @@ export function VillageSelectionProvider({ children }) {
         window.localStorage.setItem(STORAGE_KEY, String(nextValue));
       }
     } catch {
-      // Persistence is optional when storage is unavailable or blocked.
+      // Persistence optional
     }
   }, []);
 

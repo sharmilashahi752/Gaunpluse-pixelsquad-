@@ -113,7 +113,7 @@ export default function Header({ title, onMenuClick, onNavigate }) {
             <Globe size={13} color="#123D30" />
             <span style={{ fontSize: '11px', fontWeight: 600, color: '#123D30' }}>Workspace:</span>
             <select
-              value={activeMunicipality?.id || ''}
+              value={activeMunicipality?.id || 'all'}
               onChange={(e) => switchMunicipality(e.target.value)}
               style={{
                 background: 'transparent',
@@ -126,6 +126,7 @@ export default function Header({ title, onMenuClick, onNavigate }) {
               }}
               aria-label="Switch active municipality workspace"
             >
+              <option value="all">All Municipalities (Nationwide)</option>
               {municipalities.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.name} ({m.district})

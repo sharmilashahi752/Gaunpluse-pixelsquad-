@@ -27,8 +27,11 @@ export function deduplicateVillages(villages = []) {
   for (const v of villages) {
     const normName = (v.name || '').toLowerCase().trim();
     const normMuni = (v.municipality || '').toLowerCase().trim();
-    const ward = String(v.ward_no || '1').trim();
-    const key = `${normName}|${normMuni}|${ward}`;
+    const normDist = (v.district || '').toLowerCase().trim();
+    const ward = v.ward_no !== null && v.ward_no !== undefined && String(v.ward_no).trim() !== ''
+      ? String(v.ward_no).trim()
+      : 'none';
+    const key = `${normName}|${normMuni}|${normDist}|${ward}`;
 
     if (!groups.has(key)) {
       groups.set(key, []);
