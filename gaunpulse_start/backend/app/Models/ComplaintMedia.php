@@ -18,6 +18,13 @@ class ComplaintMedia extends Model
         'file_size',
     ];
 
+    protected $appends = ['url'];
+
+    public function getUrlAttribute(): string
+    {
+        return url('storage/' . $this->file_path);
+    }
+
     public function complaint(): BelongsTo
     {
         return $this->belongsTo(Complaint::class);

@@ -674,6 +674,11 @@
   color: #0369a1;
 }
 
+.status-badge.more_information_needed {
+  background: #fef08a;
+  color: #854d0e;
+}
+
 .status-badge.in_progress {
   background: #fed7aa;
   color: #c2410c;
