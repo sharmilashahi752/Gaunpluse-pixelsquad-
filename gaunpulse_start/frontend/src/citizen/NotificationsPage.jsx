@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { citizenService } from './citizenApi';
 import { Bell, CheckCircle, Info } from 'lucide-react';
 
-export default function NotificationsPage({ onNavigate, onViewComplaint }) {
+export default function NotificationsPage({ onNavigate, onViewComplaint, lang = 'ne' }) {
   const [notifications, setNotifications] = useState({ data: [] });
   const [loading, setLoading] = useState(true);
 

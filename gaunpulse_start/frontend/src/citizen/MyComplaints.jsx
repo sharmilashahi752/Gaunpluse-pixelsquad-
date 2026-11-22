@@ -3,7 +3,7 @@ import { citizenService } from './citizenApi';
 import StatusBadge from './StatusBadge';
 import { ArrowLeft, Clock, AlertTriangle, CheckCircle2, MessageSquare, MapPin, Calendar, Volume2 } from 'lucide-react';
 
-export default function MyComplaints({ selectedComplaintId, onSelectComplaint }) {
+export default function MyComplaints({ selectedComplaintId, onSelectComplaint, lang = 'ne' }) {
   const [complaints, setComplaints] = useState({ data: [] });
   const [filters, setFilters] = useState({ search: '', status: 'all', category: 'all' });
   const [selectedId, setSelectedId] = useState(selectedComplaintId || null);
@@ -46,6 +46,7 @@ export default function MyComplaints({ selectedComplaintId, onSelectComplaint })
         </button>
         <ComplaintDetails
           complaintId={selectedId}
+          lang={lang}
           onUpdated={loadComplaints}
           onBack={() => {
             setSelectedId(null);
@@ -137,7 +138,7 @@ export default function MyComplaints({ selectedComplaintId, onSelectComplaint })
                     </td>
                     <td>{new Date(complaint.submitted_at || complaint.created_at).toLocaleDateString()}</td>
                     <td>
-                      <StatusBadge status={complaint.status} />
+                      <StatusBadge status={complaint.status} lang={lang} />
                     </td>
                     <td>
                       <button
@@ -159,7 +160,7 @@ export default function MyComplaints({ selectedComplaintId, onSelectComplaint })
   );
 }
 
-function ComplaintDetails({ complaintId, onUpdated }) {
+function ComplaintDetails({ complaintId, onUpdated, lang = 'ne' }) {
   const [complaint, setComplaint] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -217,7 +218,7 @@ function ComplaintDetails({ complaintId, onUpdated }) {
           <p>Tracking Code</p>
           <h1>{complaint.complaint_number}</h1>
         </div>
-        <StatusBadge status={complaint.status} />
+        <StatusBadge status={complaint.status} lang={lang} />
       </div>
 
       {error && <p className="citizen-message error">{error}</p>}
@@ -246,7 +247,7 @@ function ComplaintDetails({ complaintId, onUpdated }) {
           <div className="live-stop-state">
             <AlertTriangle size={24} className="stop-icon" />
             <div>
-              <StatusBadge status={complaint.status} />
+              <StatusBadge status={complaint.status} lang={lang} />
               <p>
                 {complaint.status === 'withdrawn'
                   ? 'This complaint was withdrawn by the resident.'

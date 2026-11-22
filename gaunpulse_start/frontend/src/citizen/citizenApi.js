@@ -89,6 +89,11 @@ export const citizenService = {
     return res.data;
   },
 
+  async searchLocations(query) {
+    const res = await citizenClient.get('/api/citizen/locations', { params: { q: query } });
+    return res.data;
+  },
+
   async getDashboard() {
     const res = await citizenClient.get('/api/citizen/dashboard');
     return res.data;

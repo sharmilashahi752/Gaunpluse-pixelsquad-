@@ -1,7 +1,7 @@
 import React from 'react';
 import { User, Phone, MapPin, Mail, ShieldCheck } from 'lucide-react';
 
-export default function ProfilePage({ user, onLogout }) {
+export default function ProfilePage({ user, onLogout, lang = 'ne' }) {
   if (!user) return null;
 
   return (

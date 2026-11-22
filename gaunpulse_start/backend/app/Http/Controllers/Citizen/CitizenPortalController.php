@@ -217,37 +217,93 @@ class CitizenPortalController extends Controller
     }
 
     /**
-     * Locations and Categories for Complaint Submission
+     * Locations and Categories for Complaint Submission across All of Nepal
      */
     public function locations(Request $request): JsonResponse
     {
-        $allMunicipalities = \App\Models\Municipality::query()
-            ->orderBy('name')
-            ->get(['id', 'name', 'code', 'district', 'province', 'ward_count', 'center_lat', 'center_lng'])
-            ->map(function ($m) {
-                $wardCount = max(1, $m->ward_count ?? 5);
-                return [
-                    'id' => $m->id,
-                    'name' => $m->name,
-                    'code' => $m->code,
-                    'district' => $m->district,
-                    'province' => $m->province,
+        // 1. Direct search if q parameter is provided
+        if ($request->filled('q')) {
+            $locationController = app(\App\Http\Controllers\LocationController::class);
+            return $locationController->search($request);
+        }
+
+        // 2. Official Provinces Directory (All 7 Provinces)
+        $officialProvinces = \App\Services\NepalLocationService::getProvinces();
+        $selectedProvince = $request->input('province');
+        $selectedDistrict = $request->input('district');
+
+        // 3. Official Districts (Filtered by province if supplied, otherwise all 77 districts)
+        $officialDistricts = \App\Services\NepalLocationService::getDistricts($selectedProvince);
+
+        // 4. Official Municipalities (Filtered by district if supplied)
+        $catalogMunis = \App\Services\NepalLocationService::getMunicipalities($selectedDistrict);
+
+        // Fetch any existing registered municipalities from MySQL
+        $dbMuniQuery = \App\Models\Municipality::query()->orderBy('name');
+        if ($selectedProvince) {
+            $dbMuniQuery->where('province', 'LIKE', "%{$selectedProvince}%");
+        }
+        if ($selectedDistrict) {
+            $dbMuniQuery->where('district', $selectedDistrict);
+        }
+        $dbMunis = $dbMuniQuery->get(['id', 'name', 'code', 'district', 'province', 'ward_count', 'center_lat', 'center_lng', 'type']);
+
+        // Merge catalog and DB municipalities with consistent keys
+        $municipalities = collect($catalogMunis)->map(function ($m) use ($dbMunis) {
+            $dbMatch = $dbMunis->first(function ($dm) use ($m) {
+                return (isset($m['code']) && $dm->code === $m['code']) || strcasecmp($dm->name, $m['name']) === 0;
+            });
+            $wardCount = max(1, $dbMatch?->ward_count ?? $m['total_wards'] ?? 9);
+            return [
+                'id' => $dbMatch?->id ?? $m['code'] ?? ('np-' . \Illuminate\Support\Str::slug($m['name'])),
+                'db_id' => $dbMatch?->id,
+                'code' => $m['code'] ?? $dbMatch?->code ?? ('np-' . \Illuminate\Support\Str::slug($m['name'])),
+                'name' => $m['name'],
+                'local_name' => $m['local_name'] ?? $m['name'],
+                'district' => $m['district'] ?? $dbMatch?->district,
+                'province' => $m['province'] ?? $dbMatch?->province,
+                'type' => $m['type'] ?? $dbMatch?->type ?? 'rural_municipality',
+                'ward_count' => $wardCount,
+                'wards' => range(1, $wardCount),
+                'center_lat' => (float) ($dbMatch?->center_lat ?? $m['center_lat'] ?? 28.0),
+                'center_lng' => (float) ($dbMatch?->center_lng ?? $m['center_lng'] ?? 84.0),
+            ];
+        });
+
+        // Also add any DB municipalities not present in catalog
+        foreach ($dbMunis as $dm) {
+            if (!$municipalities->contains('name', $dm->name)) {
+                $wardCount = max(1, $dm->ward_count ?? 5);
+                $municipalities->push([
+                    'id' => $dm->id,
+                    'db_id' => $dm->id,
+                    'code' => $dm->code,
+                    'name' => $dm->name,
+                    'local_name' => $dm->name,
+                    'district' => $dm->district,
+                    'province' => $dm->province,
+                    'type' => $dm->type ?? 'municipality',
                     'ward_count' => $wardCount,
                     'wards' => range(1, $wardCount),
-                    'center_lat' => (float) ($m->center_lat ?? 28.0),
-                    'center_lng' => (float) ($m->center_lng ?? 84.0),
-                ];
-            });
+                    'center_lat' => (float) ($dm->center_lat ?? 28.0),
+                    'center_lng' => (float) ($dm->center_lng ?? 84.0),
+                ]);
+            }
+        }
 
+        // 5. Query registered villages from MySQL
         $muniId = $request->input('municipality_id');
+        $muniName = $request->input('municipality_name');
         $wardNo = $request->input('ward_number');
 
         $villageQuery = Village::query()->orderBy('name');
-        if ($muniId) {
-            $villageQuery->where('municipality_id', $muniId);
+        if ($muniId && is_numeric($muniId)) {
+            $villageQuery->where('municipality_id', (int) $muniId);
+        } elseif ($muniName) {
+            $villageQuery->where('municipality', 'LIKE', "%{$muniName}%");
         }
         if ($wardNo) {
-            $villageQuery->where('ward_no', $wardNo);
+            $villageQuery->where('ward_no', (string) $wardNo);
         }
 
         $villages = $villageQuery->get()->map(function ($v) {
@@ -258,22 +314,24 @@ class CitizenPortalController extends Controller
                 'municipality' => $v->municipality,
                 'district' => $v->district,
                 'province' => $v->province,
-                'ward_number' => $v->ward_no ?? $v->ward_number ?? 1,
-                'latitude' => (float) ($v->latitude ?? 28.0),
-                'longitude' => (float) ($v->longitude ?? 84.0),
+                'ward_number' => (int) ($v->ward_no ?? $v->ward_number ?? 1),
+                'latitude' => (float) ($v->latitude ?? $v->center_lat ?? 28.0),
+                'longitude' => (float) ($v->longitude ?? $v->center_lng ?? 84.0),
             ];
         });
 
-        $provinces = $allMunicipalities->pluck('province')->unique()->values();
-        $districts = $allMunicipalities->pluck('district')->unique()->values();
-
         return response()->json([
-            'municipality' => $allMunicipalities->first(),
-            'municipalities' => $allMunicipalities,
-            'provinces' => $provinces,
-            'districts' => $districts,
+            'municipality' => $municipalities->first(),
+            'municipalities' => $municipalities->values(),
+            'provinces' => $officialProvinces,
+            'districts' => $officialDistricts,
             'villages' => $villages,
             'categories' => self::CATEGORIES,
+            'national_directory' => [
+                'total_provinces' => 7,
+                'total_districts' => 77,
+                'coverage' => 'All 7 Provinces & 77 Districts of Nepal',
+            ],
         ]);
     }
 
@@ -309,7 +367,14 @@ class CitizenPortalController extends Controller
             'speech_transcript' => ['nullable', 'string', 'max:10000'],
             'transcript_language' => ['nullable', 'string', Rule::in(['ne-NP', 'en-US', 'ne', 'en'])],
             'contact_number' => ['nullable', 'string', 'max:30'],
-            'municipality_id' => ['nullable', 'exists:municipalities,id'],
+            'municipality_id' => ['nullable'],
+            'municipality_name' => ['nullable', 'string', 'max:255'],
+            'municipality_code' => ['nullable', 'string', 'max:100'],
+            'district' => ['nullable', 'string', 'max:100'],
+            'province' => ['nullable', 'string', 'max:100'],
+            'citizen_urgency' => ['nullable', 'string', Rule::in(['critical', 'high', 'medium', 'low'])],
+            'estimated_households' => ['nullable', 'integer', 'min:0'],
+            'lifeline_cutoff' => ['nullable'],
             'ward_number' => ['nullable', 'integer', 'between:1,33'],
             'village_id' => ['nullable', 'exists:villages,id'],
             'settlement_name' => ['nullable', 'string', 'max:255'],
@@ -352,6 +417,68 @@ class CitizenPortalController extends Controller
                 $village = $villageId ? Village::find($villageId) : null;
 
                 $muniId = $validated['municipality_id'] ?? ($village?->municipality_id ?? null);
+                if ($muniId && !is_numeric($muniId)) {
+                    $muniCode = $muniId;
+                    $muniId = null;
+                } else {
+                    $muniCode = $request->input('municipality_code');
+                }
+
+                // Resolve from code if ID not directly provided
+                if (!$muniId && $muniCode) {
+                    $dbMuni = \App\Models\Municipality::where('code', $muniCode)->first();
+                    if ($dbMuni) {
+                        $muniId = $dbMuni->id;
+                    } else {
+                        $catMuni = \App\Services\NepalLocationService::getMunicipalityByCode($muniCode);
+                        if ($catMuni) {
+                            $createdMuni = \App\Models\Municipality::create([
+                                'name' => $catMuni['name'],
+                                'code' => $catMuni['code'],
+                                'district' => $catMuni['district'],
+                                'province' => $catMuni['province'],
+                                'type' => $catMuni['type'] ?? 'rural_municipality',
+                                'ward_count' => $catMuni['total_wards'] ?? 9,
+                                'center_lat' => $catMuni['center_lat'] ?? 28.0,
+                                'center_lng' => $catMuni['center_lng'] ?? 84.0,
+                            ]);
+                            $muniId = $createdMuni->id;
+                        }
+                    }
+                }
+
+                // Resolve from name if still not found
+                if (!$muniId && $request->filled('municipality_name')) {
+                    $mName = $request->input('municipality_name');
+                    $dbMuni = \App\Models\Municipality::where('name', $mName)->first();
+                    if ($dbMuni) {
+                        $muniId = $dbMuni->id;
+                    } else {
+                        $dist = $request->input('district');
+                        $munis = \App\Services\NepalLocationService::getMunicipalities($dist);
+                        $found = null;
+                        foreach ($munis as $m) {
+                            if (strcasecmp($m['name'], $mName) === 0 || (!empty($m['local_name']) && strcasecmp($m['local_name'], $mName) === 0)) {
+                                $found = $m;
+                                break;
+                            }
+                        }
+                        if ($found) {
+                            $createdMuni = \App\Models\Municipality::create([
+                                'name' => $found['name'],
+                                'code' => $found['code'] ?? ('np-' . \Illuminate\Support\Str::slug($found['name']) . '-' . rand(100, 999)),
+                                'district' => $found['district'] ?? ($dist ?? 'Nepal'),
+                                'province' => $found['province'] ?? ($request->input('province') ?? 'Nepal'),
+                                'type' => $found['type'] ?? 'rural_municipality',
+                                'ward_count' => $found['total_wards'] ?? 9,
+                                'center_lat' => $found['center_lat'] ?? 28.0,
+                                'center_lng' => $found['center_lng'] ?? 84.0,
+                            ]);
+                            $muniId = $createdMuni->id;
+                        }
+                    }
+                }
+
                 if (!$muniId) {
                     $firstMuni = \App\Models\Municipality::first();
                     $muniId = $firstMuni?->id ?? 1;
@@ -360,6 +487,8 @@ class CitizenPortalController extends Controller
                 $ward = $validated['ward_number'] ?? ($village?->ward_no ?? 1);
                 $lat = $validated['latitude'] ?? ($village?->latitude ?? 28.0);
                 $lng = $validated['longitude'] ?? ($village?->longitude ?? 84.0);
+
+                $citizenPriority = $validated['citizen_urgency'] ?? self::inferSeverity($validated['category']);
 
                 // 1. Create Complaint Record (status: pending)
                 $complaint = Complaint::create([
@@ -379,6 +508,7 @@ class CitizenPortalController extends Controller
                     'latitude' => $lat,
                     'longitude' => $lng,
                     'status' => 'pending',
+                    'priority' => $citizenPriority,
                     'submitted_at' => now(),
                 ]);
 
@@ -429,7 +559,7 @@ class CitizenPortalController extends Controller
                 // 5. Dual-Sync: Create matching record in core 'issues' table
                 // Marked as pending_verification - does not count as verified until approved
                 $mappedCategory = self::mapToIssueCategory($complaint->category);
-                $severity = self::inferSeverity($complaint->category);
+                $severity = $citizenPriority ?? self::inferSeverity($complaint->category);
 
                 $issueData = [
                     'village_id' => $villageId,
@@ -459,7 +589,7 @@ class CitizenPortalController extends Controller
                     $issueData['reporter_phone'] = $complaint->contact_number;
                 }
                 if (\Illuminate\Support\Facades\Schema::hasColumn('issues', 'citizens_affected')) {
-                    $issueData['citizens_affected'] = 25;
+                    $issueData['citizens_affected'] = $validated['estimated_households'] ?? 25;
                 }
 
                 $issue = Issue::create($issueData);

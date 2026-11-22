@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { citizenService } from './citizenApi';
 import StatusBadge from './StatusBadge';
+import { translations } from './citizenI18n';
 import { FileText, Clock, PlayCircle, CheckCircle, ArrowRight, PlusCircle, Bell } from 'lucide-react';
 
-export default function CitizenDashboard({ onNavigate, onViewComplaint }) {
+export default function CitizenDashboard({ onNavigate, onViewComplaint, lang = 'ne' }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const t = translations[lang] || translations.ne;
 
   useEffect(() => {
     citizenService
@@ -15,19 +18,47 @@ export default function CitizenDashboard({ onNavigate, onViewComplaint }) {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="citizen-loading">Loading citizen dashboard...</div>;
-  if (!stats) return <div className="citizen-loading">Unable to load dashboard data. Please try again.</div>;
+  if (loading) {
+    return <div className="citizen-loading">{t.loading || 'Loading citizen dashboard...'}</div>;
+  }
+  if (!stats) {
+    return (
+      <div className="citizen-loading">
+        {lang === 'ne' ? 'तथ्यांक लोड गर्न सकिएन। कृपया पुनः प्रयास गर्नुहोस्।' : 'Unable to load dashboard data. Please try again.'}
+      </div>
+    );
+  }
 
   return (
     <div className="citizen-page">
       <div className="citizen-page-heading">
         <div>
-          <p>Citizen Portal</p>
-          <h1>Community Infrastructure Feedback</h1>
-          <span>Report hazards, damaged roads, broken water taps, and track municipal repairs live.</span>
+          <p>{t.brandSubtitle || 'Citizen Service Portal'}</p>
+          <h1>{lang === 'ne' ? 'नागरिक पूर्वाधार सहायता केन्द्र' : 'Community Infrastructure Feedback'}</h1>
+          <span>
+            {lang === 'ne'
+              ? 'सडक, पुल, खानेपानी र आपतकालीन जोखिमहरूको रिपोर्ट गर्नुहोस् र मर्मत कार्यको प्रत्यक्ष प्रगति ट्र्याक गर्नुहोस्।'
+              : 'Report hazards, damaged roads, broken water taps, and track municipal repairs live.'}
+          </span>
         </div>
-        <button type="button" className="citizen-primary" onClick={() => onNavigate('submit')}>
-          <PlusCircle size={16} /> File New Complaint
+        <button
+          type="button"
+          className="citizen-primary"
+          onClick={() => onNavigate('submit')}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 18px',
+            borderRadius: '8px',
+            background: '#123D30',
+            color: '#fff',
+            border: 'none',
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >
+          <PlusCircle size={16} /> {t.reportIncident || 'File New Complaint'}
         </button>
       </div>
 
@@ -37,7 +68,7 @@ export default function CitizenDashboard({ onNavigate, onViewComplaint }) {
             <FileText size={20} />
           </div>
           <div>
-            <span>Total Reports</span>
+            <span>{lang === 'ne' ? 'कुल उजुरीहरू' : 'Total Reports'}</span>
             <strong>{stats.total_complaints}</strong>
           </div>
         </article>
@@ -46,7 +77,7 @@ export default function CitizenDashboard({ onNavigate, onViewComplaint }) {
             <Clock size={20} />
           </div>
           <div>
-            <span>Pending Review</span>
+            <span>{lang === 'ne' ? 'प्रमाणीकरण हुन बाँकी' : 'Pending Review'}</span>
             <strong>{stats.pending_complaints}</strong>
           </div>
         </article>
@@ -55,7 +86,7 @@ export default function CitizenDashboard({ onNavigate, onViewComplaint }) {
             <PlayCircle size={20} />
           </div>
           <div>
-            <span>Work In Progress</span>
+            <span>{lang === 'ne' ? 'कार्य प्रगतिमा' : 'Work In Progress'}</span>
             <strong>{stats.in_progress_complaints}</strong>
           </div>
         </article>
@@ -64,7 +95,7 @@ export default function CitizenDashboard({ onNavigate, onViewComplaint }) {
             <CheckCircle size={20} />
           </div>
           <div>
-            <span>Resolved</span>
+            <span>{lang === 'ne' ? 'समाधान भएको' : 'Resolved'}</span>
             <strong>{stats.resolved_complaints}</strong>
           </div>
         </article>
@@ -72,9 +103,9 @@ export default function CitizenDashboard({ onNavigate, onViewComplaint }) {
 
       <section className="citizen-card">
         <div className="card-header-flex">
-          <h2>Your Recent Reports</h2>
+          <h2>{lang === 'ne' ? 'हालैका उजुरीहरू' : 'Your Recent Reports'}</h2>
           <button type="button" className="citizen-text-button" onClick={() => onNavigate('complaints')}>
-            View All Reports <ArrowRight size={14} />
+            {lang === 'ne' ? 'सबै उजुरी हेर्नुहोस्' : 'View All Reports'} <ArrowRight size={14} />
           </button>
         </div>
 
@@ -83,12 +114,12 @@ export default function CitizenDashboard({ onNavigate, onViewComplaint }) {
             <table className="citizen-table">
               <thead>
                 <tr>
-                  <th>Tracking ID</th>
-                  <th>Title</th>
-                  <th>Category</th>
-                  <th>Village / Ward</th>
-                  <th>Status</th>
-                  <th>Action</th>
+                  <th>{lang === 'ne' ? 'ट्र्याकिङ कोड' : 'Tracking ID'}</th>
+                  <th>{lang === 'ne' ? 'शीर्षक' : 'Title'}</th>
+                  <th>{lang === 'ne' ? 'प्रकार' : 'Category'}</th>
+                  <th>{lang === 'ne' ? 'गाउँ / वडा' : 'Village / Ward'}</th>
+                  <th>{lang === 'ne' ? 'अवस्था' : 'Status'}</th>
+                  <th>{lang === 'ne' ? 'कार्य' : 'Action'}</th>
                 </tr>
               </thead>
               <tbody>
@@ -102,10 +133,11 @@ export default function CitizenDashboard({ onNavigate, onViewComplaint }) {
                     </td>
                     <td>{item.category}</td>
                     <td>
-                      {item.village?.name || 'Village'} {item.ward_number ? `(Ward ${item.ward_number})` : ''}
+                      {item.village?.name || item.settlement_name || 'Village'}{' '}
+                      {item.ward_number ? `(Ward ${item.ward_number})` : ''}
                     </td>
                     <td>
-                      <StatusBadge status={item.status} />
+                      <StatusBadge status={item.status} lang={lang} />
                     </td>
                     <td>
                       <button
@@ -116,7 +148,7 @@ export default function CitizenDashboard({ onNavigate, onViewComplaint }) {
                           onNavigate('complaints');
                         }}
                       >
-                        Track Progress
+                        {lang === 'ne' ? 'प्रगति हेर्नुहोस्' : 'Track Progress'}
                       </button>
                     </td>
                   </tr>
@@ -126,20 +158,40 @@ export default function CitizenDashboard({ onNavigate, onViewComplaint }) {
           </div>
         ) : (
           <div className="empty-state-box">
-            <p className="citizen-empty">You have not submitted any infrastructure reports yet.</p>
-            <button type="button" className="citizen-primary" onClick={() => onNavigate('submit')}>
-              Submit Your First Report
+            <p className="citizen-empty">
+              {lang === 'ne'
+                ? 'तपाईंले अहिलेसम्म कुनै पूर्वाधार सम्बन्धी उजुरी दर्ता गर्नुभएको छैन।'
+                : 'You have not submitted any infrastructure reports yet.'}
+            </p>
+            <button
+              type="button"
+              className="citizen-primary"
+              onClick={() => onNavigate('submit')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 18px',
+                borderRadius: '8px',
+                background: '#123D30',
+                color: '#fff',
+                border: 'none',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              {lang === 'ne' ? 'पहिलो उजुरी दर्ता गर्नुहोस्' : 'Submit Your First Report'}
             </button>
           </div>
         )}
       </section>
 
       {stats.recent_notifications && stats.recent_notifications.length > 0 && (
-        <section className="citizen-card">
+        <section className="citizen-card" style={{ marginTop: '20px' }}>
           <div className="card-header-flex">
-            <h2>Recent Updates & Notices</h2>
+            <h2>{lang === 'ne' ? 'हालैका सरकारी सूचना तथा अपडेट' : 'Recent Updates & Notices'}</h2>
             <button type="button" className="citizen-text-button" onClick={() => onNavigate('notifications')}>
-              <Bell size={14} /> All Notifications
+              <Bell size={14} /> {lang === 'ne' ? 'सबै सूचनाहरू' : 'All Notifications'}
             </button>
           </div>
           <div className="notification-mini-list">

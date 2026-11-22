@@ -1524,3 +1524,45 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* 4-Step Wizard Stepper & Mobile Touch Target Refinements */
+.wizard-stepper-container {
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .wizard-stepper {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .citizen-auth-page {
+    grid-template-columns: 1fr;
+  }
+  .citizen-topbar {
+    padding: 10px 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .wizard-stepper {
+    grid-template-columns: 1fr !important;
+  }
+  .citizen-stats {
+    grid-template-columns: 1fr !important;
+  }
+  .citizen-primary,
+  .citizen-secondary,
+  .nav-btn,
+  .auth-tabs button {
+    min-height: 44px !important;
+  }
+}
+
+/* Accessible Interactive Touch Targets */
+.citizen-primary,
+.citizen-secondary,
+.nav-btn,
+.auth-submit-btn,
+.wizard-stepper button {
+  min-height: 44px;
+}
+

@@ -189,6 +189,7 @@ Route::prefix('citizen')->group(function () {
     Route::post('/register', [CitizenPortalController::class, 'register'])->middleware('throttle:10,1');
     Route::post('/login', [CitizenPortalController::class, 'login'])->middleware('throttle:15,1');
     Route::get('/locations', [CitizenPortalController::class, 'locations']);
+    Route::get('/locations/search', [LocationController::class, 'search']);
     Route::post('/transcribe', [CitizenPortalController::class, 'transcribe'])->middleware('throttle:30,1');
 
     Route::middleware('auth:sanctum')->group(function () {
