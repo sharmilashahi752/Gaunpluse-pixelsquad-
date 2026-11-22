@@ -214,7 +214,6 @@ export default function AIOverviewSection({ onSelectTab, onNavigate }) {
       {/* Quick Action Cards for Every Specialized Agent */}
       <Card style={{ padding: 18 }}>
         <CardHeader
-          eyebrow="Specialized agent workflows"
           title={`Direct Agent Workspaces for ${villageName}`}
           description="Access dedicated intelligence tools for triage, simulation, visual reporting, and repair action planning."
         />
@@ -481,9 +480,7 @@ export default function AIOverviewSection({ onSelectTab, onNavigate }) {
               <strong style={{ display: 'block', fontSize: 13, color: '#176342' }}>
                 Latest Verified Reports for {villageName}
               </strong>
-              <span style={{ fontSize: 11, color: '#687c73' }}>Live MySQL ServBay Records</span>
             </div>
-            <StatusBadge tone="green">MySQL Live</StatusBadge>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

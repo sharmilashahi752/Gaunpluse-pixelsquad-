@@ -36,7 +36,7 @@ const severityTone = { Critical: 'red', High: 'orange', Medium: 'green' };
 export function VillageMapPage() {
   return (
     <div className="page-stack">
-      <PageIntro eyebrow="Spatial overview" title="Village Map" description="Explore a styled preview of settlements, facilities and infrastructure reports across the demonstration municipality." actions={<button className="button button--secondary" type="button"><Filter size={16} /> Filter layers</button>} />
+      <PageIntro title="Village Map" description="Explore a styled preview of settlements, facilities and infrastructure reports across the demonstration municipality." actions={<button className="button button--secondary" type="button"><Filter size={16} /> Filter layers</button>} />
       <FeatureNotice title="Map preview only" icon={MapPinned}>Leaflet, geospatial layers and live village records will be connected in a later part.</FeatureNotice>
       <VillageMapPreview expanded />
     </div>
@@ -54,11 +54,11 @@ export function IssuesAlertsPage() {
 
   return (
     <div className="page-stack">
-      <PageIntro eyebrow="Community reporting" title="Issues & Alerts" description="Triage fictional infrastructure reports and preview an accessible issue-reporting workflow." actions={<button className="button button--primary" type="button" onClick={() => document.getElementById('report-title')?.focus()}><Plus size={16} /> New report</button>} />
+      <PageIntro title="Issues & Alerts" description="Triage fictional infrastructure reports and preview an accessible issue-reporting workflow." actions={<button className="button button--primary" type="button" onClick={() => document.getElementById('report-title')?.focus()}><Plus size={16} /> New report</button>} />
       <FeatureNotice title="Browser-only demonstration" icon={ShieldCheck}>Submitting this form does not save or send data. A secure municipal API will be added in a later part.</FeatureNotice>
       <div className="module-grid module-grid--issues">
         <Card>
-          <CardHeader eyebrow="Triage board" title="Open reports" description="Four fictional records ordered by severity." action={<DemoLabel compact />} />
+          <CardHeader title="Open reports" description="Four fictional records ordered by severity." />
           <div className="table-scroll">
             <table className="data-table">
               <thead><tr><th>Issue</th><th>Village</th><th>Severity</th><th>Status</th></tr></thead>
@@ -67,7 +67,7 @@ export function IssuesAlertsPage() {
           </div>
         </Card>
         <Card>
-          <CardHeader eyebrow="Report preview" title="Share an infrastructure issue" description="Fields show the future reporting experience." />
+          <CardHeader title="Share an infrastructure issue" description="Fields show the future reporting experience." />
           {submitted ? (
             <div className="form-success" role="status"><CheckCircle2 size={23} /><div><strong>Demo report acknowledged</strong><p>Nothing was stored. Clear the preview to test the form again.</p></div><button className="text-button" type="button" onClick={() => { setSubmitted(false); setDescription(''); }}>Clear preview</button></div>
           ) : (
@@ -90,11 +90,11 @@ export function IssuesAlertsPage() {
 export function SimulationsPage() {
   return (
     <div className="page-stack">
-      <PageIntro eyebrow="Decision sandbox" title="Simulations" description="Compare illustrative before-and-after access scenarios without changing official records." actions={<button className="button button--primary" type="button"><Network size={16} /> Run demo preview</button>} />
+      <PageIntro title="Simulations" description="Compare illustrative before-and-after access scenarios without changing official records." actions={<button className="button button--primary" type="button"><Network size={16} /> Run demo preview</button>} />
       <FeatureNotice title="No simulation service connected" icon={Network}>These cards use fixed fictional values. Part 2 does not call Python or any live infrastructure model.</FeatureNotice>
       <div className="scenario-builder">
         <Card className="scenario-controls">
-          <CardHeader eyebrow="Scenario setup" title="Seti Bridge disruption" description="Choose the inputs for a future simulation run." />
+          <CardHeader title="Seti Bridge disruption" description="Choose the inputs for a future simulation run." />
           <div className="form-stack">
             <label htmlFor="scenario-asset">Infrastructure asset</label><select id="scenario-asset" defaultValue="bridge"><option value="bridge">Seti footbridge · Ward 4</option><option value="road">Simalchaur access road · Ward 2</option></select>
             <label htmlFor="scenario-condition">Assumed condition</label><select id="scenario-condition" defaultValue="closed"><option value="closed">Fully unavailable</option><option value="limited">Limited pedestrian access</option></select>
@@ -103,7 +103,7 @@ export function SimulationsPage() {
           </div>
         </Card>
         <Card className="scenario-result">
-          <div className="scenario-result__head"><div><span className="eyebrow">Illustrative outcome</span><h2>Access impact</h2></div><DemoLabel /></div>
+          <div className="scenario-result__head"><div><h2>Access impact</h2></div></div>
           <div className="impact-number"><strong>20</strong><span>households may need a detour</span></div>
           <div className="comparison-bars">
             <div><span>School journey</span><strong>18 → 58 min</strong><i style={{ '--bar': '82%' }} /></div>
@@ -120,9 +120,9 @@ export function SimulationsPage() {
 export function ActionPlansPage() {
   return (
     <div className="page-stack">
-      <PageIntro eyebrow="Coordinated response" title="Action Plans" description="Track ownership, progress and next steps for demonstration response plans." actions={<button className="button button--primary" type="button"><Plus size={16} /> Draft action plan</button>} />
+      <PageIntro title="Action Plans" description="Track ownership, progress and next steps for demonstration response plans." actions={<button className="button button--primary" type="button"><Plus size={16} /> Draft action plan</button>} />
       <FeatureNotice title="Planning preview" icon={CircleDashed}>Assignments and progress are fictional and are not connected to municipal workflow tools.</FeatureNotice>
-      <div className="plan-grid">{actionPlans.map((plan, index) => <Card className="plan-card" key={plan.title}><div className="plan-card__top"><StatusBadge tone={index === 0 ? 'red' : index === 1 ? 'orange' : 'green'}>{index === 0 ? 'Urgent' : 'In progress'}</StatusBadge><DemoLabel compact /></div><h2>{plan.title}</h2><p>{plan.owner}</p><div className="progress-label"><span>{plan.tasks}</span><strong>{plan.progress}%</strong></div><div className="progress-track"><span style={{ width: `${plan.progress}%` }} /></div><div className="plan-card__footer"><span>Due {plan.due}</span><button className="text-button" type="button">Open plan <ArrowRight size={15} /></button></div></Card>)}</div>
+      <div className="plan-grid">{actionPlans.map((plan, index) => <Card className="plan-card" key={plan.title}><div className="plan-card__top"><StatusBadge tone={index === 0 ? 'red' : index === 1 ? 'orange' : 'green'}>{index === 0 ? 'Urgent' : 'In progress'}</StatusBadge></div><h2>{plan.title}</h2><p>{plan.owner}</p><div className="progress-label"><span>{plan.tasks}</span><strong>{plan.progress}%</strong></div><div className="progress-track"><span style={{ width: `${plan.progress}%` }} /></div><div className="plan-card__footer"><span>Due {plan.due}</span><button className="text-button" type="button">Open plan <ArrowRight size={15} /></button></div></Card>)}</div>
     </div>
   );
 }
@@ -130,7 +130,7 @@ export function ActionPlansPage() {
 export function CommunityVoicesPage() {
   return (
     <div className="page-stack">
-      <PageIntro eyebrow="Participatory insight" title="Community Voices" description="Review how local observations could be acknowledged, categorized and connected to municipal follow-up." actions={<button className="button button--primary" type="button"><MessageSquareText size={16} /> Record a voice</button>} />
+      <PageIntro title="Community Voices" description="Review how local observations could be acknowledged, categorized and connected to municipal follow-up." actions={<button className="button button--primary" type="button"><MessageSquareText size={16} /> Record a voice</button>} />
       <FeatureNotice title="Consent-first preview" icon={ShieldCheck}>All names and messages are fictional. Future community submissions will require consent, privacy controls and moderation.</FeatureNotice>
       <CommunityVoices full />
       <Card className="empty-state" as="section"><span><MessageSquareText size={23} /></span><h2>No more voices in this demo</h2><p>When connected later, filters and pagination will help teams review additional community submissions.</p><button className="button button--secondary" type="button">Review archived preview</button></Card>
@@ -172,7 +172,6 @@ export function ReportsInsightsPage() {
   return (
     <div className="page-stack">
       <PageIntro
-        eyebrow="Evidence overview"
         title="Reports & Insights"
         description="Understand reporting patterns and municipal response performance through evidence summaries."
         actions={
@@ -195,10 +194,8 @@ export function ReportsInsightsPage() {
       </div>
       <Card>
         <CardHeader
-          eyebrow="Issue mix"
           title="Reports by infrastructure category"
           description="Reports categorized across transport, water, bridges, and access."
-          action={<DemoLabel compact />}
         />
         <div className="horizontal-chart" aria-label="Horizontal bar chart of issue categories">
           <div>

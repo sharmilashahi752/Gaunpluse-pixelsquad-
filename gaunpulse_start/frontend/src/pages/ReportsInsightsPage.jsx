@@ -738,7 +738,6 @@ export default function ReportsInsightsPage({ onNavigate }) {
     <div className="page-stack reports-page" style={{ paddingBottom: '60px' }}>
       {/* 1. Header & Actions */}
       <PageIntro
-        eyebrow="Evidence-Based Municipal Analytics"
         title="Reports & Insights"
         description="Live decision-support intelligence aggregated directly from MySQL database tables, citizen reports, verified infrastructure assets, and NetworkX topological impact simulations."
         actions={
@@ -1230,7 +1229,6 @@ export default function ReportsInsightsPage({ onNavigate }) {
         {/* Chart 1: Issue Categories Breakdown */}
         <Card>
           <CardHeader
-            eyebrow="Evidence Distribution"
             title="Reports by Infrastructure Category"
             description="Categorization of reported disruptions across roads, water points, bridges, and facilities."
           />
@@ -1246,7 +1244,6 @@ export default function ReportsInsightsPage({ onNavigate }) {
         {/* Chart 2: Report Trends Timeline */}
         <Card>
           <CardHeader
-            eyebrow="Timeline Performance"
             title="Monthly Ingestion vs. Resolution Trends"
             description="Historical trend of citizen reports submitted versus successfully resolved lifelines."
           />
@@ -1262,7 +1259,6 @@ export default function ReportsInsightsPage({ onNavigate }) {
         {/* Chart 3: Issue Status Distribution */}
         <Card>
           <CardHeader
-            eyebrow="Workflow Lifecycle"
             title="Issue Status Lifecycle Distribution"
             description="Active distribution across reported, under review, verified, in progress, resolved, and rejected."
           />
@@ -1278,7 +1274,6 @@ export default function ReportsInsightsPage({ onNavigate }) {
         {/* Chart 4: Priority & Severity Breakdown */}
         <Card>
           <CardHeader
-            eyebrow="Risk Stratification"
             title="Disruption Severity Breakdown"
             description="Recorded severity classifications informing rapid municipal deployment and contractor prioritization."
           />
@@ -1294,7 +1289,6 @@ export default function ReportsInsightsPage({ onNavigate }) {
         {/* Chart 5: Ward Benchmarking */}
         <Card>
           <CardHeader
-            eyebrow="Geographic Equity"
             title="Ward Comparison & Resolution Rates"
             description="Municipal ward report volumes contrasted with verified resolution counts."
           />
@@ -1310,7 +1304,6 @@ export default function ReportsInsightsPage({ onNavigate }) {
         {/* Chart 6: Infrastructure Condition */}
         <Card>
           <CardHeader
-            eyebrow="Asset Integrity"
             title="Infrastructure Condition & Passability"
             description="Operational passability and verification status across registered road and bridge network edges."
           />
@@ -1326,7 +1319,6 @@ export default function ReportsInsightsPage({ onNavigate }) {
         {/* Chart 7: Action Plan Execution */}
         <Card>
           <CardHeader
-            eyebrow="Municipal Response"
             title="Action Plan Status & Progress"
             description="Tracking active repair milestones and task execution across municipal teams."
           />
@@ -1342,14 +1334,8 @@ export default function ReportsInsightsPage({ onNavigate }) {
         {/* Chart 8: Service Accessibility Impact (Simulation) */}
         <Card>
           <CardHeader
-            eyebrow="NetworkX Simulation"
             title="Simulated Accessibility Impact"
             description="Disruption scenario modeling showing isolated settlements and transit delays."
-            action={
-              <span style={{ fontSize: '11px', background: '#fff0df', color: '#c2410c', padding: '2px 8px', borderRadius: '10px', fontWeight: 600 }}>
-                Simulated Modeling
-              </span>
-            }
           />
           <div style={{ height: '230px', position: 'relative' }}>
             {simulationData?.scenarios?.length > 0 && simulationData.total_recorded_simulations > 0 ? (
@@ -1365,8 +1351,7 @@ export default function ReportsInsightsPage({ onNavigate }) {
       <Card style={{ marginTop: '12px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <span className="eyebrow">Audit Trail & Records</span>
-            <h2 style={{ margin: '2px 0 0', fontSize: '17px', color: '#092d22' }}>Detailed Municipal Evidence Explorer</h2>
+            <h2 style={{ margin: '0', fontSize: '17px', color: '#092d22' }}>Detailed Municipal Evidence Explorer</h2>
           </div>
 
           {/* Table Tab Selector */}

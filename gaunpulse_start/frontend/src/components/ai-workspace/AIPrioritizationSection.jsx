@@ -175,8 +175,7 @@ export default function AIPrioritizationSection({ onNavigate, onSelectTab }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Human-Centered Task Header */}
       <div>
-        <span className="eyebrow" style={{ color: '#176342', fontWeight: 700 }}>Priority Ranking</span>
-        <h2 style={{ margin: '4px 0', fontSize: 22, color: '#092d22', fontFamily: 'Georgia, serif' }}>
+        <h2 style={{ margin: '0 0 4px', fontSize: 22, color: '#092d22', fontFamily: 'Georgia, serif' }}>
           Which problems need attention first?
         </h2>
         <p style={{ margin: 0, fontSize: 13, color: '#556e62' }}>

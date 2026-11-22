@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Activity, TrendingUp } from 'lucide-react';
-import { Card, CardHeader, LiveLabel } from './ui';
+import { Card, CardHeader } from './ui';
 
 export default function ConnectivityTrendChart() {
   const [trends, setTrends] = useState(null);
@@ -49,10 +49,8 @@ export default function ConnectivityTrendChart() {
   return (
     <Card className="trend-card">
       <CardHeader
-        eyebrow="Six-month view"
         title="Infrastructure connectivity & triage"
         description="Real-time timeline of municipal issue registrations and resolution flow."
-        action={<LiveLabel text="Real-time Trends" compact />}
       />
       <div className="trend-summary">
         <strong>{resolutionRate}</strong>

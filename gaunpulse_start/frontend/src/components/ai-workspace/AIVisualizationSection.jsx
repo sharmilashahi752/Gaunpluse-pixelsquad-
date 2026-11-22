@@ -285,8 +285,7 @@ export default function AIVisualizationSection() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <span className="eyebrow" style={{ color: '#176342', fontWeight: 700 }}>Village Evidence & Trends</span>
-          <h2 style={{ margin: '4px 0', fontSize: 22, color: '#092d22', fontFamily: 'Georgia, serif' }}>
+          <h2 style={{ margin: '0 0 4px', fontSize: 22, color: '#092d22', fontFamily: 'Georgia, serif' }}>
             Understand what's happening in your village
           </h2>
           <p style={{ margin: 0, fontSize: 13, color: '#556e62' }}>

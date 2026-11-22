@@ -26,7 +26,7 @@ import {
   Zap,
 } from 'lucide-react';
 import InteractiveVillageMap from '../components/InteractiveVillageMap';
-import { Card, CardHeader, FeatureNotice, LiveLabel, PageIntro, StatusBadge } from '../components/ui';
+import { Card, CardHeader, FeatureNotice, PageIntro, StatusBadge } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useVillageSelection } from '../context/VillageSelectionContext';
 import { deduplicateVillages, formatVillageLabel } from '../utils/villageUtils';
@@ -449,7 +449,6 @@ export default function SimulationsPage({ onNavigate }) {
   return (
     <div className="page-stack">
       <PageIntro
-        eyebrow="Graph Intelligence Engine"
         title="Infrastructure Impact Simulator"
         description="Simulate the direct network effects of road and bridge disruptions on rural community access to schools, clinics, and municipal centers using graph-based shortest-path calculations."
         actions={(
@@ -548,8 +547,7 @@ export default function SimulationsPage({ onNavigate }) {
               <MapPin size={22} color="#176342" />
             </div>
             <div>
-              <span className="eyebrow">Selected administrative context</span>
-              <h3 style={{ margin: '2px 0', color: '#092d22', fontSize: '18px' }}>
+              <h3 style={{ margin: '0 0 2px', color: '#092d22', fontSize: '18px' }}>
                 {villageData?.village?.name || (loadingVillage ? 'Loading village network…' : 'Select a village')}
               </h3>
               <small style={{ color: '#687c73' }}>
@@ -678,7 +676,6 @@ export default function SimulationsPage({ onNavigate }) {
       {!loadingVillage && !isDemo && (!readiness?.can_simulate || edges.length === 0) && (
         <Card>
           <CardHeader
-            eyebrow="Network readiness"
             title={edges.length === 0 ? 'No Mapped Infrastructure Graph' : readinessLabel(readiness?.status)}
             description={
               edges.length === 0
@@ -728,7 +725,6 @@ export default function SimulationsPage({ onNavigate }) {
           <div style={{ display: 'grid', gap: 18, alignContent: 'start' }}>
             <Card>
               <CardHeader
-                eyebrow="Resilience controls"
                 title="Simulation Controller"
                 description={isDemo ? 'Test resilience against 5 pre-calibrated scenario disruptions or pick any individual asset.' : 'Simulate live disruptions on this village’s mapped infrastructure.'}
               />
@@ -846,7 +842,6 @@ export default function SimulationsPage({ onNavigate }) {
               <div className="sim-result-reveal">
                 <Card>
                   <CardHeader
-                    eyebrow="Calculated impact"
                     title="Simulation Results"
                     description={result.calculation_timestamp ? `Calculated via deterministic Dijkstra algorithm at ${new Date(result.calculation_timestamp).toLocaleTimeString()}` : ''}
                     action={
@@ -932,7 +927,6 @@ export default function SimulationsPage({ onNavigate }) {
             ) : (
               <Card>
                 <CardHeader
-                  eyebrow="Network Baseline Telemetry"
                   title="Asset Inventory & Inspection"
                   description="Physical asset distribution and topology prior to simulated disruption."
                 />
@@ -994,7 +988,6 @@ export default function SimulationsPage({ onNavigate }) {
             {/* Interactive Geographical Leaflet Map */}
             <Card>
               <CardHeader
-                eyebrow="Interactive geographical map"
                 title={`${mapMode === 'before' ? 'Baseline Network' : 'Disrupted Scenario'} (${mapMode === 'before' ? 'Before' : 'After'})`}
                 description={
                   mapMode === 'before'
@@ -1041,7 +1034,6 @@ export default function SimulationsPage({ onNavigate }) {
             {result && result.access_comparisons && result.access_comparisons.length > 0 && (
               <Card>
                 <CardHeader
-                  eyebrow="Comparative travel metrics"
                   title="Travel Time Comparison: Baseline vs Disrupted"
                   description={`Comparing travel duration before and after failure across all settlements and essential public facilities (${result.unit}).`}
                 />
@@ -1184,7 +1176,6 @@ export default function SimulationsPage({ onNavigate }) {
         <div style={{ display: 'grid', gap: 18 }}>
           <Card>
             <CardHeader
-              eyebrow="What If We Fix This First?"
               title="Repair Prioritization & Trade-off Analysis"
               description={
                 isDemo
@@ -1271,7 +1262,6 @@ export default function SimulationsPage({ onNavigate }) {
           {comparisonResult && (
             <Card>
               <CardHeader
-                eyebrow="Comparative outcomes"
                 title="Repair Priority Trade-off Evaluation"
                 description={comparisonResult.comparison_summary}
               />
@@ -1341,7 +1331,6 @@ export default function SimulationsPage({ onNavigate }) {
       {villageData && (
         <Card>
           <CardHeader
-            eyebrow="Saved calculations"
             title="Simulation History"
             description="Reopen prior simulation results for this village. An older graph badge indicates the mapped network has been edited since calculation."
             action={<History size={18} />}

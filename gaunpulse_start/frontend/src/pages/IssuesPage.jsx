@@ -26,7 +26,7 @@ import {
   X,
   XCircle,
 } from 'lucide-react';
-import { Card, CardHeader, EmptyState, FeatureNotice, LiveLabel, PageIntro, StatusBadge } from '../components/ui';
+import { Card, CardHeader, EmptyState, FeatureNotice, PageIntro, StatusBadge } from '../components/ui';
 import { deduplicateVillages, formatVillageLabel } from '../utils/villageUtils';
 import { useVillageSelection } from '../context/VillageSelectionContext';
 import { useAuth } from '../context/AuthContext';
@@ -489,7 +489,6 @@ export default function IssuesPage({ onNavigate }) {
   return (
     <div className="page-stack">
       <PageIntro
-        eyebrow="Civic & Municipal Triage"
         title="Issues & Alerts"
         description="Review, verify, and resolve rural infrastructure disruptions recorded in the municipal database. Persists directly to MySQL and calculates priority weights."
         actions={
@@ -627,10 +626,8 @@ export default function IssuesPage({ onNavigate }) {
       {/* Issues Table */}
       <Card>
         <CardHeader
-          eyebrow={activeTab === 'pending_verification' ? 'Verification Queue' : 'Triage queue'}
           title={activeTab === 'pending_verification' ? `Citizen Reports Awaiting Verification (${filteredIssues.length})` : `Registered Infrastructure Issues (${filteredIssues.length})`}
           description={activeTab === 'pending_verification' ? 'Review unverified citizen complaints, inspect audio recordings and photographic evidence, and approve or reject.' : 'Click any issue row to view complete details, history timeline, and update municipal verification status.'}
-          action={<LiveLabel text={activeTab === 'pending_verification' ? 'Verification Inbox' : 'Live Triage Queue'} compact />}
         />
 
         {loading ? (
@@ -782,7 +779,6 @@ export default function IssuesPage({ onNavigate }) {
           <div className="modal-card" style={{ maxWidth: '620px' }}>
             <div className="modal-header">
               <div>
-                <span className="eyebrow">Citizen & Field Reporting</span>
                 <h2>Report New Infrastructure Issue</h2>
               </div>
               <button

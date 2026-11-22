@@ -12,7 +12,7 @@ import {
   ShieldCheck,
   X,
 } from 'lucide-react';
-import { Card, CardHeader, FeatureNotice, LiveLabel, PageIntro, StatusBadge } from '../components/ui';
+import { Card, CardHeader, FeatureNotice, PageIntro, StatusBadge } from '../components/ui';
 import { useVillageSelection } from '../context/VillageSelectionContext';
 import { cachedFetchJson, invalidateApiCache } from '../utils/apiCache';
 
@@ -131,7 +131,6 @@ export default function CommunityVoicesPage() {
   return (
     <div className="page-stack">
       <PageIntro
-        eyebrow="Participatory Insight"
         title="Community Voices"
         description="Listen to observations shared by village residents, volunteer observers, and ward leaders. Persists to the municipal database."
         actions={
@@ -183,10 +182,8 @@ export default function CommunityVoicesPage() {
       {/* Voices List */}
       <Card className="voices-card voices-card--full">
         <CardHeader
-          eyebrow="Community Observation Stream"
           title={`Verified Resident Feedback (${filteredVoices.length})`}
           description="Local testimonies helping target municipal infrastructure priorities."
-          action={<LiveLabel text="Live Resident Feed" compact />}
         />
 
         {loading ? (

@@ -91,12 +91,6 @@ export default function AIAgentPage({ onNavigate }) {
               {TASK_TITLES[activeTab] || 'Task Workspace'}
             </span>
           </div>
-
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span style={{ fontSize: 11, background: '#eaf5ee', color: '#176342', padding: '3px 10px', borderRadius: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              <Globe size={12} /> Nepali & English
-            </span>
-          </div>
         </nav>
       )}
 

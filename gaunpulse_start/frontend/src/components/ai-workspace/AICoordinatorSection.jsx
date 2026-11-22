@@ -279,12 +279,6 @@ export default function AICoordinatorSection({ onNavigate, onSelectTab }) {
             <strong>GaunPulse AI Coordinator</strong>
             <span>Multi-Agent Decision Support for {villageName}</span>
           </div>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#e3f3e3', color: '#176342', fontSize: 10.5, padding: '3px 8px', borderRadius: 10, fontWeight: 700 }}>
-              <Cpu size={12} /> NetworkX + MySQL Gateway
-            </span>
-            <StatusBadge tone="green">Orchestrator Online</StatusBadge>
-          </div>
         </div>
 
         {/* Message Thread */}

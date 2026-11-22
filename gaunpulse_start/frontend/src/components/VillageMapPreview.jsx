@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Building2, GraduationCap, HeartPulse, House, Layers3, Maximize2, TriangleAlert, Waypoints } from 'lucide-react';
-import { Card, CardHeader, LiveLabel, TextButton } from './ui';
+import { Card, CardHeader, TextButton } from './ui';
 
 const markerIcons = {
   settlement: House,
@@ -73,15 +73,9 @@ export default function VillageMapPreview({ onOpenMap, expanded = false }) {
   return (
     <Card className={`map-card ${expanded ? 'map-card--expanded' : ''}`}>
       <CardHeader
-        eyebrow="Infrastructure overview"
         title="Village GIS Network"
         description={`${villageName} · ${nodes.length || 19} Lifeline Nodes · ${edges.length || 10} Connected Ways`}
-        action={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <LiveLabel text="Live GIS Layer" compact />
-            <TextButton onClick={onOpenMap}>View full map</TextButton>
-          </div>
-        }
+        action={<TextButton onClick={onOpenMap}>View full map</TextButton>}
       />
       <div
         className="map-preview"

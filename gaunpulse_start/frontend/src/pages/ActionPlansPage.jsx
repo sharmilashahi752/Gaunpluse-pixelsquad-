@@ -16,7 +16,7 @@ import {
   UserCheck,
   X,
 } from 'lucide-react';
-import { Card, CardHeader, DemoLabel, EmptyState, FeatureNotice, PageIntro, StatusBadge } from '../components/ui';
+import { Card, CardHeader, EmptyState, FeatureNotice, PageIntro, StatusBadge } from '../components/ui';
 import { deduplicateVillages, formatVillageLabel } from '../utils/villageUtils';
 import { useVillageSelection } from '../context/VillageSelectionContext';
 import { cachedFetchJson, invalidateApiCache } from '../utils/apiCache';
@@ -247,7 +247,6 @@ export default function ActionPlansPage() {
   return (
     <div className="page-stack">
       <PageIntro
-        eyebrow="Coordinated Municipal Response"
         title="Infrastructure Action Plans"
         description="Track repair execution, resource allocation, and progress tracking for verified infrastructure disruptions. All records persist to MySQL."
         actions={
@@ -521,7 +520,6 @@ export default function ActionPlansPage() {
           <div className="modal-card">
             <div className="modal-header">
               <div>
-                <span className="eyebrow">Municipal Intervention</span>
                 <h2>{editingPlan ? 'Edit Action Plan' : 'Add New Action Plan'}</h2>
               </div>
               <button

@@ -28,7 +28,7 @@ import {
   Zap,
 } from 'lucide-react';
 import InteractiveVillageMap from '../components/InteractiveVillageMap';
-import { Card, CardHeader, DemoLabel, FeatureNotice, PageIntro, StatusBadge } from '../components/ui';
+import { Card, CardHeader, FeatureNotice, PageIntro, StatusBadge } from '../components/ui';
 import { useVillageSelection } from '../context/VillageSelectionContext';
 import { deduplicateVillages, formatVillageLabel } from '../utils/villageUtils';
 import { cachedFetchJson, invalidateApiCache } from '../utils/apiCache';
@@ -895,7 +895,6 @@ export default function VillageMapPage() {
 
       {/* Header Intro & Nepal Search Bar */}
       <PageIntro
-        eyebrow="Automatic spatial intelligence"
         title="Village Infrastructure Map"
         description="Discover, verify, and monitor roads, suspension bridges, water supplies, and public lifelines for any village across Nepal."
         actions={
@@ -1195,8 +1194,7 @@ export default function VillageMapPage() {
         <Card style={{ background: 'var(--surface-subtle)', border: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <span className="eyebrow">Selected Lifeline Road / Bridge Asset</span>
-              <h3 style={{ margin: '2px 0 6px', color: 'var(--text-primary)' }}>{selectedEdge.name}</h3>
+              <h3 style={{ margin: '0 0 6px', color: 'var(--text-primary)' }}>{selectedEdge.name}</h3>
               <p style={{ margin: '0 0 6px', fontSize: '13px', color: 'var(--text-primary)' }}>
                 <strong>Type:</strong> {selectedEdge.infrastructure_type || selectedEdge.type} · <strong>Surface:</strong> {selectedEdge.surface_type || 'Gravel'} · <strong>Length:</strong> <span style={{ fontVariantNumeric: 'tabular-nums' }}>{selectedEdge.length_meters || 0}m</span> · <strong>Condition:</strong> <span style={{ fontWeight: '600' }}>{selectedEdge.status || 'operational'}</span> · <strong>Verification:</strong> <span style={{ color: 'var(--success)', fontWeight: '600' }}>{selectedEdge.verification_status || 'unverified'}</span>
               </p>
@@ -1228,8 +1226,7 @@ export default function VillageMapPage() {
         <Card style={{ background: 'var(--surface-subtle)', border: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <span className="eyebrow">Selected Node Facility / Settlement</span>
-              <h3 style={{ margin: '2px 0 6px', color: 'var(--text-primary)' }}>{selectedNode.name}</h3>
+              <h3 style={{ margin: '0 0 6px', color: 'var(--text-primary)' }}>{selectedNode.name}</h3>
               <p style={{ margin: '0 0 6px', fontSize: '13px', color: 'var(--text-primary)' }}>
                 <strong>Type:</strong> {(selectedNode.node_type || selectedNode.type || 'junction').toUpperCase()} · <strong>Coordinates:</strong> <span style={{ fontVariantNumeric: 'tabular-nums' }}>{parseFloat(selectedNode.latitude).toFixed(5)}, {parseFloat(selectedNode.longitude).toFixed(5)}</span> · <strong>Verification:</strong> <span style={{ color: 'var(--primary-green)', fontWeight: '600' }}>{selectedNode.verification_status || 'unverified'}</span>
               </p>

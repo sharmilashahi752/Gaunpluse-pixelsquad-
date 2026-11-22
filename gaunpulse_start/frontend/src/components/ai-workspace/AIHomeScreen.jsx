@@ -238,9 +238,6 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
       {/* 1. Welcoming Assistant Hero */}
       <div className="ai-home-hero">
         <div className="ai-home-hero__header">
-          <span className="ai-home-hero__badge">
-            <Sparkles size={14} /> GaunPulse AI
-          </span>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {/* Village Selector in Hero */}
             <select
@@ -263,10 +260,6 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
                 </option>
               ))}
             </select>
-
-            <span className="ai-home-hero__lang">
-              <Globe size={13} /> Nepali & English
-            </span>
           </div>
         </div>
         <h1 className="ai-home-hero__title">How can I help your village today?</h1>
@@ -289,7 +282,6 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
             <ShieldAlert size={24} />
           </div>
           <div className="ai-task-card__content">
-            <span className="ai-task-card__eyebrow">Find Urgent Problems</span>
             <h3 className="ai-task-card__title">What should we fix first?</h3>
             <p className="ai-task-card__desc">
               Discover which issues in {villageName} need attention first based on safety risk and village access.
@@ -312,7 +304,6 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
             <Network size={24} />
           </div>
           <div className="ai-task-card__content">
-            <span className="ai-task-card__eyebrow">Check Infrastructure</span>
             <h3 className="ai-task-card__title">Explore road & bridge impacts</h3>
             <p className="ai-task-card__desc">
               Simulate closures on {villageName}'s network to see how damaged roads and bridges cut off access.
@@ -335,7 +326,6 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
             <BarChart3 size={24} />
           </div>
           <div className="ai-task-card__content">
-            <span className="ai-task-card__eyebrow">Create a Report</span>
             <h3 className="ai-task-card__title">Understand village trends</h3>
             <p className="ai-task-card__desc">
               Turn complaint records and infrastructure evidence into clear visual charts for {villageName}.
@@ -358,7 +348,6 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
             <ClipboardCheck size={24} />
           </div>
           <div className="ai-task-card__content">
-            <span className="ai-task-card__eyebrow">Plan a Repair</span>
             <h3 className="ai-task-card__title">Prepare a draft action plan</h3>
             <p className="ai-task-card__desc">
               Draft a practical action plan with task checklists ready for municipal council review in {villageName}.
@@ -562,8 +551,7 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
       <Card style={{ padding: '16px 20px', background: '#ffffff', borderRadius: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <span className="eyebrow" style={{ color: '#176342', fontWeight: 700 }}>Village Context</span>
-            <h4 style={{ margin: '2px 0', fontSize: 14, color: '#092d22' }}>Active Municipal Intelligence: {villageName}</h4>
+            <h4 style={{ margin: '0 0 2px', fontSize: 14, color: '#092d22' }}>Active Municipal Intelligence: {villageName}</h4>
             <p style={{ margin: 0, fontSize: 12, color: '#687c73' }}>
               Connected to <strong>{stats?.monitored_villages ?? 18} registered villages</strong> across Nepal · {stats?.active_issues ?? 7} active community reports.
             </p>

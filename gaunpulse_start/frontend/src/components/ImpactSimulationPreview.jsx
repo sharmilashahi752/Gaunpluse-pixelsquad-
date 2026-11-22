@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowRight, Route, TriangleAlert } from 'lucide-react';
 import { impactComparison as fallbackJourneys } from '../data/demoData';
-import { Card, CardHeader, LiveLabel, StatusBadge } from './ui';
+import { Card, CardHeader, StatusBadge } from './ui';
 
 const API_BASE = import.meta.env.VITE_API_URL !== undefined ? `${import.meta.env.VITE_API_URL}/api` : '/api';
 
@@ -57,10 +57,8 @@ export default function ImpactSimulationPreview({ onOpenSimulation }) {
   return (
     <Card className="simulation-card">
       <CardHeader
-        eyebrow="What-if scenario"
         title="Impact simulation"
         description="Calculated live from NetworkX graph shortest-path engine."
-        action={<LiveLabel text="NetworkX Engine" compact />}
       />
       <div className="simulation-alert">
         <span><TriangleAlert size={18} aria-hidden="true" /></span>

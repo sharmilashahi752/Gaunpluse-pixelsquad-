@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowRight, Bot, Cpu, LockKeyhole, ShieldCheck, Sparkles, TriangleAlert } from 'lucide-react';
+import { ArrowRight, Bot, LockKeyhole, ShieldCheck, Sparkles, TriangleAlert } from 'lucide-react';
 import { Card } from './ui';
 
 export default function AIAgentPreview({ onOpenAgent }) {
@@ -29,9 +29,6 @@ export default function AIAgentPreview({ onOpenAgent }) {
           <strong>GaunPulse AI Insights</strong>
           <span>Live Municipal Intelligence</span>
         </div>
-        <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4, background: '#e3f3e3', color: '#176342', fontSize: 10, padding: '3px 8px', borderRadius: 10, fontWeight: 700 }}>
-          <Cpu size={12} /> NetworkX + MySQL
-        </span>
       </div>
 
       <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -46,13 +43,13 @@ export default function AIAgentPreview({ onOpenAgent }) {
         {/* Database Metric Summary */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 11, background: '#f6faf7', padding: '8px 12px', borderRadius: 6 }}>
           <div>
-            <span style={{ color: '#687c73', display: 'block', fontSize: 10 }}>TOP DISRUPTION CATEGORY</span>
+            <span style={{ color: '#687c73', display: 'block', fontSize: 11 }}>Top Disruption Category</span>
             <strong style={{ color: '#176342' }}>
               {insights?.frequent_category || 'Damaged Bridge'}
             </strong>
           </div>
           <div>
-            <span style={{ color: '#687c73', display: 'block', fontSize: 10 }}>CRITICAL LIFELINES</span>
+            <span style={{ color: '#687c73', display: 'block', fontSize: 11 }}>Critical Lifelines</span>
             <strong style={{ color: '#c0392b' }}>
               {insights?.metrics?.critical_disruptions ?? 3} Under Alert
             </strong>

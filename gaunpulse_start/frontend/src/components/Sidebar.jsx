@@ -102,17 +102,6 @@ export default function Sidebar({ activePage, isOpen, onNavigate, onClose }) {
             );
           })}
         </nav>
-
-        {/* System Operational Footer */}
-        <div className="sidebar__footer">
-          <div className="sidebar__pulse" aria-hidden="true">
-            <span />
-          </div>
-          <div>
-            <strong>System Operational</strong>
-            <span>MySQL & NetworkX Active</span>
-          </div>
-        </div>
       </aside>
     </>
   );

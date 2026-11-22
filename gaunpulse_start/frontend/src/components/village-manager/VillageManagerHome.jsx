@@ -71,9 +71,6 @@ export default function VillageManagerHome({
       {/* 1. Lush Forest Hero Banner */}
       <div className="vm-hero">
         <div className="vm-hero__content">
-          <span className="vm-hero__badge">
-            <Sparkles size={14} /> Real Nepal Village Stewardship
-          </span>
           <h1 className="vm-hero__title">Village Data Manager</h1>
           <p className="vm-hero__subtitle">
             Manage your villages and infrastructure in one place.
