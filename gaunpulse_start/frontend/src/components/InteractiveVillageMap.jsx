@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Tooltip, Circle, useMap, useMapEvents } from 'react-leaflet';
-import L from 'leaflet';
+import L from '../utils/leafletCluster';
 import 'leaflet/dist/leaflet.css';
 import {
   AlertTriangle,
@@ -48,50 +48,62 @@ function MapClickHandler({ onMapClick }) {
 
 // Custom DivIcons styled for GaunPulse forest & cream design language
 function createCustomIcon(type, status = 'operational', count = null) {
-  let bg = '#176342';
+  let bg = '#166534';
   let border = '#ffffff';
   let svgPath = '';
-  let size = 34;
+  let size = 24;
 
   if (type === 'settlement') {
     bg = '#124b35';
-    svgPath = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`;
+    svgPath = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`;
   } else if (type === 'school') {
     bg = '#1d4ed8';
-    svgPath = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg>`;
-  } else if (type === 'health_post' || type === 'health') {
+    svgPath = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg>`;
+  } else if (type === 'health_post' || type === 'health' || type === 'clinic') {
     bg = '#0f766e';
-    svgPath = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M12 5v6"/><path d="M9 8h6"/></svg>`;
+    svgPath = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
   } else if (type === 'water_point' || type === 'water') {
     bg = '#0284c7';
-    svgPath = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg>`;
+    svgPath = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg>`;
+  } else if (type === 'bridge') {
+    bg = '#b45309';
+    svgPath = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17h18"/><path d="M4 17V8"/><path d="M20 17V8"/><path d="M4 8c4 3 12 3 16 0"/><path d="M12 10v7"/></svg>`;
+  } else if (type === 'facility' || type === 'office' || type === 'civic') {
+    bg = '#047857';
+    svgPath = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><path d="M9 22v-4h6v4"/></svg>`;
   } else if (type === 'issue' || type === 'hazard') {
-    bg = status === 'critical' ? '#b91c1c' : '#c2410c';
-    svgPath = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+    bg = status === 'critical' ? '#dc2626' : '#ea580c';
+    svgPath = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
   } else if (type === 'saved_village') {
     bg = '#064e3b';
-    size = 38;
+    size = 28;
     border = '#86efac';
-    svgPath = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>`;
+    svgPath = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>`;
   } else if (type === 'search_target' || type === 'clicked_target') {
     bg = '#ea580c';
-    size = 40;
+    size = 30;
     border = '#ffffff';
-    svgPath = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>`;
+    svgPath = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>`;
   } else {
-    // Junction / default
-    bg = '#64748b';
-    svgPath = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/></svg>`;
+    // Junction / waypoint: restrained 8px subtle dot
+    size = 8;
+    return L.divIcon({
+      className: 'custom-leaflet-marker-waypoint',
+      html: `<div style="width:8px; height:8px; background:#64748b; border:1.5px solid #ffffff; border-radius:50%; box-shadow:0 1px 3px rgba(0,0,0,0.2); cursor:pointer;"></div>`,
+      iconSize: [8, 8],
+      iconAnchor: [4, 4],
+      popupAnchor: [0, -6],
+    });
   }
 
   if (status === 'blocked' || status === 'unreachable') {
-    bg = '#c94b46';
+    bg = '#dc2626';
   } else if (status === 'limited' || status === 'detour') {
-    bg = '#e98535';
+    bg = '#ea580c';
   }
 
   const badgeHtml = count !== null && count > 0
-    ? `<span style="position:absolute; top:-6px; right:-8px; background:#e98535; color:#fff; font-size:10px; font-weight:800; border-radius:99px; padding:1px 5px; box-shadow:0 2px 5px rgba(0,0,0,0.25);">${count}</span>`
+    ? `<span style="position:absolute; top:-5px; right:-7px; background:#e98535; color:#fff; font-size:9px; font-weight:800; border-radius:99px; padding:0 4px; box-shadow:0 1px 3px rgba(0,0,0,0.25); line-height:14px; height:14px;">${count}</span>`
     : '';
 
   const pulseClass = (type === 'search_target' || type === 'clicked_target')
@@ -101,7 +113,7 @@ function createCustomIcon(type, status = 'operational', count = null) {
   return L.divIcon({
     className: 'custom-leaflet-marker',
     html: `
-      <div style="position:relative; width:${size}px; height:${size}px; background:${bg}; border:2.5px solid ${border}; border-radius:50%; display:grid; place-items:center; box-shadow:0 4px 14px rgba(18,62,44,0.4); transform:translate(-50%, -50%); cursor:pointer; ${pulseClass}">
+      <div style="position:relative; width:${size}px; height:${size}px; background:${bg}; border:1.5px solid ${border}; border-radius:50%; display:grid; place-items:center; box-shadow:0 2px 6px rgba(0,0,0,0.18); transform:translate(-50%, -50%); cursor:pointer; ${pulseClass}">
         ${svgPath}
         ${badgeHtml}
       </div>
@@ -110,6 +122,168 @@ function createCustomIcon(type, status = 'operational', count = null) {
     iconAnchor: [size / 2, size / 2],
     popupAnchor: [0, -size / 2 - 2],
   });
+}
+
+// MarkerClusterLayer: Clusters dense infrastructure points with custom GaunPulse green badge
+function MarkerClusterLayer({
+  nodes,
+  activeLayers,
+  isolatedSettlementIds = [],
+  affectedSettlementIds = [],
+  onSelectNode,
+  issues = [],
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map) return;
+
+    const useClustering = typeof L.markerClusterGroup === 'function';
+    const layerContainer = useClustering
+      ? L.markerClusterGroup({
+          chunkedLoading: true,
+          maxClusterRadius: 38,
+          spiderfyOnMaxZoom: true,
+          showCoverageOnHover: false,
+          zoomToBoundsOnClick: true,
+          disableClusteringAtZoom: 17,
+          iconCreateFunction: (cluster) => {
+            const count = cluster.getChildCount();
+            let size = 30;
+            if (count > 50) size = 38;
+            else if (count > 15) size = 34;
+
+            return L.divIcon({
+              html: `<div class="gaunpulse-cluster-badge"><span>${count}</span></div>`,
+              className: 'gaunpulse-marker-cluster-wrap',
+              iconSize: L.point(size, size),
+              iconAnchor: L.point(size / 2, size / 2),
+            });
+          },
+        })
+      : L.layerGroup();
+
+    // 1. Add node markers (settlements, facilities, junctions)
+    nodes.forEach((node) => {
+      if (!node.latitude || !node.longitude) return;
+      const lat = parseFloat(node.latitude);
+      const lng = parseFloat(node.longitude);
+      if (isNaN(lat) || isNaN(lng)) return;
+
+      const nodeType = (node.node_type || node.type || 'junction').toLowerCase();
+      const isSettlement = nodeType === 'settlement' || (node.households && node.households > 0) || Boolean(node.settlement_group_id);
+      const isFacility = ['school', 'health_post', 'health', 'clinic', 'water_point', 'water', 'facility', 'office', 'civic'].includes(nodeType);
+      const isJunction = !isSettlement && !isFacility;
+
+      if (isSettlement && !activeLayers.settlements) return;
+      if (isFacility && !activeLayers.facilities) return;
+      if (isJunction && !activeLayers.waypoints) return;
+
+      const nodeIdStr = String(node.id);
+      const isIsolated = isolatedSettlementIds.map(String).includes(nodeIdStr);
+      const isAffected = affectedSettlementIds.map(String).includes(nodeIdStr);
+
+      let nodeStatus = 'operational';
+      if (isIsolated) {
+        nodeStatus = 'unreachable';
+      } else if (isAffected) {
+        nodeStatus = 'detour';
+      }
+
+      const markerType = isSettlement ? 'settlement' : (isFacility ? nodeType : 'junction');
+      const icon = createCustomIcon(markerType, nodeStatus, node.households);
+
+      const marker = L.marker([lat, lng], { icon });
+
+      if (onSelectNode) {
+        marker.on('click', () => onSelectNode(node));
+      }
+
+      const categoryLabel = isSettlement
+        ? 'Village Settlement'
+        : isFacility
+          ? nodeType.replace('_', ' ').toUpperCase()
+          : 'Road Junction';
+
+      const statusColor = nodeStatus === 'unreachable' ? '#dc2626' : (nodeStatus === 'detour' ? '#ea580c' : '#166534');
+
+      const popupContent = `
+        <div style="min-width: 180px; padding: 4px; font-family: inherit;">
+          <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: #176342; font-weight: bold;">
+            ${categoryLabel}
+          </span>
+          <h4 style="margin: 2px 0 6px; color: #092d22; fontSize: 13px;">
+            ${node.name || (isJunction ? `Waypoint #${node.id}` : `Node ${node.id}`)}
+          </h4>
+          <div style="font-size: 11px; color: #475569; line-height: 1.4;">
+            ${isSettlement ? `<p style="margin: 2px 0;"><strong>Households:</strong> ${node.households || 'Documented'}</p>${node.population ? `<p style="margin: 2px 0;"><strong>Population:</strong> ${node.population}</p>` : ''}` : ''}
+            <p style="margin: 2px 0;"><strong>Condition:</strong> <span style="font-weight: 700; color: ${statusColor};">${nodeStatus.toUpperCase()}</span></p>
+            <p style="margin: 2px 0;"><strong>Source:</strong> ${node.source || 'OpenStreetMap'} (© OpenStreetMap)</p>
+            <p style="margin: 4px 0 0; font-size: 10px; color: #94a3b8;">
+              Coordinates: ${lat.toFixed(5)}, ${lng.toFixed(5)}
+            </p>
+          </div>
+        </div>
+      `;
+      marker.bindPopup(popupContent);
+      layerContainer.addLayer(marker);
+    });
+
+    // 2. Add reported issues
+    if (activeLayers.issues && Array.isArray(issues)) {
+      issues.forEach((issue) => {
+        if (!issue.latitude || !issue.longitude) return;
+        const lat = parseFloat(issue.latitude);
+        const lng = parseFloat(issue.longitude);
+        if (isNaN(lat) || isNaN(lng)) return;
+
+        const isCritical = (issue.severity || '').toLowerCase() === 'critical';
+        const icon = createCustomIcon('issue', isCritical ? 'critical' : 'limited');
+        const marker = L.marker([lat, lng], { icon });
+
+        const popupContent = `
+          <div style="min-width: 200px; padding: 4px; font-family: inherit;">
+            <div style="display: flex; gap: 6px; margin-bottom: 4px;">
+              <span style="background: ${isCritical ? '#fee2e2' : '#ffedd5'}; color: ${isCritical ? '#991b1b' : '#c2410c'}; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">
+                ${issue.severity || 'Hazard'}
+              </span>
+              <span style="background: #e2e8f0; color: #475569; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">
+                ${issue.status || 'Reported'}
+              </span>
+            </div>
+            <h4 style="margin: 4px 0; color: #092d22; font-size: 13px;">${issue.title}</h4>
+            <p style="margin: 0 0 6px; font-size: 11px; color: #687c73;">
+              <strong>Code:</strong> ${issue.tracking_code || `GP-${issue.id}`} · <strong>Category:</strong> ${(issue.category || '').replace('_', ' ')}
+            </p>
+            <p style="margin: 0; font-size: 11.5px; color: #19392f; line-height: 1.4;">
+              ${issue.description || ''}
+            </p>
+          </div>
+        `;
+        marker.bindPopup(popupContent);
+        layerContainer.addLayer(marker);
+      });
+    }
+
+    map.addLayer(layerContainer);
+
+    return () => {
+      map.removeLayer(layerContainer);
+    };
+  }, [
+    map,
+    nodes,
+    issues,
+    activeLayers.settlements,
+    activeLayers.facilities,
+    activeLayers.waypoints,
+    activeLayers.issues,
+    isolatedSettlementIds,
+    affectedSettlementIds,
+    onSelectNode,
+  ]);
+
+  return null;
 }
 
 export default function InteractiveVillageMap({
@@ -142,12 +316,22 @@ export default function InteractiveVillageMap({
     bridges: true,
     issues: true,
     savedVillages: true,
+    waypoints: false,
   });
 
   const nodes = villageData?.nodes || [];
   const edges = villageData?.edges || [];
   const issues = villageData?.issues || [];
   const village = villageData?.village || {};
+
+  const waypointCount = nodes.filter(
+    (n) =>
+      !['settlement', 'school', 'health_post', 'health', 'clinic', 'water_point', 'water', 'facility', 'office', 'civic'].includes(
+        (n.node_type || n.type || '').toLowerCase()
+      ) &&
+      !n.households &&
+      !n.settlement_group_id
+  ).length;
 
   // Center & zoom logic
   let centerLat = 28.3949; // Nepal central geographic coordinates
@@ -212,25 +396,25 @@ export default function InteractiveVillageMap({
       <div
         style={{
           position: 'absolute',
-          top: '12px',
-          right: '12px',
+          top: '10px',
+          right: '10px',
           zIndex: 1000,
           background: 'rgba(255,255,255,0.96)',
           backdropFilter: 'blur(8px)',
-          padding: '6px 10px',
-          borderRadius: '12px',
+          padding: '4px 8px',
+          borderRadius: '8px',
           border: '1px solid #dfe6df',
-          boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
           display: 'flex',
           flexWrap: 'wrap',
-          gap: '6px',
+          gap: '4px',
           alignItems: 'center',
           fontSize: '11px',
           fontWeight: '600',
         }}
       >
-        <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#176342', marginRight: '2px' }}>
-          <Layers size={13} /> Layers:
+        <span style={{ display: 'flex', alignItems: 'center', gap: '3px', color: '#176342', marginRight: '2px', fontSize: '10.5px' }}>
+          <Layers size={12} /> Layers:
         </span>
 
         {allVillages.length > 0 && (
@@ -239,12 +423,13 @@ export default function InteractiveVillageMap({
             onClick={() => toggleLayer('savedVillages')}
             style={{
               border: 'none',
-              padding: '4px 8px',
-              borderRadius: '6px',
+              padding: '3px 7px',
+              borderRadius: '5px',
               cursor: 'pointer',
               background: activeLayers.savedVillages ? '#d1fae5' : '#f1f5f9',
               color: activeLayers.savedVillages ? '#065f46' : '#64748b',
               fontWeight: '700',
+              fontSize: '11px',
             }}
           >
             Villages ({allVillages.length})
@@ -256,11 +441,12 @@ export default function InteractiveVillageMap({
           onClick={() => toggleLayer('settlements')}
           style={{
             border: 'none',
-            padding: '4px 8px',
-            borderRadius: '6px',
+            padding: '3px 7px',
+            borderRadius: '5px',
             cursor: 'pointer',
             background: activeLayers.settlements ? '#e4f4e9' : '#f1f5f9',
             color: activeLayers.settlements ? '#124b35' : '#64748b',
+            fontSize: '11px',
           }}
         >
           Settlements
@@ -271,11 +457,12 @@ export default function InteractiveVillageMap({
           onClick={() => toggleLayer('facilities')}
           style={{
             border: 'none',
-            padding: '4px 8px',
-            borderRadius: '6px',
+            padding: '3px 7px',
+            borderRadius: '5px',
             cursor: 'pointer',
             background: activeLayers.facilities ? '#e0f2fe' : '#f1f5f9',
             color: activeLayers.facilities ? '#0369a1' : '#64748b',
+            fontSize: '11px',
           }}
         >
           Facilities
@@ -286,11 +473,12 @@ export default function InteractiveVillageMap({
           onClick={() => toggleLayer('bridges')}
           style={{
             border: 'none',
-            padding: '4px 8px',
-            borderRadius: '6px',
+            padding: '3px 7px',
+            borderRadius: '5px',
             cursor: 'pointer',
             background: activeLayers.bridges ? '#ffedd5' : '#f1f5f9',
             color: activeLayers.bridges ? '#c2410c' : '#64748b',
+            fontSize: '11px',
           }}
         >
           Bridges
@@ -301,15 +489,35 @@ export default function InteractiveVillageMap({
           onClick={() => toggleLayer('issues')}
           style={{
             border: 'none',
-            padding: '4px 8px',
-            borderRadius: '6px',
+            padding: '3px 7px',
+            borderRadius: '5px',
             cursor: 'pointer',
             background: activeLayers.issues ? '#fee2e2' : '#f1f5f9',
             color: activeLayers.issues ? '#b91c1c' : '#64748b',
+            fontSize: '11px',
           }}
         >
           Issues ({issues.length})
         </button>
+
+        {waypointCount > 0 && (
+          <button
+            type="button"
+            onClick={() => toggleLayer('waypoints')}
+            style={{
+              border: activeLayers.waypoints ? '1px solid #94a3b8' : '1px solid #e2e8f0',
+              padding: '3px 7px',
+              borderRadius: '5px',
+              cursor: 'pointer',
+              background: activeLayers.waypoints ? '#f1f5f9' : '#ffffff',
+              color: activeLayers.waypoints ? '#334155' : '#94a3b8',
+              fontSize: '11px',
+            }}
+            title="Toggle road network waypoints"
+          >
+            Waypoints ({waypointCount})
+          </button>
+        )}
       </div>
 
       <MapContainer
@@ -564,32 +772,35 @@ export default function InteractiveVillageMap({
             baselineRouteEdgeIds.map(String).includes(edgeCodeStr);
           const isSelected = selectedEdgeId && (String(selectedEdgeId) === edgeIdStr || String(selectedEdgeId) === edgeCodeStr);
 
-          let color = '#248157';
-          let weight = isBridge ? 6 : 4;
+          let color = '#16a34a';
+          let weight = isBridge ? 5 : 3.5;
           let dashArray = null;
+          let polylineClassName = '';
 
           if (isHighlighted) {
             color = highlightedStatus === 'blocked' ? '#dc2626' : '#ea580c';
-            weight = 8;
+            weight = 6;
             dashArray = '6, 6';
           } else if (isAlternative) {
             color = '#d97706';
-            weight = 7;
-            dashArray = '5, 5';
+            weight = 5.5;
+            dashArray = '6, 6';
+            polylineClassName = 'sim-alternative-route-path';
           } else if (isBaseline) {
             color = '#059669';
-            weight = 6;
+            weight = 4.5;
           } else if (edge.status === 'blocked') {
             color = '#dc2626';
-            dashArray = '8, 8';
+            dashArray = '6, 6';
           } else if (edge.status === 'limited' || edge.status === 'under_review' || edge.status === 'partially_blocked') {
             color = '#d97706';
           } else if (isBridge) {
             color = '#b45309';
+            weight = 5;
           }
 
           if (isSelected) {
-            weight = 9;
+            weight = 7;
             color = '#f97316';
           }
 
@@ -616,6 +827,7 @@ export default function InteractiveVillageMap({
                 opacity: isHighlighted ? 0.95 : 0.85,
                 lineCap: 'round',
                 lineJoin: 'round',
+                className: polylineClassName,
               }}
               eventHandlers={{
                 click: () => onSelectEdge && onSelectEdge(edge),
@@ -672,179 +884,66 @@ export default function InteractiveVillageMap({
           );
         })}
 
-        {/* 4. Infrastructure Nodes (Settlements & Facilities) */}
-        {nodes.map((node) => {
-          if (!node.latitude || !node.longitude) return null;
-          const lat = parseFloat(node.latitude);
-          const lng = parseFloat(node.longitude);
-          const nodeType = (node.node_type || node.type || 'junction').toLowerCase();
-
-          const isSettlement = nodeType === 'settlement' || (node.households && node.households > 0) || node.settlement_group_id;
-          const isFacility = ['school', 'health_post', 'health', 'water_point', 'water', 'facility'].includes(nodeType);
-
-          if (isSettlement && !activeLayers.settlements) return null;
-          if (isFacility && !activeLayers.facilities) return null;
-
-          const nodeIdStr = String(node.id);
-          const isIsolated = isolatedSettlementIds.map(String).includes(nodeIdStr);
-          const isAffected = affectedSettlementIds.map(String).includes(nodeIdStr);
-
-          let nodeStatus = 'operational';
-          if (isIsolated) {
-            nodeStatus = 'unreachable';
-          } else if (isAffected) {
-            nodeStatus = 'detour';
-          }
-
-          const markerType = isSettlement ? 'settlement' : nodeType;
-          const icon = createCustomIcon(markerType, nodeStatus, node.households);
-
-          return (
-            <Marker
-              key={`node-${node.id}`}
-              position={[lat, lng]}
-              icon={icon}
-              eventHandlers={{
-                click: () => onSelectNode && onSelectNode(node),
-              }}
-            >
-              <Popup>
-                <div style={{ minWidth: '180px', padding: '4px' }}>
-                  <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.8px', color: '#176342', fontWeight: 'bold' }}>
-                    {isSettlement ? 'Village Settlement' : 'Essential Facility'}
-                  </span>
-                  <h4 style={{ margin: '2px 0 6px', color: '#092d22', fontSize: '13px' }}>
-                    {node.name || `Node ${node.id}`}
-                  </h4>
-                  <div style={{ fontSize: '11px', color: '#475569', lineHeight: '1.4' }}>
-                    {isSettlement && (
-                      <>
-                        <p style={{ margin: '2px 0' }}><strong>Households:</strong> {node.households || 'Documented'}</p>
-                        {node.population && <p style={{ margin: '2px 0' }}><strong>Population:</strong> {node.population}</p>}
-                      </>
-                    )}
-                    {isFacility && (
-                      <p style={{ margin: '2px 0' }}><strong>Facility Type:</strong> {nodeType.replace('_', ' ').toUpperCase()}</p>
-                    )}
-                    <p style={{ margin: '2px 0' }}><strong>Source:</strong> {node.source || 'OpenStreetMap'} (© OpenStreetMap)</p>
-                    <p style={{ margin: '2px 0' }}><strong>Verification:</strong> <span style={{ color: node.verification_status === 'verified' ? '#166534' : '#b45309', fontWeight: '600' }}>{node.verification_status || 'imported (unverified)'}</span></p>
-                    {node.confidence_score && <p style={{ margin: '2px 0' }}><strong>Confidence:</strong> {node.confidence_score}%</p>}
-                    {node.description && <p style={{ margin: '4px 0 0', color: '#687c73' }}>{node.description}</p>}
-                    <p style={{ margin: '4px 0 0', fontSize: '10px', color: '#94a3b8' }}>
-                      Coordinates: {lat.toFixed(5)}, {lng.toFixed(5)}
-                    </p>
-                  </div>
-                </div>
-              </Popup>
-            </Marker>
-          );
-        })}
-
-        {/* 5. Reported Issues Layer */}
-        {activeLayers.issues &&
-          issues.map((issue) => {
-            if (!issue.latitude || !issue.longitude) return null;
-            const lat = parseFloat(issue.latitude);
-            const lng = parseFloat(issue.longitude);
-            const isCritical = (issue.severity || '').toLowerCase() === 'critical';
-            const icon = createCustomIcon('issue', isCritical ? 'critical' : 'limited');
-
-            return (
-              <Marker key={`issue-marker-${issue.id}`} position={[lat, lng]} icon={icon}>
-                <Popup>
-                  <div style={{ minWidth: '220px', padding: '4px' }}>
-                    <div style={{ display: 'flex', gap: '6px', marginBottom: '4px' }}>
-                      <span
-                        style={{
-                          background: isCritical ? '#fee2e2' : '#ffedd5',
-                          color: isCritical ? '#991b1b' : '#c2410c',
-                          fontSize: '10px',
-                          fontWeight: '800',
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          textTransform: 'uppercase',
-                        }}
-                      >
-                        {issue.severity || 'Hazard'}
-                      </span>
-                      <span
-                        style={{
-                          background: '#e2e8f0',
-                          color: '#475569',
-                          fontSize: '10px',
-                          fontWeight: '700',
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                        }}
-                      >
-                        {issue.status || 'Reported'}
-                      </span>
-                    </div>
-                    <h4 style={{ margin: '4px 0', color: '#092d22', fontSize: '13px' }}>
-                      {issue.title}
-                    </h4>
-                    <p style={{ margin: '0 0 6px', fontSize: '11px', color: '#687c73' }}>
-                      <strong>Code:</strong> {issue.tracking_code || `GP-${issue.id}`} · <strong>Category:</strong> {(issue.category || '').replace('_', ' ')}
-                    </p>
-                    <p style={{ margin: '0 0 6px', fontSize: '12px', color: '#19392f', lineHeight: '1.4' }}>
-                      {issue.description}
-                    </p>
-                  </div>
-                </Popup>
-              </Marker>
-            );
-          })}
+        {/* 4. Clustered Infrastructure Nodes & Issues */}
+        <MarkerClusterLayer
+          nodes={nodes}
+          issues={issues}
+          activeLayers={activeLayers}
+          isolatedSettlementIds={isolatedSettlementIds}
+          affectedSettlementIds={affectedSettlementIds}
+          onSelectNode={onSelectNode}
+        />
       </MapContainer>
 
       {/* Map Legend Footer */}
       <div
         style={{
           background: '#ffffff',
-          padding: '9px 16px',
+          padding: '8px 14px',
           borderTop: '1px solid #dfe6df',
           display: 'flex',
           flexWrap: 'wrap',
-          gap: '14px',
-          fontSize: '11.5px',
+          gap: '12px',
+          fontSize: '11px',
           color: '#19392f',
           alignItems: 'center',
         }}
       >
         <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#064e3b', border: '1px solid #86efac' }}></span>
-          Monitored Village
-        </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#124b35' }}></span>
+          <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#124b35', border: '1px solid #ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}></span>
           Settlement / Tole
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#0f766e' }}></span>
+          <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#0f766e', border: '1px solid #ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}></span>
           Health Post
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#1d4ed8' }}></span>
+          <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#1d4ed8', border: '1px solid #ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}></span>
           School
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#0284c7' }}></span>
+          <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#0284c7', border: '1px solid #ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}></span>
           Water Point
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <span style={{ width: '16px', height: '3px', background: '#248157' }}></span>
+          <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#64748b', border: '1px solid #ffffff' }}></span>
+          Waypoint
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <span style={{ width: '15px', height: '3px', background: '#16a34a', borderRadius: '2px' }}></span>
           Operational Road
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <span style={{ width: '16px', height: '4px', background: '#b45309' }}></span>
+          <span style={{ width: '15px', height: '4px', background: '#b45309', borderRadius: '2px' }}></span>
           Suspension Bridge
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <span style={{ width: '16px', height: '4px', background: '#d97706', borderTop: '2px dashed #d97706' }}></span>
-          Detour / Alternative Route
+          <span style={{ width: '15px', height: '3.5px', background: '#dc2626', borderTop: '2px dashed #dc2626' }}></span>
+          Failed / Closed Link
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <span style={{ width: '16px', height: '4px', background: '#dc2626', borderTop: '2px dashed #dc2626' }}></span>
-          Closed / Blocked Infrastructure
+          <span style={{ width: '15px', height: '3.5px', background: '#d97706', borderTop: '2px dashed #d97706' }}></span>
+          Alternative Detour
         </span>
       </div>
     </div>

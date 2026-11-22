@@ -815,7 +815,7 @@ export default function SimulationsPage({ onNavigate }) {
                     disabled={simulating || !selectedEdgeId}
                     style={{ flex: 1, minWidth: '130px' }}
                   >
-                    {simulating ? <Loader2 className="animate-spin" size={16} /> : <Network size={16} />}
+                    {simulating ? <Loader2 className="animate-spin" size={15} /> : <Network size={16} />}
                     {simulating ? 'Computing…' : 'Run Simulation'}
                   </button>
                   <button className="button button--secondary" type="button" onClick={resetScenario}>
@@ -826,6 +826,13 @@ export default function SimulationsPage({ onNavigate }) {
                   </button>
                 </div>
 
+                {simulating && (
+                  <div className="sim-computing-status">
+                    <Loader2 className="animate-spin" size={13} />
+                    <span>Evaluating graph connectivity across {nodes.length} nodes &amp; {edges.length} edges…</span>
+                  </div>
+                )}
+
                 {simulationError && (
                   <div className="inline-error">
                     <AlertCircle size={15} /> {simulationError}
@@ -834,79 +841,149 @@ export default function SimulationsPage({ onNavigate }) {
               </div>
             </Card>
 
-            {/* Calculated Results Summary KPI Card */}
-            {result && (
+            {/* Calculated Results Summary KPI Card OR Baseline Telemetry */}
+            {result ? (
+              <div className="sim-result-reveal">
+                <Card>
+                  <CardHeader
+                    eyebrow="Calculated impact"
+                    title="Simulation Results"
+                    description={result.calculation_timestamp ? `Calculated via deterministic Dijkstra algorithm at ${new Date(result.calculation_timestamp).toLocaleTimeString()}` : ''}
+                    action={
+                      <button
+                        className="button button--secondary"
+                        type="button"
+                        style={{ padding: '4px 8px', fontSize: '11px' }}
+                        onClick={() => setSimulationEnvelope(null)}
+                        title="Return to baseline telemetry view"
+                      >
+                        <Activity size={12} /> Baseline View
+                      </button>
+                    }
+                  />
+                  
+                  {/* 4 Core Summary KPI Boxes */}
+                  <div className="simulation-kpis">
+                    <div>
+                      <span>Affected households</span>
+                      <strong>{result.affected_households}</strong>
+                      <small>of total village</small>
+                    </div>
+                    <div>
+                      <span>Disconnected communities</span>
+                      <strong style={{ color: result.isolated_settlements?.length > 0 ? '#b91c1c' : '#166534' }}>
+                        {result.isolated_settlements?.length || 0}
+                      </strong>
+                      <small>{result.isolated_settlements?.length > 0 ? 'Zero access to services' : 'Detours available'}</small>
+                    </div>
+                    <div>
+                      <span>Max travel delay</span>
+                      <strong style={{ color: '#d97706' }}>
+                        {result.max_travel_time_increase_minutes ? `+${result.max_travel_time_increase_minutes} min` : (result.detour_settlements?.length > 0 ? 'Detour' : '0 min')}
+                      </strong>
+                      <small>Pedestrian detour</small>
+                    </div>
+                    <div>
+                      <span>Alternative routes</span>
+                      <strong style={{ fontSize: '14px', color: result.isolated_settlements?.length > 0 ? '#b91c1c' : '#166534' }}>
+                        {result.isolated_settlements?.length > 0 ? 'Severed' : 'Operational'}
+                      </strong>
+                      <small>{alternativeRouteEdgeIds.length} detour link(s)</small>
+                    </div>
+                  </div>
+
+                  {/* Modal Access Preservation Overview */}
+                  <div style={{ background: '#f8faf9', border: '1px solid #dfe6df', borderRadius: '8px', padding: '12px', marginBottom: '14px', fontSize: '11.5px', display: 'grid', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Truck size={16} color={result.motor_vehicle_access?.includes('Severed') ? '#b91c1c' : '#166534'} />
+                      <div>
+                        <strong>Motor Vehicle / Ambulance Access:</strong>{' '}
+                        <span style={{ color: result.motor_vehicle_access?.includes('Severed') ? '#b91c1c' : '#166534', fontWeight: '600' }}>
+                          {result.motor_vehicle_access || 'Assessed on network graph'}
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Footprints size={16} color={result.pedestrian_access?.includes('Severed') ? '#b91c1c' : '#0369a1'} />
+                      <div>
+                        <strong>Pedestrian Trail Access:</strong>{' '}
+                        <span style={{ color: result.pedestrian_access?.includes('Severed') ? '#b91c1c' : '#0369a1', fontWeight: '600' }}>
+                          {result.pedestrian_access || 'Preserved via footpath'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Plain-Language Intelligence Explanation */}
+                  <p style={{ fontSize: 12.5, lineHeight: 1.55, color: '#334b42', margin: '0 0 14px' }}>
+                    {result.summary_explanation}
+                  </p>
+
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button className="button button--secondary" type="button" onClick={downloadReport}>
+                      <Download size={15} /> Generate Report (JSON)
+                    </button>
+                    <button className="button button--secondary" type="button" onClick={openRelatedIssue}>
+                      <AlertCircle size={15} /> Open Related Issue
+                    </button>
+                  </div>
+                </Card>
+              </div>
+            ) : (
               <Card>
                 <CardHeader
-                  eyebrow="Calculated impact"
-                  title="Simulation Results"
-                  description={result.calculation_timestamp ? `Calculated via deterministic Dijkstra algorithm at ${new Date(result.calculation_timestamp).toLocaleTimeString()}` : ''}
+                  eyebrow="Network Baseline Telemetry"
+                  title="Asset Inventory & Inspection"
+                  description="Physical asset distribution and topology prior to simulated disruption."
                 />
-                
-                {/* 4 Core Summary KPI Boxes */}
-                <div className="simulation-kpis">
-                  <div>
-                    <span>Affected households</span>
-                    <strong>{result.affected_households}</strong>
-                    <small>of total village</small>
+                <div className="sim-baseline-telemetry-grid">
+                  <div className="sim-baseline-telemetry-item">
+                    <span>Road Segments</span>
+                    <strong>{edges.filter((e) => (e.infrastructure_type || e.type) !== 'bridge').length}</strong>
                   </div>
-                  <div>
-                    <span>Disconnected communities</span>
-                    <strong style={{ color: result.isolated_settlements?.length > 0 ? '#b91c1c' : '#166534' }}>
-                      {result.isolated_settlements?.length || 0}
+                  <div className="sim-baseline-telemetry-item">
+                    <span>Bridges & Crossings</span>
+                    <strong style={{ color: '#b45309' }}>
+                      {edges.filter((e) => (e.infrastructure_type || e.type) === 'bridge').length}
                     </strong>
-                    <small>{result.isolated_settlements?.length > 0 ? 'Zero access to services' : 'Detours available'}</small>
                   </div>
-                  <div>
-                    <span>Max travel delay</span>
-                    <strong style={{ color: '#d97706' }}>
-                      {result.max_travel_time_increase_minutes ? `+${result.max_travel_time_increase_minutes} min` : (result.detour_settlements?.length > 0 ? 'Detour' : '0 min')}
+                  <div className="sim-baseline-telemetry-item">
+                    <span>Public Facilities</span>
+                    <strong style={{ color: '#0369a1' }}>
+                      {nodes.filter((n) => ['school', 'health_post', 'health', 'clinic', 'water_point', 'water', 'facility', 'office'].includes((n.node_type || n.type || '').toLowerCase())).length}
                     </strong>
-                    <small>Pedestrian detour</small>
                   </div>
-                  <div>
-                    <span>Alternative routes</span>
-                    <strong style={{ fontSize: '14px', color: result.isolated_settlements?.length > 0 ? '#b91c1c' : '#166534' }}>
-                      {result.isolated_settlements?.length > 0 ? 'Severed' : 'Operational'}
+                  <div className="sim-baseline-telemetry-item">
+                    <span>Settlements</span>
+                    <strong style={{ color: '#166534' }}>
+                      {nodes.filter((n) => (n.node_type || n.type) === 'settlement' || n.households > 0 || n.settlement_group_id).length}
                     </strong>
-                    <small>{alternativeRouteEdgeIds.length} detour link(s)</small>
                   </div>
                 </div>
 
-                {/* Modal Access Preservation Overview */}
-                <div style={{ background: '#f8faf9', border: '1px solid #dfe6df', borderRadius: '8px', padding: '12px', marginBottom: '14px', fontSize: '11.5px', display: 'grid', gap: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Truck size={16} color={result.motor_vehicle_access?.includes('Severed') ? '#b91c1c' : '#166534'} />
-                    <div>
-                      <strong>Motor Vehicle / Ambulance Access:</strong>{' '}
-                      <span style={{ color: result.motor_vehicle_access?.includes('Severed') ? '#b91c1c' : '#166534', fontWeight: '600' }}>
-                        {result.motor_vehicle_access || 'Assessed on network graph'}
+                {selectedEdge ? (
+                  <div style={{ background: 'var(--surface-subtle)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 12px', fontSize: '11.5px', marginBottom: '10px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <strong style={{ color: '#092d22', fontSize: '12px' }}>{selectedEdge.name}</strong>
+                      <span style={{ fontSize: '10px', fontWeight: '700', padding: '2px 6px', borderRadius: '4px', background: '#dcfce7', color: '#166534' }}>
+                        OPERATIONAL
                       </span>
                     </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Footprints size={16} color={result.pedestrian_access?.includes('Severed') ? '#b91c1c' : '#0369a1'} />
-                    <div>
-                      <strong>Pedestrian Trail Access:</strong>{' '}
-                      <span style={{ color: result.pedestrian_access?.includes('Severed') ? '#b91c1c' : '#0369a1', fontWeight: '600' }}>
-                        {result.pedestrian_access || 'Preserved via footpath'}
-                      </span>
+                    <div style={{ color: '#587066', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px' }}>
+                      <div><strong>Code:</strong> {selectedEdge.edge_code || selectedEdge.id}</div>
+                      <div><strong>Type:</strong> {selectedEdge.infrastructure_type || selectedEdge.type}</div>
+                      <div><strong>Surface:</strong> {selectedEdge.surface_type || 'Gravel'}</div>
+                      <div><strong>Baseline Transit:</strong> {displayMetric(selectedEdge.travel_minutes ?? selectedEdge.length_meters, readiness?.routing_metric === 'distance_meters' ? 'meters' : 'minutes')}</div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div style={{ fontSize: '11.5px', color: '#687c73', padding: '8px 0', textAlign: 'center' }}>
+                    Select a road or bridge segment to view baseline connectivity.
+                  </div>
+                )}
 
-                {/* Plain-Language Intelligence Explanation */}
-                <p style={{ fontSize: 12.5, lineHeight: 1.55, color: '#334b42', margin: '0 0 14px' }}>
-                  {result.summary_explanation}
-                </p>
-
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button className="button button--secondary" type="button" onClick={downloadReport}>
-                    <Download size={15} /> Generate Report (JSON)
-                  </button>
-                  <button className="button button--secondary" type="button" onClick={openRelatedIssue}>
-                    <AlertCircle size={15} /> Open Related Issue
-                  </button>
+                <div style={{ padding: '8px 10px', background: '#f8faf9', border: '1px solid #dfe6df', borderRadius: '6px', fontSize: '11px', color: '#4b6357', lineHeight: '1.45' }}>
+                  <strong>Simulation Guide:</strong> Select a failure condition and click <strong>Run Simulation</strong> to compute shortest paths. The engine tests alternative detours and highlights any isolated communities.
                 </div>
               </Card>
             )}
@@ -956,7 +1033,7 @@ export default function SimulationsPage({ onNavigate }) {
                 highlightedStatus="blocked"
                 selectedEdgeId={selectedEdgeId}
                 onSelectEdge={(edge) => handleAssetSelect(String(edge.id))}
-                height="470px"
+                height="490px"
               />
             </Card>
 
