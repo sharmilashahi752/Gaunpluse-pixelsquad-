@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Component } from 'react';
 import { citizenService, citizenAuth } from './citizenApi';
 import CitizenDashboard from './CitizenDashboard';
 import SubmitComplaint from './SubmitComplaint';
@@ -14,17 +14,110 @@ import {
   Bell,
   User,
   LogOut,
-  ArrowRight,
   Menu,
   X,
   ShieldAlert,
-  Home,
-  CheckCircle2,
   Globe,
+  RefreshCw,
 } from 'lucide-react';
 import './CitizenPortal.css';
 
-export default function CitizenPortal({ onSwitchToAdmin }) {
+const VALID_SUBPAGES = ['dashboard', 'submit', 'complaints', 'notifications', 'profile'];
+
+function getSubPageFromHash() {
+  const hash = window.location.hash || '';
+  const clean = hash.replace(/^#\/?/, '');
+  const parts = clean.split('?')[0].split('/');
+  if (parts[0] === 'citizen') {
+    const sub = parts[1];
+    if (['submit', 'register', 'report'].includes(sub)) return 'submit';
+    if (['complaints', 'my-complaints', 'my-reports'].includes(sub)) return 'complaints';
+    if (['notifications', 'notices', 'alerts'].includes(sub)) return 'notifications';
+    if (['profile', 'account'].includes(sub)) return 'profile';
+    if (['dashboard', 'overview'].includes(sub)) return 'dashboard';
+  }
+  return 'dashboard';
+}
+
+class CitizenErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Citizen Portal Render Error:', error, errorInfo);
+  }
+
+  handleReload = () => {
+    this.setState({ hasError: false, error: null });
+    if (this.props.onReset) {
+      this.props.onReset();
+    }
+  };
+
+  render() {
+    if (this.state.hasError) {
+      const isNe = this.props.lang === 'ne';
+      return (
+        <div className="citizen-page">
+          <div
+            style={{
+              background: '#ffffff',
+              border: '1px solid #fee2e2',
+              borderRadius: '12px',
+              padding: '36px 24px',
+              textAlign: 'center',
+              maxWidth: '540px',
+              margin: '40px auto',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+            }}
+          >
+            <ShieldAlert size={48} color="#dc2626" style={{ margin: '0 auto 14px' }} />
+            <h2 style={{ fontSize: '19px', fontWeight: 800, color: '#991b1b', marginBottom: '8px' }}>
+              {isNe ? 'पृष्ठ प्रदर्शनमा समस्या आयो' : 'Unable to Display This Page'}
+            </h2>
+            <p style={{ color: '#64748b', fontSize: '13.5px', lineHeight: 1.6, marginBottom: '22px' }}>
+              {isNe
+                ? 'अनपेक्षित त्रुटि देखा परेको छ। कृपया पृष्ठ पुनः लोड गर्नुहोस् वा मुख्य पृष्ठमा फर्कनुहोस्।'
+                : (this.state.error?.message || 'An unexpected rendering error occurred. You can safely return to the dashboard overview.')}
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+              <button
+                type="button"
+                className="citizen-primary"
+                onClick={this.handleReload}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '9px 18px',
+                  background: '#123D30',
+                  color: '#ffffff',
+                  borderRadius: '7px',
+                  border: 'none',
+                  fontSize: '13.5px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                <RefreshCw size={14} />
+                {isNe ? 'पुनः प्रयास गर्नुहोस्' : 'Reload Overview'}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default function CitizenPortal() {
   const [user, setUser] = useState(citizenAuth.getUser());
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState('login'); // 'login' | 'register'
@@ -41,7 +134,7 @@ export default function CitizenPortal({ onSwitchToAdmin }) {
     contact_number: '',
     ward_number: '1',
   });
-  const [page, setPage] = useState('dashboard');
+  const [page, setPage] = useState(getSubPageFromHash);
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectedComplaintId, setSelectedComplaintId] = useState(null);
   const [authSubmitting, setAuthSubmitting] = useState(false);
@@ -52,6 +145,15 @@ export default function CitizenPortal({ onSwitchToAdmin }) {
     setLang(selectedLang);
     localStorage.setItem('gaunpulse_lang', selectedLang);
   };
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const newSubPage = getSubPageFromHash();
+      setPage(newSubPage);
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   useEffect(() => {
     citizenService
@@ -66,6 +168,16 @@ export default function CitizenPortal({ onSwitchToAdmin }) {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  const handleNavigate = (subPage, complaintId = null) => {
+    if (complaintId !== null) {
+      setSelectedComplaintId(complaintId);
+    }
+    const safe = VALID_SUBPAGES.includes(subPage) ? subPage : 'dashboard';
+    setPage(safe);
+    window.location.hash = `#/citizen/${safe}`;
+    setMenuOpen(false);
+  };
 
   async function handleAuth(event) {
     event.preventDefault();
@@ -96,8 +208,14 @@ export default function CitizenPortal({ onSwitchToAdmin }) {
   }
 
   async function handleLogout() {
-    await citizenService.logout();
-    setUser(null);
+    try {
+      await citizenService.logout();
+    } catch (err) {
+      console.warn('Citizen logout failed on server:', err);
+    } finally {
+      setUser(null);
+      window.location.href = 'http://localhost:5173/login';
+    }
   }
 
   // Pre-fill quick citizen demo login
@@ -139,20 +257,6 @@ export default function CitizenPortal({ onSwitchToAdmin }) {
             {t.signInSubtitle ||
               'Report rural infrastructure hazards directly to ward engineers and track municipal repair action live.'}
           </p>
-
-          <div className="admin-switch-banner">
-            <span>{t.adminPrompt || 'Are you a municipal officer or system administrator?'}</span>
-            <button
-              type="button"
-              className="citizen-text-button admin-link"
-              onClick={() => {
-                if (onSwitchToAdmin) onSwitchToAdmin();
-                else window.location.hash = '#/dashboard';
-              }}
-            >
-              {t.adminDashboard || 'Switch to Municipal Admin Dashboard'} <ArrowRight size={14} />
-            </button>
-          </div>
         </section>
 
         <section className="citizen-auth-card-wrap">
@@ -232,11 +336,19 @@ export default function CitizenPortal({ onSwitchToAdmin }) {
             </div>
 
             <div className="auth-card-header">
-              <h2>{mode === 'login' ? (lang === 'ne' ? 'नागरिक प्रवेश' : 'Citizen Sign In') : (lang === 'ne' ? 'नयाँ नागरिक खाता' : 'Register Citizen Account')}</h2>
+              <h2>
+                {mode === 'login'
+                  ? (lang === 'ne' ? 'नागरिक प्रवेश' : 'Citizen Sign In')
+                  : (lang === 'ne' ? 'नयाँ नागरिक खाता' : 'Register Citizen Account')}
+              </h2>
               <p>
                 {mode === 'login'
-                  ? (lang === 'ne' ? 'आफ्ना उजुरीहरूको प्रगति हेर्न र नयाँ समस्या दर्ता गर्न प्रवेश गर्नुहोस्।' : 'Access your submitted reports and live status updates.')
-                  : (lang === 'ne' ? 'आफ्नो नाम, इमेल र वडा नम्बर राखी आधिकारिक नागरिक खाता खोल्नुहोस्।' : 'Register with your verified email and ward information.')}
+                  ? (lang === 'ne'
+                      ? 'आफ्ना उजुरीहरूको प्रगति हेर्न र नयाँ समस्या दर्ता गर्न प्रवेश गर्नुहोस्।'
+                      : 'Access your submitted reports and live status updates.')
+                  : (lang === 'ne'
+                      ? 'आफ्नो नाम, इमेल र वडा नम्बर राखी आधिकारिक नागरिक खाता खोल्नुहोस्।'
+                      : 'Register with your verified email and ward information.')}
               </p>
             </div>
 
@@ -335,9 +447,9 @@ export default function CitizenPortal({ onSwitchToAdmin }) {
   // Navigation Items
   const navItems = [
     { id: 'dashboard', label: t.overview || 'Overview', icon: LayoutDashboard },
-    { id: 'submit', label: t.reportIncident || 'Report Incident', icon: PlusCircle },
-    { id: 'complaints', label: t.myReports || 'My Reports', icon: FileText },
-    { id: 'notifications', label: t.officialNotices || 'Official Notices', icon: Bell },
+    { id: 'submit', label: t.registerComplaint || 'Register Complaint', icon: PlusCircle },
+    { id: 'complaints', label: t.myComplaints || 'My Complaints', icon: FileText },
+    { id: 'notifications', label: t.governmentNotices || 'Government Notices', icon: Bell },
     { id: 'profile', label: t.myProfile || 'My Profile', icon: User },
   ];
 
@@ -362,10 +474,7 @@ export default function CitizenPortal({ onSwitchToAdmin }) {
                 key={item.id}
                 type="button"
                 className={`nav-btn ${isActive ? 'active' : ''}`}
-                onClick={() => {
-                  setPage(item.id);
-                  setMenuOpen(false);
-                }}
+                onClick={() => handleNavigate(item.id)}
               >
                 <Icon size={18} />
                 <span>{item.label}</span>
@@ -373,21 +482,6 @@ export default function CitizenPortal({ onSwitchToAdmin }) {
             );
           })}
         </nav>
-
-        {/* Switch back to Admin Dashboard Pill */}
-        <div className="sidebar-switch-box">
-          <span>{t.adminPrompt || 'Municipal Administration:'}</span>
-          <button
-            type="button"
-            className="switch-admin-btn"
-            onClick={() => {
-              if (onSwitchToAdmin) onSwitchToAdmin();
-              else window.location.hash = '#/dashboard';
-            }}
-          >
-            <Home size={15} /> {t.backToAdmin || 'Back to Admin Dashboard'}
-          </button>
-        </div>
 
         {/* User Card */}
         <div className="citizen-user-card">
@@ -470,63 +564,55 @@ export default function CitizenPortal({ onSwitchToAdmin }) {
                 English
               </button>
             </div>
-
-            <button
-              type="button"
-              className="topbar-admin-switch"
-              onClick={() => {
-                if (onSwitchToAdmin) onSwitchToAdmin();
-                else window.location.hash = '#/dashboard';
-              }}
-            >
-              <Home size={14} /> {t.adminDashboard || 'Admin Dashboard'}
-            </button>
           </div>
         </header>
 
         <div className="citizen-main-body">
-          {page === 'dashboard' && (
-            <CitizenDashboard
-              lang={lang}
-              onNavigate={setPage}
-              onViewComplaint={(id) => {
-                setSelectedComplaintId(id);
-                setPage('complaints');
-              }}
-            />
-          )}
+          <CitizenErrorBoundary lang={lang} onReset={() => handleNavigate('dashboard')}>
+            {page === 'dashboard' && (
+              <CitizenDashboard
+                lang={lang}
+                onNavigate={handleNavigate}
+                onViewComplaint={(id) => handleNavigate('complaints', id)}
+              />
+            )}
 
-          {page === 'submit' && (
-            <SubmitComplaint
-              lang={lang}
-              onNavigate={setPage}
-              onViewComplaint={(id) => {
-                setSelectedComplaintId(id);
-                setPage('complaints');
-              }}
-            />
-          )}
+            {page === 'submit' && (
+              <SubmitComplaint
+                lang={lang}
+                onNavigate={handleNavigate}
+                onViewComplaint={(id) => handleNavigate('complaints', id)}
+              />
+            )}
 
-          {page === 'complaints' && (
-            <MyComplaints
-              lang={lang}
-              selectedComplaintId={selectedComplaintId}
-              onSelectComplaint={setSelectedComplaintId}
-            />
-          )}
+            {page === 'complaints' && (
+              <MyComplaints
+                lang={lang}
+                selectedComplaintId={selectedComplaintId}
+                onSelectComplaint={setSelectedComplaintId}
+              />
+            )}
 
-          {page === 'notifications' && (
-            <NotificationsPage
-              lang={lang}
-              onNavigate={setPage}
-              onViewComplaint={(id) => {
-                setSelectedComplaintId(id);
-                setPage('complaints');
-              }}
-            />
-          )}
+            {page === 'notifications' && (
+              <NotificationsPage
+                lang={lang}
+                onNavigate={handleNavigate}
+                onViewComplaint={(id) => handleNavigate('complaints', id)}
+              />
+            )}
 
-          {page === 'profile' && <ProfilePage lang={lang} user={user} onLogout={handleLogout} />}
+            {page === 'profile' && (
+              <ProfilePage lang={lang} user={user} onLogout={handleLogout} />
+            )}
+
+            {!VALID_SUBPAGES.includes(page) && (
+              <CitizenDashboard
+                lang={lang}
+                onNavigate={handleNavigate}
+                onViewComplaint={(id) => handleNavigate('complaints', id)}
+              />
+            )}
+          </CitizenErrorBoundary>
         </div>
       </section>
     </main>

@@ -77,16 +77,8 @@ function AppContent() {
     }
   }, [activePage, user, isCitizen, isAdmin, loading]);
 
-  const handleSwitchToAdmin = () => {
-    if (user && isCitizen) {
-      alert('Your current account is a Citizen account. Official municipal administration workspaces require municipal official credentials.');
-      return;
-    }
-    navigate('dashboard');
-  };
-
   if (activePage === 'citizen') {
-    return <CitizenPortal onSwitchToAdmin={handleSwitchToAdmin} />;
+    return <CitizenPortal />;
   }
 
   const ActivePage = pages[activePage] || DashboardPage;

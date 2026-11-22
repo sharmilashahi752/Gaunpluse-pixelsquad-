@@ -308,36 +308,15 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-.sidebar-switch-box {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  padding: 12px;
-  margin-bottom: 14px;
-  font-size: 11px;
-  color: #a8d5c2;
-  display: grid;
-  gap: 6px;
+.citizen-register-btn:hover {
+  background: #1a5241 !important;
 }
 
-.switch-admin-btn {
-  border: 0;
-  border-radius: 7px;
-  background: #1a4d3d;
-  color: #ffffff;
-  font-weight: 700;
-  font-size: 12px;
-  padding: 8px 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.switch-admin-btn:hover {
-  background: #267153;
+@media (max-width: 640px) {
+  .citizen-register-btn {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
 }
 
 .citizen-user-card {
@@ -451,19 +430,7 @@
   padding: 2px;
 }
 
-.topbar-admin-switch {
-  background: #1a4d3d;
-  color: white;
-  border: 0;
-  border-radius: 7px;
-  padding: 6px 10px;
-  font-size: 12px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  cursor: pointer;
-}
+
 
 .citizen-main-body {
   flex: 1;
