@@ -19,7 +19,6 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import AdminLoginModal from './auth/AdminLoginModal';
 
 export default function Header({ title, onMenuClick, onNavigate }) {
   const {
@@ -35,9 +34,13 @@ export default function Header({ title, onMenuClick, onNavigate }) {
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
-  const [showLoginModal, setShowLoginModal] = useState(false);
   const [issues, setIssues] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  const handleSignIn = () => {
+    const publicBase = import.meta.env.VITE_PUBLIC_URL || 'http://localhost:5173';
+    window.location.href = `${publicBase}/login`;
+  };
 
   useEffect(() => {
     fetch('http://127.0.0.1:8000/api/issues')
@@ -238,13 +241,13 @@ export default function Header({ title, onMenuClick, onNavigate }) {
               title={`Sign out (${user.name})`}
             >
               <LogOut size={14} />
-              <span>Log Out</span>
+              <span>Sign Out</span>
             </button>
           </div>
         ) : (
           <button
             type="button"
-            onClick={() => setShowLoginModal(true)}
+            onClick={handleSignIn}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -261,7 +264,7 @@ export default function Header({ title, onMenuClick, onNavigate }) {
             }}
             onMouseEnter={(e) => (e.currentTarget.style.background = '#1a5443')}
             onMouseLeave={(e) => (e.currentTarget.style.background = '#123D30')}
-            title="Municipal Staff Sign In"
+            title="Sign In to GaunPulse"
           >
             <LogIn size={14} />
             <span>Sign In</span>
@@ -512,7 +515,7 @@ export default function Header({ title, onMenuClick, onNavigate }) {
               type="button"
               onClick={() => {
                 setShowProfile(false);
-                setShowLoginModal(true);
+                handleSignIn();
               }}
               style={{
                 display: 'flex',
@@ -566,13 +569,6 @@ export default function Header({ title, onMenuClick, onNavigate }) {
           </div>
         </div>
       )}
-
-      {/* Admin Login Modal */}
-      <AdminLoginModal
-        isOpen={showLoginModal}
-        onClose={() => setShowLoginModal(false)}
-        onSuccess={() => setShowLoginModal(false)}
-      />
     </header>
   );
 }
