@@ -26,7 +26,7 @@ import gaunpulseLogo from '../assets/gaunpulse-logo.png';
  */
 export default function GaunPulseLogo({
   variant = 'sidebar',
-  size = 50,
+  size = 48,
   collapsed = false,
   showTagline = true,
   showNepali = true,
@@ -44,13 +44,15 @@ export default function GaunPulseLogo({
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
       style={{
-        display: 'inline-flex',
+        display: 'flex',
         alignItems: 'center',
-        gap: collapsed ? '0' : '12px',
+        gap: collapsed ? '0' : '10px',
         textDecoration: 'none',
         userSelect: 'none',
         cursor: onClick ? 'pointer' : 'default',
         minWidth: 0,
+        margin: 0,
+        padding: 0,
       }}
     >
       {/* Official Transparent GaunPulse Emblem */}
@@ -59,12 +61,14 @@ export default function GaunPulseLogo({
         alt="GaunPulse official emblem"
         className="gaunpulse-brand__logo-img"
         style={{
+          width: `${size}px`,
           height: `${size}px`,
-          width: 'auto',
-          maxWidth: `${Math.round(size * 1.15)}px`,
+          minWidth: `${size}px`,
           objectFit: 'contain',
           display: 'block',
           flexShrink: 0,
+          margin: 0,
+          padding: 0,
         }}
         loading="eager"
       />
@@ -79,6 +83,8 @@ export default function GaunPulseLogo({
             justifyContent: 'center',
             minWidth: 0,
             textAlign: 'left',
+            margin: 0,
+            padding: 0,
           }}
         >
           {/* Line 1: Bilingual Brand Name (GaunPulse गाउँपल्स) */}
@@ -90,16 +96,20 @@ export default function GaunPulseLogo({
               gap: '6px',
               lineHeight: 1.15,
               whiteSpace: 'nowrap',
+              margin: 0,
+              padding: 0,
             }}
           >
             <span
               className="gaunpulse-brand__title"
               style={{
-                fontSize: size >= 48 ? '21px' : '18px',
+                fontSize: size >= 48 ? '20px' : '17px',
                 fontWeight: 800,
                 letterSpacing: '-0.3px',
                 color: isDark ? '#ffffff' : '#173D32',
                 fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+                margin: 0,
+                padding: 0,
               }}
             >
               Gaun<span style={{ color: isDark ? '#DDEBE2' : '#3d8b67' }}>Pulse</span>
@@ -108,11 +118,13 @@ export default function GaunPulseLogo({
               <span
                 className="gaunpulse-brand__nepali"
                 style={{
-                  fontSize: size >= 48 ? '13px' : '11.5px',
+                  fontSize: size >= 48 ? '12.5px' : '11px',
                   fontWeight: 600,
                   color: isDark ? 'rgba(221, 235, 226, 0.85)' : '#356D57',
                   fontFamily: 'system-ui, -apple-system, sans-serif',
                   letterSpacing: '0.2px',
+                  margin: 0,
+                  padding: 0,
                 }}
               >
                 गाउँपल्स
@@ -132,6 +144,7 @@ export default function GaunPulseLogo({
                 letterSpacing: '0.2px',
                 lineHeight: 1.25,
                 whiteSpace: 'nowrap',
+                padding: 0,
               }}
             >
               The Village That Speaks

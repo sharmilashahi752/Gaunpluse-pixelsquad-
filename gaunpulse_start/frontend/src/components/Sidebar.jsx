@@ -37,7 +37,7 @@ export default function Sidebar({ activePage, isOpen, onNavigate, onClose }) {
         {/* Brand Area with Official Logo */}
         <div className="sidebar__brand">
           <div className="sidebar__brand-identity">
-            <GaunPulseLogo variant="sidebar" size={50} />
+            <GaunPulseLogo variant="sidebar" size={48} />
           </div>
           <button
             className="icon-button sidebar__close"

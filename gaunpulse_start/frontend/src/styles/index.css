@@ -374,28 +374,34 @@ h1, h2, h3, p { margin-top: 0; }
 .sidebar__brand-identity {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
   flex: 1;
+  margin: 0;
+  padding: 0;
 }
 
 /* GaunPulse Official Brand Styling */
 .gaunpulse-brand {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   text-decoration: none;
   user-select: none;
   min-width: 0;
+  margin: 0;
+  padding: 0;
 }
 
 .gaunpulse-brand__logo-img {
-  height: 50px;
-  width: auto;
-  max-width: 58px;
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
   object-fit: contain;
   display: block;
   flex-shrink: 0;
+  margin: 0;
+  padding: 0;
   transition: transform 0.2s ease;
 }
 
@@ -407,7 +413,10 @@ h1, h2, h3, p { margin-top: 0; }
   display: flex;
   flex-direction: column;
   justify-content: center;
+  text-align: left;
   min-width: 0;
+  margin: 0;
+  padding: 0;
 }
 
 .gaunpulse-brand__heading {
@@ -416,6 +425,8 @@ h1, h2, h3, p { margin-top: 0; }
   gap: 6px;
   line-height: 1.15;
   white-space: nowrap;
+  margin: 0;
+  padding: 0;
 }
 
 .gaunpulse-brand__title {
@@ -425,6 +436,8 @@ h1, h2, h3, p { margin-top: 0; }
   letter-spacing: -0.3px;
   line-height: 1.15;
   font-family: Inter, system-ui, -apple-system, sans-serif;
+  margin: 0;
+  padding: 0;
 }
 
 .gaunpulse-brand--dark .gaunpulse-brand__title {
@@ -448,6 +461,8 @@ h1, h2, h3, p { margin-top: 0; }
   font-size: 12.5px;
   font-weight: 600;
   letter-spacing: 0.2px;
+  margin: 0;
+  padding: 0;
 }
 
 .gaunpulse-brand--dark .gaunpulse-brand__nepali {
@@ -466,6 +481,8 @@ h1, h2, h3, p { margin-top: 0; }
   letter-spacing: 0.2px;
   line-height: 1.25;
   white-space: nowrap;
+  margin: 3px 0 0 0;
+  padding: 0;
 }
 
 .gaunpulse-brand--dark .gaunpulse-brand__tagline {
