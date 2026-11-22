@@ -1,7 +1,20 @@
-import { ChevronLeft, Leaf, LogOut, X } from 'lucide-react';
+import { Building2, ChevronRight, MapPin, X } from 'lucide-react';
 import { navigationItems } from '../data/demoData';
+import { useVillageSelection } from '../context/VillageSelectionContext';
+import gaunpulseLogo from '../assets/gaunpulse-logo.png';
 
 export default function Sidebar({ activePage, isOpen, onNavigate, onClose }) {
+  const { selectedVillage } = useVillageSelection();
+
+  const municipalityName =
+    selectedVillage?.municipality ||
+    (selectedVillage ? `${selectedVillage.name} (${selectedVillage.district || ''})`.trim() : null) ||
+    'Select a municipality';
+
+  const locationDetail = selectedVillage
+    ? `Ward ${selectedVillage.ward_no || '1'} · ${selectedVillage.name}`
+    : 'Click to select active village';
+
   return (
     <>
       <button
@@ -12,24 +25,62 @@ export default function Sidebar({ activePage, isOpen, onNavigate, onClose }) {
         onClick={onClose}
       />
       <aside className={`sidebar ${isOpen ? 'is-open' : ''}`} aria-label="Primary navigation">
+        {/* Brand Area with Official Logo */}
         <div className="sidebar__brand">
-          <span className="brand-mark" aria-hidden="true">
-            <Leaf size={22} strokeWidth={2.4} />
-          </span>
-          <div>
-            <strong>GaunPulse</strong>
-            <span>The Village That Speaks</span>
+          <div className="sidebar__brand-identity">
+            <div className="sidebar__logo-wrapper" aria-hidden="true">
+              <img
+                src={gaunpulseLogo}
+                alt="GaunPulse official emblem"
+                className="sidebar__logo-img"
+                loading="eager"
+              />
+            </div>
+            <div className="sidebar__brand-copy">
+              <strong className="sidebar__brand-title">GaunPulse</strong>
+              <span className="sidebar__brand-tagline">The Village That Speaks</span>
+            </div>
           </div>
-          <button className="icon-button sidebar__close" type="button" onClick={onClose} aria-label="Close menu">
+          <button
+            className="icon-button sidebar__close"
+            type="button"
+            onClick={onClose}
+            aria-label="Close menu"
+          >
             <X size={18} />
           </button>
         </div>
 
-        <div className="sidebar__context">
-          <span>Municipality workspace</span>
-          <strong>Helambu Rural Municipality</strong>
+        {/* Dynamic Municipality Workspace Card */}
+        <div
+          className="sidebar__context"
+          role="button"
+          tabIndex={0}
+          onClick={() => onNavigate('village-data')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onNavigate('village-data');
+            }
+          }}
+          aria-label={`Current Municipality Workspace: ${municipalityName}. Click to open Village Data Manager.`}
+          title="Click to view or switch village workspace in Village Data Manager"
+        >
+          <div className="sidebar__context-header">
+            <span className="sidebar__context-eyebrow">
+              <Building2 size={11} strokeWidth={2.4} aria-hidden="true" />
+              Municipality Workspace
+            </span>
+            <ChevronRight size={13} className="sidebar__context-arrow" aria-hidden="true" />
+          </div>
+          <strong className="sidebar__context-title">{municipalityName}</strong>
+          <span className="sidebar__context-subtext">
+            <MapPin size={10} strokeWidth={2.2} aria-hidden="true" />
+            {locationDetail}
+          </span>
         </div>
 
+        {/* Main Workspace Navigation */}
         <nav className="sidebar__nav" aria-label="Main menu">
           <span className="sidebar__label">Workspace Navigation</span>
           {navigationItems.map(({ id, label, icon: Icon, badge }) => {
@@ -54,6 +105,7 @@ export default function Sidebar({ activePage, isOpen, onNavigate, onClose }) {
           })}
         </nav>
 
+        {/* System Operational Footer */}
         <div className="sidebar__footer">
           <div className="sidebar__pulse" aria-hidden="true">
             <span />
