@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { KeyRound, Lock, LogIn, Mail, ShieldAlert, ShieldCheck, UserCheck, X } from 'lucide-react';
+import { Lock, LogIn, Mail, ShieldAlert, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import gaunpulseLogo from '../../assets/gaunpulse-logo.png';
 
@@ -36,12 +36,6 @@ export default function AdminLoginModal({ isOpen, onClose, onSuccess }) {
     }
   };
 
-  const handleQuickLogin = (quickEmail, quickPassword) => {
-    setEmail(quickEmail);
-    setPassword(quickPassword);
-    setError(null);
-  };
-
   return (
     <div
       style={{
@@ -60,7 +54,7 @@ export default function AdminLoginModal({ isOpen, onClose, onSuccess }) {
           background: '#ffffff',
           borderRadius: '14px',
           width: '100%',
-          maxWidth: '440px',
+          maxWidth: '420px',
           boxShadow: '0 12px 36px rgba(18, 61, 48, 0.2)',
           border: '1px solid #d9e3db',
           overflow: 'hidden',
@@ -71,7 +65,7 @@ export default function AdminLoginModal({ isOpen, onClose, onSuccess }) {
           style={{
             background: '#123D30',
             color: '#ffffff',
-            padding: '20px 24px',
+            padding: '18px 22px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -103,6 +97,9 @@ export default function AdminLoginModal({ isOpen, onClose, onSuccess }) {
                 cursor: 'pointer',
                 padding: '4px',
                 borderRadius: '4px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
               aria-label="Close dialog"
             >
@@ -112,7 +109,7 @@ export default function AdminLoginModal({ isOpen, onClose, onSuccess }) {
         </div>
 
         {/* Form Body */}
-        <div style={{ padding: '24px' }}>
+        <div style={{ padding: '22px' }}>
           {(error || authError) && (
             <div
               style={{
@@ -224,7 +221,7 @@ export default function AdminLoginModal({ isOpen, onClose, onSuccess }) {
               type="submit"
               disabled={loading}
               style={{
-                marginTop: '6px',
+                marginTop: '4px',
                 padding: '11px',
                 background: '#123D30',
                 color: '#ffffff',
@@ -239,6 +236,12 @@ export default function AdminLoginModal({ isOpen, onClose, onSuccess }) {
                 gap: '8px',
                 transition: 'background 0.15s ease',
               }}
+              onMouseEnter={(e) => {
+                if (!loading) e.currentTarget.style.background = '#1a5443';
+              }}
+              onMouseLeave={(e) => {
+                if (!loading) e.currentTarget.style.background = '#123D30';
+              }}
             >
               {loading ? (
                 <span>Authenticating...</span>
@@ -250,49 +253,6 @@ export default function AdminLoginModal({ isOpen, onClose, onSuccess }) {
               )}
             </button>
           </form>
-
-          {/* Quick Demo Switcher */}
-          <div
-            style={{
-              marginTop: '20px',
-              paddingTop: '16px',
-              borderTop: '1px solid #e6ece6',
-            }}
-          >
-            <div
-              style={{
-                fontSize: '11px',
-                fontWeight: 600,
-                color: '#66786d',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-                marginBottom: '10px',
-              }}
-            >
-              Quick Test Credentials
-            </div>
-            <div style={{ display: 'grid', gap: '6px' }}>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('system_admin@gaunpulse.gov.np', 'Admin@123')}
-                style={{
-                  textAlign: 'left',
-                  padding: '7px 10px',
-                  background: '#f7f7f3',
-                  border: '1px solid #e4e8e4',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '11.5px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <span><strong>System Admin</strong> (All Municipalities)</span>
-                <span style={{ color: '#267153', fontWeight: 600 }}>Fill</span>
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>

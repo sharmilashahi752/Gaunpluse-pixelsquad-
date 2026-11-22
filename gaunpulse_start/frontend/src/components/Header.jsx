@@ -196,24 +196,51 @@ export default function Header({ title, onMenuClick, onNavigate }) {
 
         {/* Profile / Auth Button */}
         {user ? (
-          <button
-            className="profile-button"
-            type="button"
-            aria-label="Open profile menu"
-            onClick={() => {
-              setShowProfile(!showProfile);
-              setShowNotifications(false);
-            }}
-          >
-            <span className="profile-button__avatar" aria-hidden="true">
-              {userInitials}
-            </span>
-            <span className="profile-button__copy">
-              <strong>{user.name}</strong>
-              <small>{roleLabel}</small>
-            </span>
-            <ChevronDown size={15} aria-hidden="true" />
-          </button>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              className="profile-button"
+              type="button"
+              aria-label="Open profile menu"
+              onClick={() => {
+                setShowProfile(!showProfile);
+                setShowNotifications(false);
+              }}
+            >
+              <span className="profile-button__avatar" aria-hidden="true">
+                {userInitials}
+              </span>
+              <span className="profile-button__copy">
+                <strong>{user.name}</strong>
+                <small>{roleLabel}</small>
+              </span>
+              <ChevronDown size={15} aria-hidden="true" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => logout()}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: '#123D30',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '7px 14px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'background 0.15s ease',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#1a5443')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = '#123D30')}
+              title={`Sign out (${user.name})`}
+            >
+              <LogOut size={14} />
+              <span>Log Out</span>
+            </button>
+          </div>
         ) : (
           <button
             type="button"
@@ -222,15 +249,19 @@ export default function Header({ title, onMenuClick, onNavigate }) {
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
-              background: '#f7f7f3',
-              border: '1px solid #d9e3db',
+              background: '#123D30',
+              color: '#ffffff',
+              border: 'none',
               borderRadius: '8px',
-              padding: '6px 12px',
+              padding: '7px 14px',
               fontSize: '12px',
               fontWeight: 600,
               cursor: 'pointer',
-              color: '#172e25',
+              transition: 'background 0.15s ease',
             }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#1a5443')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = '#123D30')}
+            title="Municipal Staff Sign In"
           >
             <LogIn size={14} />
             <span>Sign In</span>

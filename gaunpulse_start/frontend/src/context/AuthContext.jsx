@@ -64,7 +64,7 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
 
-  // Watch for any hash-based authentication handoff
+  // Watch for any hash-based authentication handoff or back-forward cache restoration
   useEffect(() => {
     const handleHashCheck = () => {
       const cbToken = extractCallbackToken();
@@ -72,8 +72,21 @@ export function AuthProvider({ children }) {
         setToken(cbToken);
       }
     };
+
+    const handlePageShow = () => {
+      const storedToken = localStorage.getItem(TOKEN_KEY) || localStorage.getItem('gaunpulse_citizen_token');
+      if (!storedToken && token) {
+        setToken(null);
+        setUser(null);
+      }
+    };
+
     window.addEventListener('hashchange', handleHashCheck);
-    return () => window.removeEventListener('hashchange', handleHashCheck);
+    window.addEventListener('pageshow', handlePageShow);
+    return () => {
+      window.removeEventListener('hashchange', handleHashCheck);
+      window.removeEventListener('pageshow', handlePageShow);
+    };
   }, [token]);
 
   // Fetch current workspace and municipalities
@@ -222,17 +235,22 @@ export function AuthProvider({ children }) {
     } catch (err) {
       console.warn('Logout API notification failed:', err);
     } finally {
+      // 1. Reset state
       setToken(null);
       setUser(null);
       setCurrentWorkspace(null);
+
+      // 2. Clear credentials from persistent storage
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
       localStorage.removeItem('gaunpulse_citizen_token');
       localStorage.removeItem('gaunpulse_citizen_user');
       localStorage.removeItem(MUNICIPALITY_KEY);
+      sessionStorage.clear();
 
+      // 3. Prevent back navigation from restoring session
       const publicBase = import.meta.env.VITE_PUBLIC_URL || 'http://localhost:5173';
-      window.location.href = `${publicBase}/login`;
+      window.location.replace(`${publicBase}/login`);
     }
   }, [token]);
 
