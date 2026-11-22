@@ -291,46 +291,6 @@ export default function AdminLoginModal({ isOpen, onClose, onSuccess }) {
                 <span><strong>System Admin</strong> (All Municipalities)</span>
                 <span style={{ color: '#267153', fontWeight: 600 }}>Fill</span>
               </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('admin.dailekh@gaunpulse.gov.np', 'Admin@123')}
-                style={{
-                  textAlign: 'left',
-                  padding: '7px 10px',
-                  background: '#f7f7f3',
-                  border: '1px solid #e4e8e4',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '11.5px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <span><strong>Municipality Admin</strong> (Dailekh)</span>
-                <span style={{ color: '#267153', fontWeight: 600 }}>Fill</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('ward1.dailekh@gaunpulse.gov.np', 'Admin@123')}
-                style={{
-                  textAlign: 'left',
-                  padding: '7px 10px',
-                  background: '#f7f7f3',
-                  border: '1px solid #e4e8e4',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '11.5px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <span><strong>Ward 1 Officer</strong> (Mahabu Ward 1)</span>
-                <span style={{ color: '#267153', fontWeight: 600 }}>Fill</span>
-              </button>
             </div>
           </div>
         </div>
