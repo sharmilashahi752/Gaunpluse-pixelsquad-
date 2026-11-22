@@ -115,8 +115,9 @@ class LocationController extends Controller
                     if (!isset($seen[$key])) {
                         $seen[$key] = true;
                         $dMunis = NepalLocationService::getMunicipalities($distName);
-                        $dLat = !empty($dMunis[0]['center_lat']) ? (float)$dMunis[0]['center_lat'] : 28.0;
-                        $dLng = !empty($dMunis[0]['center_lng']) ? (float)$dMunis[0]['center_lng'] : 84.0;
+                        $dCenter = NepalLocationService::getDistrictCenter($distName);
+                        $dLat = $dCenter ? $dCenter['lat'] : (!empty($dMunis[0]['center_lat']) ? (float)$dMunis[0]['center_lat'] : 27.7172);
+                        $dLng = $dCenter ? $dCenter['lng'] : (!empty($dMunis[0]['center_lng']) ? (float)$dMunis[0]['center_lng'] : 85.3240);
                         $results[] = [
                             'title' => "{$distName} District",
                             'subtitle' => "District · {$p['name']}",

@@ -395,6 +395,232 @@ class NepalLocationService
             'center_lng' => 82.1830,
             'elevation_range' => '2,300m - 3,500m',
         ],
+
+        // Dailekh (Karnali) - Complete Municipal Directory
+        [
+            'code' => 'np-dai-mahabu',
+            'name' => 'Mahabu Rural Municipality',
+            'local_name' => 'महाबु गाउँपालिका',
+            'type' => 'rural_municipality',
+            'district' => 'Dailekh',
+            'province' => 'Karnali Province',
+            'total_wards' => 6,
+            'center_lat' => 28.9242,
+            'center_lng' => 81.7125,
+            'elevation_range' => '1,050m - 4,168m',
+            'notable_villages' => ['Mahabu', 'Raniban', 'Bhairabkalikathum', 'Basi', 'Kasikandh', 'Gauda'],
+        ],
+        [
+            'code' => 'np-dai-narayan',
+            'name' => 'Narayan Municipality',
+            'local_name' => 'नारायण नगरपालिका',
+            'type' => 'municipality',
+            'district' => 'Dailekh',
+            'province' => 'Karnali Province',
+            'total_wards' => 11,
+            'center_lat' => 28.8417,
+            'center_lng' => 81.7083,
+            'elevation_range' => '800m - 2,100m',
+            'notable_villages' => ['Dailekh Bazaar', 'Bilagee', 'Tribhuwani', 'Bhairab'],
+        ],
+        [
+            'code' => 'np-dai-dullu',
+            'name' => 'Dullu Municipality',
+            'local_name' => 'दुल्लु नगरपालिका',
+            'type' => 'municipality',
+            'district' => 'Dailekh',
+            'province' => 'Karnali Province',
+            'total_wards' => 13,
+            'center_lat' => 28.8833,
+            'center_lng' => 81.6000,
+            'elevation_range' => '750m - 2,050m',
+        ],
+        [
+            'code' => 'np-dai-chamunda',
+            'name' => 'Chamunda Bindrasaini Municipality',
+            'local_name' => 'चामुण्डा विन्द्रासैनी नगरपालिका',
+            'type' => 'municipality',
+            'district' => 'Dailekh',
+            'province' => 'Karnali Province',
+            'total_wards' => 9,
+            'center_lat' => 28.9167,
+            'center_lng' => 81.5333,
+            'elevation_range' => '800m - 1,900m',
+        ],
+        [
+            'code' => 'np-dai-aathbis',
+            'name' => 'Aathbis Municipality',
+            'local_name' => 'आठबीस नगरपालिका',
+            'type' => 'municipality',
+            'district' => 'Dailekh',
+            'province' => 'Karnali Province',
+            'total_wards' => 9,
+            'center_lat' => 28.9500,
+            'center_lng' => 81.4500,
+            'elevation_range' => '700m - 2,200m',
+        ],
+        [
+            'code' => 'np-dai-naumule',
+            'name' => 'Naumule Rural Municipality',
+            'local_name' => 'नौमुले गाउँपालिका',
+            'type' => 'rural_municipality',
+            'district' => 'Dailekh',
+            'province' => 'Karnali Province',
+            'total_wards' => 8,
+            'center_lat' => 28.8833,
+            'center_lng' => 81.8500,
+            'elevation_range' => '950m - 2,800m',
+        ],
+        [
+            'code' => 'np-dai-dungeshwar',
+            'name' => 'Dungeshwar Rural Municipality',
+            'local_name' => 'डुङ्गेश्वर गाउँपालिका',
+            'type' => 'rural_municipality',
+            'district' => 'Dailekh',
+            'province' => 'Karnali Province',
+            'total_wards' => 6,
+            'center_lat' => 28.7833,
+            'center_lng' => 81.6833,
+            'elevation_range' => '650m - 1,800m',
+        ],
+        [
+            'code' => 'np-dai-gurans',
+            'name' => 'Gurans Rural Municipality',
+            'local_name' => 'गुराँस गाउँपालिका',
+            'type' => 'rural_municipality',
+            'district' => 'Dailekh',
+            'province' => 'Karnali Province',
+            'total_wards' => 8,
+            'center_lat' => 28.7167,
+            'center_lng' => 81.6667,
+            'elevation_range' => '800m - 2,300m',
+        ],
+        [
+            'code' => 'np-dai-bhairabi',
+            'name' => 'Bhairabi Rural Municipality',
+            'local_name' => 'भैरवी गाउँपालिका',
+            'type' => 'rural_municipality',
+            'district' => 'Dailekh',
+            'province' => 'Karnali Province',
+            'total_wards' => 7,
+            'center_lat' => 28.9500,
+            'center_lng' => 81.6000,
+            'elevation_range' => '900m - 2,400m',
+        ],
+        [
+            'code' => 'np-dai-bhagawatimai',
+            'name' => 'Bhagawatimai Rural Municipality',
+            'local_name' => 'भगवतीमाई गाउँपालिका',
+            'type' => 'rural_municipality',
+            'district' => 'Dailekh',
+            'province' => 'Karnali Province',
+            'total_wards' => 7,
+            'center_lat' => 28.8333,
+            'center_lng' => 81.8000,
+            'elevation_range' => '850m - 2,600m',
+        ],
+        [
+            'code' => 'np-dai-thantikandh',
+            'name' => 'Thantikandh Rural Municipality',
+            'local_name' => 'ठाँटीकाँध गाउँपालिका',
+            'type' => 'rural_municipality',
+            'district' => 'Dailekh',
+            'province' => 'Karnali Province',
+            'total_wards' => 6,
+            'center_lat' => 29.0000,
+            'center_lng' => 81.5500,
+            'elevation_range' => '1,100m - 2,900m',
+        ],
+    ];
+
+    /**
+     * Authoritative centroid coordinates for all 77 districts of Nepal.
+     */
+    protected static array $districtCoordinates = [
+        // Koshi Province
+        'Bhojpur' => ['lat' => 27.1700, 'lng' => 87.0500],
+        'Dhankuta' => ['lat' => 26.9800, 'lng' => 87.3300],
+        'Ilam' => ['lat' => 26.9100, 'lng' => 87.9300],
+        'Jhapa' => ['lat' => 26.6500, 'lng' => 87.9000],
+        'Khotang' => ['lat' => 27.2000, 'lng' => 86.8300],
+        'Morang' => ['lat' => 26.6500, 'lng' => 87.4500],
+        'Okhaldhunga' => ['lat' => 27.3200, 'lng' => 86.5000],
+        'Panchthar' => ['lat' => 27.2000, 'lng' => 87.8500],
+        'Sankhuwasabha' => ['lat' => 27.6000, 'lng' => 87.2000],
+        'Solukhumbu' => ['lat' => 27.7000, 'lng' => 86.7200],
+        'Sunsari' => ['lat' => 26.6500, 'lng' => 87.1700],
+        'Taplejung' => ['lat' => 27.3500, 'lng' => 87.6700],
+        'Terhathum' => ['lat' => 27.1300, 'lng' => 87.5500],
+        'Udayapur' => ['lat' => 26.9000, 'lng' => 86.5200],
+        // Madhesh Province
+        'Bara' => ['lat' => 27.0300, 'lng' => 85.0000],
+        'Dhanusha' => ['lat' => 26.7500, 'lng' => 85.9500],
+        'Mahottari' => ['lat' => 26.8500, 'lng' => 85.8000],
+        'Parsa' => ['lat' => 27.1500, 'lng' => 84.8500],
+        'Rautahat' => ['lat' => 26.9500, 'lng' => 85.3000],
+        'Saptari' => ['lat' => 26.6000, 'lng' => 86.7500],
+        'Sarlahi' => ['lat' => 26.9500, 'lng' => 85.5500],
+        'Siraha' => ['lat' => 26.6500, 'lng' => 86.2000],
+        // Bagmati Province
+        'Bhaktapur' => ['lat' => 27.6700, 'lng' => 85.4300],
+        'Chitwan' => ['lat' => 27.5300, 'lng' => 84.4500],
+        'Dhading' => ['lat' => 27.8700, 'lng' => 84.9000],
+        'Dolakha' => ['lat' => 27.7700, 'lng' => 86.1700],
+        'Kathmandu' => ['lat' => 27.7172, 'lng' => 85.3240],
+        'Kavrepalanchok' => ['lat' => 27.5300, 'lng' => 85.5500],
+        'Lalitpur' => ['lat' => 27.6667, 'lng' => 85.3167],
+        'Makwanpur' => ['lat' => 27.4300, 'lng' => 85.0300],
+        'Nuwakot' => ['lat' => 27.9100, 'lng' => 85.1700],
+        'Ramechhap' => ['lat' => 27.3300, 'lng' => 86.0800],
+        'Rasuwa' => ['lat' => 28.1500, 'lng' => 85.3000],
+        'Sindhuli' => ['lat' => 27.2500, 'lng' => 85.9700],
+        'Sindhupalchok' => ['lat' => 27.8635, 'lng' => 85.5815],
+        // Gandaki Province
+        'Baglung' => ['lat' => 28.2700, 'lng' => 83.6000],
+        'Gorkha' => ['lat' => 28.0500, 'lng' => 84.6300],
+        'Kaski' => ['lat' => 28.2300, 'lng' => 83.9900],
+        'Lamjung' => ['lat' => 28.2300, 'lng' => 84.4000],
+        'Manang' => ['lat' => 28.6700, 'lng' => 84.0200],
+        'Mustang' => ['lat' => 28.7516, 'lng' => 83.6844],
+        'Myagdi' => ['lat' => 28.3500, 'lng' => 83.5700],
+        'Nawalpur' => ['lat' => 27.7000, 'lng' => 84.1000],
+        'Parbat' => ['lat' => 28.2300, 'lng' => 83.6700],
+        'Syangja' => ['lat' => 28.1000, 'lng' => 83.8700],
+        'Tanahun' => ['lat' => 27.9700, 'lng' => 84.2500],
+        // Lumbini Province
+        'Arghakhanchi' => ['lat' => 27.9200, 'lng' => 83.0800],
+        'Banke' => ['lat' => 28.1200, 'lng' => 81.7000],
+        'Bardiya' => ['lat' => 28.3000, 'lng' => 81.3500],
+        'Dang' => ['lat' => 28.0500, 'lng' => 82.3000],
+        'Gulmi' => ['lat' => 28.0700, 'lng' => 83.2500],
+        'Kapilvastu' => ['lat' => 27.5500, 'lng' => 83.0500],
+        'Nawalparasi West' => ['lat' => 27.5300, 'lng' => 83.6700],
+        'Palpa' => ['lat' => 27.8700, 'lng' => 83.5500],
+        'Pyuthan' => ['lat' => 28.1000, 'lng' => 82.8700],
+        'Rolpa' => ['lat' => 28.3000, 'lng' => 82.6300],
+        'Rukum East' => ['lat' => 28.6200, 'lng' => 82.7500],
+        'Rupandehi' => ['lat' => 27.5000, 'lng' => 83.4500],
+        // Karnali Province
+        'Dailekh' => ['lat' => 28.8500, 'lng' => 81.7100],
+        'Dolpa' => ['lat' => 28.9833, 'lng' => 82.8833],
+        'Humla' => ['lat' => 29.9667, 'lng' => 81.8333],
+        'Jajarkot' => ['lat' => 28.7000, 'lng' => 82.2000],
+        'Jumla' => ['lat' => 29.2747, 'lng' => 82.1838],
+        'Kalikot' => ['lat' => 29.2333, 'lng' => 81.7167],
+        'Mugu' => ['lat' => 29.5333, 'lng' => 82.1667],
+        'Rukum West' => ['lat' => 28.6333, 'lng' => 82.4667],
+        'Salyan' => ['lat' => 28.3667, 'lng' => 82.1667],
+        'Surkhet' => ['lat' => 28.6000, 'lng' => 81.6333],
+        // Sudurpashchim Province
+        'Achham' => ['lat' => 29.1100, 'lng' => 81.3000],
+        'Baitadi' => ['lat' => 29.5300, 'lng' => 80.5500],
+        'Bajhang' => ['lat' => 29.5500, 'lng' => 81.2000],
+        'Bajura' => ['lat' => 29.5000, 'lng' => 81.5700],
+        'Dadeldhura' => ['lat' => 29.3000, 'lng' => 80.5800],
+        'Darchula' => ['lat' => 29.8500, 'lng' => 80.5300],
+        'Doti' => ['lat' => 29.2500, 'lng' => 80.9800],
+        'Kailali' => ['lat' => 28.7000, 'lng' => 80.6000],
+        'Kanchanpur' => ['lat' => 28.8300, 'lng' => 80.3300],
     ];
 
     public static function getProvinces(): array
@@ -461,6 +687,17 @@ class NepalLocationService
         return null;
     }
 
+    public static function getDistrictCenter(string $districtName): ?array
+    {
+        $dClean = trim(str_ireplace('district', '', $districtName));
+        foreach (self::$districtCoordinates as $d => $coords) {
+            if (strcasecmp($d, $dClean) === 0) {
+                return $coords;
+            }
+        }
+        return null;
+    }
+
     public static function getMunicipalities(?string $districtName = null): array
     {
         if (!$districtName) {
@@ -476,6 +713,7 @@ class NepalLocationService
         if (empty($matches)) {
             $province = self::getProvinceByDistrict($dClean) ?? 'Nepal';
             $slug = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $dClean));
+            $dCenter = self::getDistrictCenter($dClean) ?? ['lat' => 28.25, 'lng' => 83.5];
             $matches = [
                 [
                     'code' => "np-{$slug}-muni",
@@ -485,8 +723,8 @@ class NepalLocationService
                     'district' => $dClean,
                     'province' => $province,
                     'total_wards' => 9,
-                    'center_lat' => 28.0,
-                    'center_lng' => 84.0,
+                    'center_lat' => round($dCenter['lat'], 4),
+                    'center_lng' => round($dCenter['lng'], 4),
                 ],
                 [
                     'code' => "np-{$slug}-rural",
@@ -496,8 +734,8 @@ class NepalLocationService
                     'district' => $dClean,
                     'province' => $province,
                     'total_wards' => 7,
-                    'center_lat' => 28.05,
-                    'center_lng' => 84.05,
+                    'center_lat' => round($dCenter['lat'] + 0.05, 4),
+                    'center_lng' => round($dCenter['lng'] + 0.05, 4),
                 ],
             ];
         }
@@ -738,6 +976,11 @@ class NepalLocationService
     {
         $cleanPlace = trim(preg_replace('/\(.*?\)/', '', $placeName));
 
+        // 0. Dedicated check for Mahabu, Dailekh (Karnali Province)
+        if (str_contains(mb_strtolower($cleanPlace), 'mahabu') || ($district && strcasecmp($district, 'Dailekh') === 0 && str_contains(mb_strtolower($cleanPlace), 'mahabu'))) {
+            return ['lat' => 28.9242, 'lng' => 81.7125];
+        }
+
         // 1. Check known municipalities catalog
         foreach (self::$municipalities as $m) {
             if (strcasecmp($m['name'], $placeName) === 0 || strcasecmp($m['name'], $cleanPlace) === 0) {
@@ -790,6 +1033,14 @@ class NepalLocationService
                 }
             } catch (\Throwable $e) {
                 // proceed to next query or fallback
+            }
+        }
+
+        // 3. Fallback to district centroid instead of generic fallback
+        if ($district) {
+            $dCenter = self::getDistrictCenter($district);
+            if ($dCenter) {
+                return $dCenter;
             }
         }
 

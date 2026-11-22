@@ -42,6 +42,8 @@ export default function MapDataImportModal({
   // Discovery state
   const [summary, setSummary] = useState(null);
   const [categories, setCategories] = useState(null);
+  const [scanData, setScanData] = useState(null);
+  const [confirmingLocation, setConfirmingLocation] = useState(false);
 
   // Category selections
   const [selection, setSelection] = useState({
@@ -74,6 +76,7 @@ export default function MapDataImportModal({
       }
 
       const data = await res.json();
+      setScanData(data);
       setSummary(data.summary);
       setCategories(data.categories);
 
@@ -86,6 +89,33 @@ export default function MapDataImportModal({
       setError(err.message || 'Failed to retrieve spatial map data.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Confirm Official Location
+  const handleConfirmCoordinates = async () => {
+    if (!scanData?.suggested_coordinates) return;
+    setConfirmingLocation(true);
+    setError(null);
+    try {
+      const coords = scanData.suggested_coordinates;
+      const res = await fetch(`${API_BASE}/villages/${selectedVillageId}/coordinates`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          center_lat: coords.lat,
+          center_lng: coords.lng,
+          confirmed: true,
+          radius,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to confirm official coordinates');
+      setSuccess(`Coordinates confirmed to ${coords.lat}°N, ${coords.lng}°E! Re-scanning...`);
+      await handleFindMapData();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setConfirmingLocation(false);
     }
   };
 
@@ -324,7 +354,10 @@ export default function MapDataImportModal({
                     2. Geographic Study Area
                   </span>
                   <div style={{ fontSize: '12px', color: '#687c73', marginTop: '2px' }}>
-                    Center: {currentVillage?.center_lat?.toFixed(4)}, {currentVillage?.center_lng?.toFixed(4)}
+                    Center: {scanData?.scan_center ? `${scanData.scan_center.lat.toFixed(4)}, ${scanData.scan_center.lng.toFixed(4)}` : `${currentVillage?.center_lat?.toFixed(4) || '28.0000'}, ${currentVillage?.center_lng?.toFixed(4) || '84.0000'}`}
+                    {currentVillage?.is_coordinates_confirmed ? (
+                      <span style={{ marginLeft: '6px', color: '#166534', fontWeight: 650 }}>✓ Confirmed</span>
+                    ) : null}
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -341,6 +374,50 @@ export default function MapDataImportModal({
                   </select>
                 </div>
               </div>
+
+              {/* Location Confirmation Banner if needed */}
+              {(scanData?.needs_location_confirmation || currentVillage?.needs_location_confirmation || (!currentVillage?.is_coordinates_confirmed && currentVillage?.center_lat == 28.0 && currentVillage?.center_lng == 84.0)) && (
+                <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '10px 14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                    <AlertTriangle size={16} color="#d97706" style={{ marginTop: '2px', flexShrink: 0 }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#92400e' }}>
+                        Village Location Needs Confirmation
+                      </div>
+                      <div style={{ fontSize: '11.5px', color: '#78350f', marginTop: '2px' }}>
+                        Current scan center ({currentVillage?.center_lat?.toFixed(4)}, {currentVillage?.center_lng?.toFixed(4)}) is a broad district centroid.
+                        {scanData?.suggested_coordinates && (
+                          <span> Official catalog location for {currentVillage?.name}: <strong>{scanData.suggested_coordinates.lat.toFixed(4)}°N, {scanData.suggested_coordinates.lng.toFixed(4)}°E</strong>.</span>
+                        )}
+                      </div>
+                      {scanData?.suggested_coordinates && (
+                        <button
+                          type="button"
+                          onClick={handleConfirmCoordinates}
+                          disabled={confirmingLocation}
+                          style={{
+                            marginTop: '8px',
+                            background: '#166534',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '5px',
+                            padding: '5px 12px',
+                            fontSize: '11.5px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          {confirmingLocation ? <Loader2 size={13} className="spin" /> : <CheckCircle2 size={13} />}
+                          Confirm Official Coordinates ({scanData.suggested_coordinates.lat.toFixed(4)}°N, {scanData.suggested_coordinates.lng.toFixed(4)}°E)
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* 3. Find Map Data Action */}
               <div>
@@ -385,6 +462,26 @@ export default function MapDataImportModal({
                     <span style={{ fontSize: '11px', color: '#687c73' }}>
                       {summary.attribution}
                     </span>
+                  </div>
+
+                  {/* Summary Metric Chips */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                    <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '6px 8px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '16px', fontWeight: 800, color: '#1e293b' }}>{summary.total_features || 0}</div>
+                      <div style={{ fontSize: '10.5px', color: '#64748b' }}>Discovered</div>
+                    </div>
+                    <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '6px', padding: '6px 8px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '16px', fontWeight: 800, color: '#047857' }}>{summary.new_features_count ?? summary.total_features}</div>
+                      <div style={{ fontSize: '10.5px', color: '#065f46', fontWeight: 600 }}>✨ New</div>
+                    </div>
+                    <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '6px', padding: '6px 8px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '16px', fontWeight: 800, color: '#b45309' }}>{summary.possible_duplicates_count ?? 0}</div>
+                      <div style={{ fontSize: '10.5px', color: '#92400e', fontWeight: 600 }}>🔍 Possible Dups</div>
+                    </div>
+                    <div style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '6px 8px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '16px', fontWeight: 800, color: '#475569' }}>{summary.already_imported_count ?? 0}</div>
+                      <div style={{ fontSize: '10.5px', color: '#475569', fontWeight: 600 }}>⏭️ In DB</div>
+                    </div>
                   </div>
 
                   <div className="vm-infra-grid">

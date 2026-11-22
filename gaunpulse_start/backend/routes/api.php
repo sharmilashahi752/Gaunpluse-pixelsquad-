@@ -38,6 +38,7 @@ Route::post('/villages', [VillageController::class, 'store']);
 Route::post('/villages/wizard-draft', [VillageController::class, 'storeWizardDraft']);
 Route::post('/villages/{village}/activate', [VillageController::class, 'activate']);
 Route::post('/villages/{village}/correct-hierarchy', [VillageController::class, 'correctHierarchy']);
+Route::match(['patch', 'post'], '/villages/{village}/coordinates', [VillageController::class, 'updateCoordinates']);
 Route::get('/villages/{village}', [VillageController::class, 'show']);
 Route::put('/villages/{village}', [VillageController::class, 'update']);
 Route::delete('/villages/{village}', [VillageController::class, 'destroy']);

@@ -79,7 +79,12 @@ export default function VillageMapPage() {
   const [discoveryData, setDiscoveryData] = useState(null);
   const [selectedFeatureMap, setSelectedFeatureMap] = useState({}); // featureId -> bool
   const [activeCategoryTab, setActiveCategoryTab] = useState('all');
+  const [activeMainTab, setActiveMainTab] = useState('new'); // 'new' | 'possible_duplicates' | 'already_imported'
   const [importingLoading, setImportingLoading] = useState(false);
+  const [confirmingLocation, setConfirmingLocation] = useState(false);
+  const [showCoordInput, setShowCoordInput] = useState(false);
+  const [manualLat, setManualLat] = useState('');
+  const [manualLng, setManualLng] = useState('');
 
   // Administrative Cascade Data
   const [provinces, setProvinces] = useState([]);
@@ -478,10 +483,10 @@ export default function VillageMapPage() {
         setDiscoveryStatus('ready');
       }
 
-      // Initialize selected checkboxes (select all valid non-duplicates)
+      // Initialize selected checkboxes (select all valid new features, uncheck possible duplicates & already imported)
       const initialMap = {};
       features.forEach((feat) => {
-        initialMap[feat.id] = (feat.selected ?? true) && !feat.is_duplicate;
+        initialMap[feat.id] = feat.duplicate_status === 'new' || (feat.is_new ?? false);
       });
       setSelectedFeatureMap(initialMap);
     } catch (err) {
@@ -492,15 +497,72 @@ export default function VillageMapPage() {
     }
   };
 
+  // Confirm Official Location from Suggestion
+  const handleConfirmOfficialLocation = async () => {
+    if (!selectedVillageId || !discoveryData?.suggested_coordinates) return;
+    setConfirmingLocation(true);
+    try {
+      const coords = discoveryData.suggested_coordinates;
+      const res = await fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/coordinates`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          center_lat: coords.lat,
+          center_lng: coords.lng,
+          confirmed: true,
+          radius: discoveryRadius,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to confirm official coordinates');
+      showNotification(`Village coordinates confirmed to ${coords.lat}°N, ${coords.lng}°E! Re-scanning...`);
+      loadVillages();
+      await triggerDiscovery(selectedVillageId, discoveryRadius, true);
+    } catch (err) {
+      alert('Error confirming coordinates: ' + err.message);
+    } finally {
+      setConfirmingLocation(false);
+    }
+  };
+
+  // Save Custom Coordinates Manually
+  const handleSaveManualCoordinates = async () => {
+    if (!selectedVillageId || !manualLat || !manualLng) return;
+    setConfirmingLocation(true);
+    try {
+      const lat = parseFloat(manualLat);
+      const lng = parseFloat(manualLng);
+      const res = await fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/coordinates`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          center_lat: lat,
+          center_lng: lng,
+          confirmed: true,
+          radius: discoveryRadius,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to save coordinates');
+      showNotification(`Coordinates saved to ${lat}°N, ${lng}°E! Re-scanning...`);
+      setShowCoordInput(false);
+      loadVillages();
+      await triggerDiscovery(selectedVillageId, discoveryRadius, true);
+    } catch (err) {
+      alert('Error saving coordinates: ' + err.message);
+    } finally {
+      setConfirmingLocation(false);
+    }
+  };
+
   // Confirm and Save Selected Discovery Features (Task 6 & 7)
   const handleConfirmImport = async () => {
     if (!selectedVillageId || !discoveryData) return;
 
     const allFeatures = discoveryData.features || [];
-    const approvedFeatures = allFeatures.filter((f) => selectedFeatureMap[f.id]);
+    // Only persist features checked by the user that are NOT already in MySQL
+    const approvedFeatures = allFeatures.filter((f) => selectedFeatureMap[f.id] && f.duplicate_status !== 'already_imported');
 
     if (approvedFeatures.length === 0) {
-      alert('Please select at least one feature to import.');
+      alert('Please select at least one new or verified feature to import.');
       return;
     }
 
@@ -524,7 +586,7 @@ export default function VillageMapPage() {
       const result = await res.json();
       setDiscoveryStatus('completed');
       setIsDiscoveryModalOpen(false);
-      showNotification(`Import complete! ${result.imported_nodes} nodes and ${result.imported_edges} lifeline edges saved to MySQL.`);
+      showNotification(`Import complete! ${result.imported_nodes || result.nodes_created || 0} nodes and ${result.imported_edges || result.edges_created || 0} lifeline edges saved to MySQL.`);
 
       // Refresh village network immediately from MySQL (Task 7)
       const refreshRes = await fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/network`);
@@ -538,12 +600,27 @@ export default function VillageMapPage() {
     }
   };
 
-  // Toggle selection for all or category
+  // Main Tab Filter
+  const getFeaturesByMainTab = (tab) => {
+    if (!discoveryData?.features) return [];
+    if (tab === 'new') {
+      return discoveryData.features.filter((f) => f.duplicate_status === 'new' || (!f.is_duplicate && !f.is_possible_duplicate));
+    }
+    if (tab === 'possible_duplicates') {
+      return discoveryData.features.filter((f) => f.duplicate_status === 'possible_duplicate' || f.is_possible_duplicate);
+    }
+    if (tab === 'already_imported') {
+      return discoveryData.features.filter((f) => f.duplicate_status === 'already_imported' || (f.is_duplicate && !f.is_possible_duplicate));
+    }
+    return discoveryData.features;
+  };
+
+  // Toggle selection for visible features
   const toggleSelectAll = (selectVal) => {
     const updated = { ...selectedFeatureMap };
     const currentFeatures = getFilteredDiscoveryFeatures();
     currentFeatures.forEach((f) => {
-      if (!f.is_duplicate) {
+      if (f.duplicate_status !== 'already_imported' && !f.is_duplicate) {
         updated[f.id] = selectVal;
       }
     });
@@ -552,16 +629,11 @@ export default function VillageMapPage() {
 
   // Filter discovery features by active category
   const getFilteredDiscoveryFeatures = () => {
-    if (!discoveryData?.features) return [];
-    if (activeCategoryTab === 'all') return discoveryData.features;
-    if (activeCategoryTab === 'roads') return discoveryData.categories?.roads || [];
-    if (activeCategoryTab === 'bridges') return discoveryData.categories?.bridges || [];
-    if (activeCategoryTab === 'schools') return discoveryData.categories?.schools || [];
-    if (activeCategoryTab === 'health') return discoveryData.categories?.health || [];
-    if (activeCategoryTab === 'water') return discoveryData.categories?.water || [];
-    if (activeCategoryTab === 'settlements') return discoveryData.categories?.settlements || [];
-    if (activeCategoryTab === 'warnings') return discoveryData.features.filter((f) => f.is_duplicate);
-    return discoveryData.features;
+    let list = getFeaturesByMainTab(activeMainTab);
+    if (activeCategoryTab !== 'all') {
+      list = list.filter((f) => f.category === activeCategoryTab);
+    }
+    return list;
   };
 
   // Submit Point Asset (Node)
@@ -1511,7 +1583,10 @@ export default function VillageMapPage() {
                   Study Area Radius (Meters):
                 </span>
                 <div style={{ fontSize: '11px', color: '#64748b' }}>
-                  Radius centered at {parseFloat(village.center_lat || village.latitude || 27.8635).toFixed(4)}°N, {parseFloat(village.center_lng || village.longitude || 85.5815).toFixed(4)}°E
+                  Scan center: {parseFloat(discoveryData?.scan_center?.lat || village.center_lat || village.latitude || 27.8635).toFixed(4)}°N, {parseFloat(discoveryData?.scan_center?.lng || village.center_lng || village.longitude || 85.5815).toFixed(4)}°E
+                  {village.is_coordinates_confirmed ? (
+                    <span style={{ marginLeft: '6px', color: '#047857', fontWeight: 600 }}>✓ Confirmed</span>
+                  ) : null}
                 </div>
               </div>
 
@@ -1561,6 +1636,124 @@ export default function VillageMapPage() {
                 </button>
               </div>
             </div>
+
+            {/* Village Location Confirmation Banner */}
+            {(discoveryData?.needs_location_confirmation || village.needs_location_confirmation || (!village.is_coordinates_confirmed && village.center_lat == 28.0 && village.center_lng == 84.0)) && (
+              <div
+                style={{
+                  background: '#fffbeb',
+                  border: '1.5px solid #fde68a',
+                  borderRadius: '10px',
+                  padding: '12px 16px',
+                  marginBottom: '16px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                  <AlertTriangle size={20} color="#d97706" style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#92400e', marginBottom: '2px' }}>
+                      Village Location Needs Confirmation
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#78350f', lineHeight: 1.4 }}>
+                      Current scan coordinates ({parseFloat(village.center_lat || 28.0).toFixed(4)}°N, {parseFloat(village.center_lng || 84.0).toFixed(4)}°E) appear to be a broad administrative fallback.
+                      {discoveryData?.suggested_coordinates && (
+                        <span> Official catalog centroid for <strong>{village.name}</strong> ({village.municipality || village.district}) is <strong>{discoveryData.suggested_coordinates.lat.toFixed(4)}°N, {discoveryData.suggested_coordinates.lng.toFixed(4)}°E</strong>.</span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
+                      {discoveryData?.suggested_coordinates && (
+                        <button
+                          type="button"
+                          onClick={handleConfirmOfficialLocation}
+                          disabled={confirmingLocation}
+                          style={{
+                            background: '#047857',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '6px 14px',
+                            fontSize: '12px',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                          }}
+                        >
+                          {confirmingLocation ? <RefreshCw size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
+                          Confirm Official Coordinates ({discoveryData.suggested_coordinates.lat.toFixed(4)}°N, {discoveryData.suggested_coordinates.lng.toFixed(4)}°E)
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowCoordInput(!showCoordInput);
+                          if (!manualLat) setManualLat(village.center_lat || '28.9242');
+                          if (!manualLng) setManualLng(village.center_lng || '81.7125');
+                        }}
+                        style={{
+                          background: '#fff',
+                          color: '#475569',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '6px',
+                          padding: '6px 12px',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {showCoordInput ? 'Cancel Manual Input' : 'Edit Coordinates Manually'}
+                      </button>
+                    </div>
+
+                    {showCoordInput && (
+                      <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <div>
+                          <label style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>Latitude</label>
+                          <input
+                            type="number"
+                            step="0.0001"
+                            value={manualLat}
+                            onChange={(e) => setManualLat(e.target.value)}
+                            style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '12px', width: '110px' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>Longitude</label>
+                          <input
+                            type="number"
+                            step="0.0001"
+                            value={manualLng}
+                            onChange={(e) => setManualLng(e.target.value)}
+                            style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '12px', width: '110px' }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleSaveManualCoordinates}
+                          disabled={confirmingLocation}
+                          style={{
+                            marginTop: '16px',
+                            background: '#176342',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '4px',
+                            padding: '6px 12px',
+                            fontSize: '12px',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Save & Re-Scan
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Discovery State: Loading / Provider Unavailable / Empty / Loaded */}
             {discoveryLoading || discoveryStatus === 'searching' || discoveryStatus === 'processing' || discoveryStatus === 'saving' ? (
@@ -1708,287 +1901,306 @@ export default function VillageMapPage() {
               </div>
             ) : discoveryData ? (
               <div>
-                {/* Discovery Stat Cards (Phase 6) */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(105px, 1fr))', gap: '8px', marginBottom: '16px' }}>
+                {/* 4 Metric Summary Cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', marginBottom: '16px' }}>
                   <div
-                    onClick={() => setActiveCategoryTab('roads')}
                     style={{
-                      background: activeCategoryTab === 'roads' ? '#e4f4e9' : '#fff',
-                      border: `1.5px solid ${activeCategoryTab === 'roads' ? '#176342' : '#e2e8f0'}`,
+                      background: '#f8fafc',
+                      border: '1.5px solid #cbd5e1',
                       borderRadius: '8px',
-                      padding: '10px 8px',
+                      padding: '10px 12px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    <div style={{ fontSize: '20px', fontWeight: '800', color: '#1e293b' }}>
+                      {discoveryData.features?.length || discoveryData.summary?.total_features || 0}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>Total Discovered</div>
+                  </div>
+
+                  <div
+                    onClick={() => setActiveMainTab('new')}
+                    style={{
+                      background: activeMainTab === 'new' ? '#ecfdf5' : '#fff',
+                      border: `1.5px solid ${activeMainTab === 'new' ? '#059669' : '#a7f3d0'}`,
+                      borderRadius: '8px',
+                      padding: '10px 12px',
                       textAlign: 'center',
                       cursor: 'pointer',
                     }}
                   >
-                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#176342' }}>
-                      {discoveryData.summary?.roads_count || 0}
+                    <div style={{ fontSize: '20px', fontWeight: '800', color: '#047857' }}>
+                      {discoveryData.summary?.new_features_count ?? (discoveryData.features?.filter((f) => f.duplicate_status === 'new' || (!f.is_duplicate && !f.is_possible_duplicate)).length || 0)}
                     </div>
-                    <div style={{ fontSize: '10.5px', color: '#475569', fontWeight: '600' }}>Roads</div>
+                    <div style={{ fontSize: '11px', color: '#065f46', fontWeight: '700' }}>✨ New Features</div>
                   </div>
 
                   <div
-                    onClick={() => setActiveCategoryTab('bridges')}
+                    onClick={() => setActiveMainTab('possible_duplicates')}
                     style={{
-                      background: activeCategoryTab === 'bridges' ? '#ffedd5' : '#fff',
-                      border: `1.5px solid ${activeCategoryTab === 'bridges' ? '#c2410c' : '#e2e8f0'}`,
+                      background: activeMainTab === 'possible_duplicates' ? '#fffbeb' : '#fff',
+                      border: `1.5px solid ${activeMainTab === 'possible_duplicates' ? '#d97706' : '#fde68a'}`,
                       borderRadius: '8px',
-                      padding: '10px 8px',
+                      padding: '10px 12px',
                       textAlign: 'center',
                       cursor: 'pointer',
                     }}
                   >
-                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#c2410c' }}>
-                      {discoveryData.summary?.bridges_count || 0}
+                    <div style={{ fontSize: '20px', fontWeight: '800', color: '#b45309' }}>
+                      {discoveryData.summary?.possible_duplicates_count ?? (discoveryData.features?.filter((f) => f.duplicate_status === 'possible_duplicate' || f.is_possible_duplicate).length || 0)}
                     </div>
-                    <div style={{ fontSize: '10.5px', color: '#475569', fontWeight: '600' }}>Bridges</div>
+                    <div style={{ fontSize: '11px', color: '#92400e', fontWeight: '700' }}>🔍 Possible Duplicates</div>
                   </div>
 
                   <div
-                    onClick={() => setActiveCategoryTab('schools')}
+                    onClick={() => setActiveMainTab('already_imported')}
                     style={{
-                      background: activeCategoryTab === 'schools' ? '#dbeafe' : '#fff',
-                      border: `1.5px solid ${activeCategoryTab === 'schools' ? '#1d4ed8' : '#e2e8f0'}`,
+                      background: activeMainTab === 'already_imported' ? '#f1f5f9' : '#fff',
+                      border: `1.5px solid ${activeMainTab === 'already_imported' ? '#64748b' : '#e2e8f0'}`,
                       borderRadius: '8px',
-                      padding: '10px 8px',
+                      padding: '10px 12px',
                       textAlign: 'center',
                       cursor: 'pointer',
                     }}
                   >
-                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#1d4ed8' }}>
-                      {discoveryData.summary?.schools_count || 0}
+                    <div style={{ fontSize: '20px', fontWeight: '800', color: '#475569' }}>
+                      {discoveryData.summary?.already_imported_count ?? (discoveryData.features?.filter((f) => f.duplicate_status === 'already_imported' || (f.is_duplicate && !f.is_possible_duplicate)).length || 0)}
                     </div>
-                    <div style={{ fontSize: '10.5px', color: '#475569', fontWeight: '600' }}>Schools</div>
+                    <div style={{ fontSize: '11px', color: '#475569', fontWeight: '700' }}>⏭️ Already in Database</div>
                   </div>
-
-                  <div
-                    onClick={() => setActiveCategoryTab('health')}
-                    style={{
-                      background: activeCategoryTab === 'health' ? '#ccfbf1' : '#fff',
-                      border: `1.5px solid ${activeCategoryTab === 'health' ? '#0f766e' : '#e2e8f0'}`,
-                      borderRadius: '8px',
-                      padding: '10px 8px',
-                      textAlign: 'center',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#0f766e' }}>
-                      {discoveryData.summary?.health_count || 0}
-                    </div>
-                    <div style={{ fontSize: '10.5px', color: '#475569', fontWeight: '600' }}>Health Posts</div>
-                  </div>
-
-                  <div
-                    onClick={() => setActiveCategoryTab('water')}
-                    style={{
-                      background: activeCategoryTab === 'water' ? '#e0f2fe' : '#fff',
-                      border: `1.5px solid ${activeCategoryTab === 'water' ? '#0284c7' : '#e2e8f0'}`,
-                      borderRadius: '8px',
-                      padding: '10px 8px',
-                      textAlign: 'center',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#0284c7' }}>
-                      {discoveryData.summary?.water_count || 0}
-                    </div>
-                    <div style={{ fontSize: '10.5px', color: '#475569', fontWeight: '600' }}>Water Tanks</div>
-                  </div>
-
-                  <div
-                    onClick={() => setActiveCategoryTab('settlements')}
-                    style={{
-                      background: activeCategoryTab === 'settlements' ? '#f0fdf4' : '#fff',
-                      border: `1.5px solid ${activeCategoryTab === 'settlements' ? '#15803d' : '#e2e8f0'}`,
-                      borderRadius: '8px',
-                      padding: '10px 8px',
-                      textAlign: 'center',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#15803d' }}>
-                      {discoveryData.summary?.settlements_count || 0}
-                    </div>
-                    <div style={{ fontSize: '10.5px', color: '#475569', fontWeight: '600' }}>Settlements</div>
-                  </div>
-
-                  {discoveryData.summary?.duplicates_count > 0 && (
-                    <div
-                      onClick={() => setActiveCategoryTab('warnings')}
-                      style={{
-                        background: activeCategoryTab === 'warnings' ? '#fef3c7' : '#fff',
-                        border: `1.5px solid ${activeCategoryTab === 'warnings' ? '#d97706' : '#fde68a'}`,
-                        borderRadius: '8px',
-                        padding: '10px 8px',
-                        textAlign: 'center',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <div style={{ fontSize: '18px', fontWeight: '800', color: '#d97706' }}>
-                        {discoveryData.summary?.duplicates_count}
-                      </div>
-                      <div style={{ fontSize: '10.5px', color: '#78350f', fontWeight: '600' }}>Duplicates</div>
-                    </div>
-                  )}
                 </div>
 
-                {/* Duplicate Notice Banner */}
-                {discoveryData.summary?.duplicates_count > 0 && (
-                  <div
+                {/* 3 Main Categorized Tabs */}
+                <div style={{ display: 'flex', borderBottom: '2px solid #e2e8f0', marginBottom: '14px', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveMainTab('new')}
                     style={{
-                      background: '#fffbeb',
-                      border: '1px solid #fde68a',
-                      borderRadius: '8px',
-                      padding: '8px 12px',
-                      fontSize: '11.5px',
-                      color: '#92400e',
-                      marginBottom: '12px',
+                      padding: '8px 16px',
+                      border: 'none',
+                      borderBottom: activeMainTab === 'new' ? '3px solid #059669' : '3px solid transparent',
+                      background: 'none',
+                      fontSize: '13px',
+                      fontWeight: activeMainTab === 'new' ? '800' : '600',
+                      color: activeMainTab === 'new' ? '#065f46' : '#64748b',
+                      cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
                     }}
                   >
-                    <AlertTriangle size={15} color="#d97706" />
-                    <span>
-                      {discoveryData.summary?.duplicates_count} candidate feature(s) overlap with existing village records in MySQL and have been automatically unchecked to prevent duplication.
-                    </span>
-                  </div>
-                )}
+                    ✨ New Features ({getFeaturesByMainTab('new').length})
+                  </button>
 
-                {/* Discovered Features Breakdown & Selection */}
-                <div>
-                  {/* Category Tabs & Bulk Selection */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
-                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                        {['all', 'roads', 'bridges', 'schools', 'health', 'water', 'settlements'].map((cat) => (
-                          <button
-                            key={`tab-${cat}`}
-                            type="button"
-                            onClick={() => setActiveCategoryTab(cat)}
-                            style={{
-                              padding: '4px 10px',
-                              borderRadius: '6px',
-                              border: 'none',
-                              fontSize: '11px',
-                              fontWeight: '700',
-                              cursor: 'pointer',
-                              background: activeCategoryTab === cat ? '#176342' : '#f1f5f9',
-                              color: activeCategoryTab === cat ? '#fff' : '#475569',
-                              textTransform: 'capitalize',
-                            }}
-                          >
-                            {cat}
-                          </button>
-                        ))}
-                      </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveMainTab('possible_duplicates')}
+                    style={{
+                      padding: '8px 16px',
+                      border: 'none',
+                      borderBottom: activeMainTab === 'possible_duplicates' ? '3px solid #d97706' : '3px solid transparent',
+                      background: 'none',
+                      fontSize: '13px',
+                      fontWeight: activeMainTab === 'possible_duplicates' ? '800' : '600',
+                      color: activeMainTab === 'possible_duplicates' ? '#92400e' : '#64748b',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    🔍 Possible Duplicates ({getFeaturesByMainTab('possible_duplicates').length})
+                  </button>
 
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button
-                          type="button"
-                          onClick={() => toggleSelectAll(true)}
-                          style={{
-                            background: '#f1f5f9',
-                            border: '1px solid #cbd5e1',
-                            padding: '3px 8px',
-                            borderRadius: '4px',
-                            fontSize: '11px',
-                            fontWeight: '600',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Select Valid
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => toggleSelectAll(false)}
-                          style={{
-                            background: '#f1f5f9',
-                            border: '1px solid #cbd5e1',
-                            padding: '3px 8px',
-                            borderRadius: '4px',
-                            fontSize: '11px',
-                            fontWeight: '600',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Deselect All
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Discovered Features List */}
-                    <div
-                      style={{
-                        maxHeight: '260px',
-                        overflowY: 'auto',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        background: '#f8fafc',
-                        padding: '6px',
-                        marginBottom: '16px',
-                      }}
-                    >
-                      {getFilteredDiscoveryFeatures().map((item, idx) => {
-                        const isChecked = Boolean(selectedFeatureMap[item.id]);
-                        return (
-                          <div
-                            key={`feat-${item.id}-${idx}`}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              padding: '8px 10px',
-                              background: '#fff',
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '6px',
-                              marginBottom: '4px',
-                              opacity: item.is_duplicate ? 0.65 : 1,
-                            }}
-                          >
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: item.is_duplicate ? 'default' : 'pointer', flex: 1 }}>
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                disabled={item.is_duplicate}
-                                onChange={(e) => {
-                                  setSelectedFeatureMap((prev) => ({
-                                    ...prev,
-                                    [item.id]: e.target.checked,
-                                  }));
-                                }}
-                              />
-                              <div>
-                                <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#0f172a' }}>
-                                  {item.name}
-                                </div>
-                                <div style={{ fontSize: '10.5px', color: '#64748b' }}>
-                                  Category: {item.category} · {item.infrastructure_type || item.node_type || 'asset'}
-                                  {item.length_meters && ` · ${item.length_meters}m`}
-                                  {item.surface_type && ` · ${item.surface_type}`}
-                                </div>
-                              </div>
-                            </label>
-
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span
-                                style={{
-                                  fontSize: '10px',
-                                  fontWeight: '700',
-                                  padding: '2px 6px',
-                                  borderRadius: '4px',
-                                  background: item.is_duplicate ? '#fee2e2' : '#dbeafe',
-                                  color: item.is_duplicate ? '#991b1b' : '#1e40af',
-                                }}
-                              >
-                                {item.is_duplicate ? 'Duplicate' : 'Needs Verification'}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveMainTab('already_imported')}
+                    style={{
+                      padding: '8px 16px',
+                      border: 'none',
+                      borderBottom: activeMainTab === 'already_imported' ? '3px solid #64748b' : '3px solid transparent',
+                      background: 'none',
+                      fontSize: '13px',
+                      fontWeight: activeMainTab === 'already_imported' ? '800' : '600',
+                      color: activeMainTab === 'already_imported' ? '#1e293b' : '#64748b',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    ⏭️ Already in Database ({getFeaturesByMainTab('already_imported').length})
+                  </button>
                 </div>
+
+                {/* Tab Context Explanation */}
+                <div style={{ marginBottom: '10px', fontSize: '12px', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    {activeMainTab === 'new' && (
+                      <span>✨ Discovered features ready to import. Pre-selected by default.</span>
+                    )}
+                    {activeMainTab === 'possible_duplicates' && (
+                      <span>🔍 Features near existing infrastructure (&lt;25m or similar name). Check box only if you want to import as separate asset.</span>
+                    )}
+                    {activeMainTab === 'already_imported' && (
+                      <span>⏭️ Features with identical OSM element ID already in MySQL. Automatically excluded.</span>
+                    )}
+                  </div>
+
+                  {activeMainTab !== 'already_imported' && (
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        type="button"
+                        onClick={() => toggleSelectAll(true)}
+                        style={{
+                          background: '#f1f5f9',
+                          border: '1px solid #cbd5e1',
+                          padding: '3px 8px',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Select All
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleSelectAll(false)}
+                        style={{
+                          background: '#f1f5f9',
+                          border: '1px solid #cbd5e1',
+                          padding: '3px 8px',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Deselect All
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Category Pills Filter */}
+                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                  {['all', 'roads', 'bridges', 'schools', 'health', 'water', 'settlements'].map((cat) => {
+                    const count = getFeaturesByMainTab(activeMainTab).filter((f) => cat === 'all' || f.category === cat).length;
+                    return (
+                      <button
+                        key={`cat-pill-${cat}`}
+                        type="button"
+                        onClick={() => setActiveCategoryTab(cat)}
+                        style={{
+                          padding: '3px 9px',
+                          borderRadius: '12px',
+                          border: 'none',
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          background: activeCategoryTab === cat ? '#176342' : '#f1f5f9',
+                          color: activeCategoryTab === cat ? '#fff' : '#475569',
+                          textTransform: 'capitalize',
+                        }}
+                      >
+                        {cat} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Features List */}
+                <div
+                  style={{
+                    maxHeight: '280px',
+                    overflowY: 'auto',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    background: '#f8fafc',
+                    padding: '6px',
+                    marginBottom: '16px',
+                  }}
+                >
+                  {getFilteredDiscoveryFeatures().length === 0 ? (
+                    <div style={{ padding: '24px', textAlign: 'center', color: '#64748b', fontSize: '12.5px' }}>
+                      No features found in this category for {activeMainTab.replace('_', ' ')}.
+                    </div>
+                  ) : (
+                    getFilteredDiscoveryFeatures().map((item, idx) => {
+                      const isChecked = Boolean(selectedFeatureMap[item.id]);
+                      const isAlready = item.duplicate_status === 'already_imported' || (item.is_duplicate && !item.is_possible_duplicate);
+                      const isPossible = item.duplicate_status === 'possible_duplicate' || item.is_possible_duplicate;
+
+                      return (
+                        <div
+                          key={`feat-${item.id}-${idx}`}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '8px 10px',
+                            background: '#fff',
+                            border: `1px solid ${isPossible ? '#fde68a' : isAlready ? '#e2e8f0' : '#e2e8f0'}`,
+                            borderRadius: '6px',
+                            marginBottom: '4px',
+                            opacity: isAlready ? 0.6 : 1,
+                          }}
+                        >
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: isAlready ? 'default' : 'pointer', flex: 1 }}>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              disabled={isAlready}
+                              onChange={(e) => {
+                                setSelectedFeatureMap((prev) => ({
+                                  ...prev,
+                                  [item.id]: e.target.checked,
+                                }));
+                              }}
+                            />
+                            <div>
+                              <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#0f172a' }}>
+                                {item.name}
+                              </div>
+                              <div style={{ fontSize: '10.5px', color: '#64748b' }}>
+                                Category: {item.category} · {item.infrastructure_type || item.node_type || 'asset'}
+                                {item.length_meters && ` · ${item.length_meters}m`}
+                                {item.surface_type && ` · ${item.surface_type}`}
+                              </div>
+                              {isPossible && (
+                                <div style={{ fontSize: '10.5px', color: '#b45309', marginTop: '2px', fontWeight: 600 }}>
+                                  ⚠️ Matches: "{item.existing_name || 'Existing Record'}" ({item.match_reason || 'spatial proximity'}{item.distance_meters ? ` · ~${Math.round(item.distance_meters)}m away` : ''})
+                                </div>
+                              )}
+                              {isAlready && (
+                                <div style={{ fontSize: '10.5px', color: '#64748b', marginTop: '2px' }}>
+                                  Already in MySQL (OSM {item.osm_type || 'way'}/{item.osm_id || item.id})
+                                </div>
+                              )}
+                            </div>
+                          </label>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                fontWeight: '700',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                background: isAlready ? '#f1f5f9' : isPossible ? '#fef3c7' : '#ecfdf5',
+                                color: isAlready ? '#475569' : isPossible ? '#92400e' : '#047857',
+                              }}
+                            >
+                              {isAlready ? '⏭️ In Database' : isPossible ? '🔍 Review Candidate' : '✨ New'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
             ) : null}
 
             {/* Modal Actions */}

@@ -1169,6 +1169,62 @@ class VillageController extends Controller
     }
 
     /**
+     * Confirm and update village geographic center coordinates and search radius.
+     */
+    public function updateCoordinates(Request $request, Village $village)
+    {
+        $validated = $request->validate([
+            'center_lat' => 'sometimes|required|numeric|between:26.0,31.0',
+            'center_lng' => 'sometimes|required|numeric|between:80.0,89.0',
+            'latitude' => 'nullable|numeric|between:26.0,31.0',
+            'longitude' => 'nullable|numeric|between:80.0,89.0',
+            'search_radius_meters' => 'nullable|integer|between:500,10000',
+            'radius' => 'nullable|integer|between:500,10000',
+            'confirmed' => 'nullable|boolean',
+        ]);
+
+        $lat = (float) ($validated['center_lat'] ?? $validated['latitude'] ?? $village->center_lat);
+        $lng = (float) ($validated['center_lng'] ?? $validated['longitude'] ?? $village->center_lng);
+        $radius = (int) ($validated['search_radius_meters'] ?? $validated['radius'] ?? $village->search_radius_meters ?? 2000);
+
+        $attrs = [
+            'center_lat' => $lat,
+            'center_lng' => $lng,
+            'is_coordinates_confirmed' => true,
+            'coordinates_confirmed_at' => now(),
+            'search_radius_meters' => $radius,
+        ];
+
+        if (Schema::hasColumn('villages', 'latitude')) {
+            $attrs['latitude'] = $lat;
+            $attrs['longitude'] = $lng;
+        }
+
+        $village->update($attrs);
+
+        // Record in audit log
+        AuditLog::create([
+            'village_id' => $village->id,
+            'action_type' => 'coordinates_confirmed',
+            'entity_type' => 'village',
+            'entity_id' => $village->id,
+            'performed_by' => 'Municipal Officer',
+            'summary' => "Confirmed village coordinates to {$lat}°N, {$lng}°E with {$radius}m radius.",
+            'details' => [
+                'latitude' => $lat,
+                'longitude' => $lng,
+                'radius' => $radius,
+            ],
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Location coordinates confirmed for {$village->name} ({$lat}°N, {$lng}°E).",
+            'village' => $village->fresh(),
+        ]);
+    }
+
+    /**
      * Audit villages for duplicate registration groups (Read-Only).
      */
     public function duplicateAudit()

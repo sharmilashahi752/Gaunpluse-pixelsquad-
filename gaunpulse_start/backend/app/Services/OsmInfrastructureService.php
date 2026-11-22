@@ -49,9 +49,19 @@ class OsmInfrastructureService
     public static function discover(Village $village, int $radiusMeters = 2000, ?array $customBounds = null, bool $force = false): array
     {
         @ini_set('memory_limit', '512M');
-        // 1. Precise location selection (Task 2): Use actual village coordinates
-        $lat = (float) ($village->center_lat ?? $village->latitude ?? 27.8635);
-        $lng = (float) ($village->center_lng ?? $village->longitude ?? 85.5815);
+        // 1. Precise location selection: Resolve village coordinates & detect if confirmation is required
+        $suggestedCoords = \App\Services\NepalLocationService::resolveCoordinates($village->name, $village->district, $village->municipality);
+        $needsLocationConfirmation = $village->needs_location_confirmation;
+
+        // If coordinates were left at the hardcoded Pokhara fallback (28.0, 84.0) or null, and we know the real coordinates
+        $isGenericFallback = ($village->center_lat !== null && abs((float)$village->center_lat - 28.0) < 0.0001 && abs((float)$village->center_lng - 84.0) < 0.0001);
+        if (($isGenericFallback || empty($village->center_lat)) && $suggestedCoords) {
+            $lat = (float) $suggestedCoords['lat'];
+            $lng = (float) $suggestedCoords['lng'];
+        } else {
+            $lat = (float) ($village->center_lat ?? $village->latitude ?? ($suggestedCoords['lat'] ?? 28.9242));
+            $lng = (float) ($village->center_lng ?? $village->longitude ?? ($suggestedCoords['lng'] ?? 81.7125));
+        }
 
         $bounds = $customBounds ?? self::computeBoundingBox($lat, $lng, $radiusMeters);
         $south = $bounds['south'];
@@ -78,7 +88,7 @@ class OsmInfrastructureService
             }
         }
 
-        // 3. Parse and categorize features
+        // 3. Parse and categorize features with precision deduplication
         $parsed = self::parseOsmElements($rawOsm, $village);
 
         // Determine clear provider status (Task 5)
@@ -93,9 +103,13 @@ class OsmInfrastructureService
             $providerStatus = 'ready';
         }
 
-        // 4. Build preview summary and safe diagnostics (Task 1)
+        // 4. Build preview summary and safe diagnostics
         $summary = [
             'total_features' => $totalFeatures,
+            'new_features_count' => $parsed['new_features_count'],
+            'possible_duplicates_count' => $parsed['possible_duplicates_count'],
+            'already_imported_count' => $parsed['already_imported_count'],
+            'duplicates_count' => $parsed['already_imported_count'] + $parsed['possible_duplicates_count'],
             'roads_count' => count($parsed['categories']['roads']),
             'bridges_count' => count($parsed['categories']['bridges']),
             'schools_count' => count($parsed['categories']['schools']),
@@ -103,13 +117,18 @@ class OsmInfrastructureService
             'water_count' => count($parsed['categories']['water']),
             'settlements_count' => count($parsed['categories']['settlements']),
             'public_facilities_count' => count($parsed['categories']['public_facilities']),
-            'duplicates_count' => $parsed['duplicates_count'],
             'bounds' => $bounds,
             'source' => $rawOsm['source'] ?? 'OpenStreetMap',
             'attribution' => '© OpenStreetMap contributors (ODbL 1.0)',
             'is_cached' => $isCached,
             'provider_status' => $providerStatus,
             'error' => $rawOsm['error'] ?? null,
+            'needs_location_confirmation' => $needsLocationConfirmation,
+            'scan_center' => [
+                'latitude' => $lat,
+                'longitude' => $lng,
+            ],
+            'suggested_coordinates' => $suggestedCoords,
         ];
 
         $diagnostics = [
@@ -132,7 +151,10 @@ class OsmInfrastructureService
                 'water' => count($parsed['categories']['water']),
                 'settlements' => count($parsed['categories']['settlements']),
             ],
-            'duplicates_flagged' => $parsed['duplicates_count'],
+            'new_features_count' => $parsed['new_features_count'],
+            'possible_duplicates_count' => $parsed['possible_duplicates_count'],
+            'already_imported_count' => $parsed['already_imported_count'],
+            'needs_location_confirmation' => $needsLocationConfirmation,
         ];
 
         Log::info('GaunPulse OSM Discovery Diagnostics', $diagnostics);
@@ -140,6 +162,12 @@ class OsmInfrastructureService
         return [
             'village_id' => $village->id,
             'village_name' => $village->name,
+            'needs_location_confirmation' => $needsLocationConfirmation,
+            'scan_center' => [
+                'latitude' => $lat,
+                'longitude' => $lng,
+            ],
+            'suggested_coordinates' => $suggestedCoords,
             'provider_status' => $providerStatus,
             'error' => $rawOsm['error'] ?? null,
             'summary' => $summary,
@@ -360,7 +388,7 @@ OVERPASS;
         // 1. Index all raw node coordinates
         $nodeCoords = [];
         $nodeTags = [];
-        foreach ($elements as $el) {
+        foreach ($elements as &$el) {
             if ($el['type'] === 'node' && isset($el['lat'], $el['lon'])) {
                 $nodeCoords[$el['id']] = [
                     'lat' => (float) $el['lat'],
@@ -369,22 +397,28 @@ OVERPASS;
                 if (!empty($el['tags'])) {
                     $nodeTags[$el['id']] = $el['tags'];
                 }
-            } elseif ($el['type'] === 'way' && !empty($el['geometry']) && !empty($el['nodes'])) {
-                // Also index endpoints from way geometry if available
-                $len = count($el['nodes']);
+            } elseif ($el['type'] === 'way' && !empty($el['geometry'])) {
+                if (empty($el['nodes']) && is_array($el['geometry'])) {
+                    $el['nodes'] = [];
+                    foreach ($el['geometry'] as $idx => $geo) {
+                        $el['nodes'][] = ($el['id'] * 1000) + $idx;
+                    }
+                }
+                $len = count($el['nodes'] ?? []);
                 if ($len >= 2 && count($el['geometry']) === $len) {
                     for ($gi = 0; $gi < $len; $gi++) {
                         $ptId = $el['nodes'][$gi];
                         if (!isset($nodeCoords[$ptId])) {
                             $nodeCoords[$ptId] = [
                                 'lat' => (float) $el['geometry'][$gi]['lat'],
-                                'lon' => (float) $el['geometry'][$gi]['lon'],
+                                'lon' => (float) ($el['geometry'][$gi]['lon'] ?? ($el['geometry'][$gi]['lng'] ?? 0)),
                             ];
                         }
                     }
                 }
             }
         }
+        unset($el);
 
         // 2. Fetch existing nodes and edges in MySQL for duplicate detection
         $existingNodes = Node::where('village_id', $village->id)->get();
@@ -402,7 +436,9 @@ OVERPASS;
 
         $allFeatures = [];
         $duplicateWarnings = [];
-        $duplicatesCount = 0;
+        $newFeaturesCount = 0;
+        $possibleDuplicatesCount = 0;
+        $alreadyImportedCount = 0;
 
         // 3. Process Point Amenities & Places (Nodes)
         foreach ($nodeTags as $nodeId => $tags) {
@@ -412,37 +448,64 @@ OVERPASS;
             $feature = self::classifyPointFeature($nodeId, $coords, $tags);
             if (!$feature) continue;
 
-            // Check duplicate against MySQL
-            $isDuplicate = false;
+            // Categorize duplicate status: exact duplicate vs possible duplicate vs new
+            $duplicateStatus = 'new';
             $existingMatch = null;
+            $matchReason = null;
+            $distToMatch = null;
+
+            // 1. Exact match (Already Imported): matching OSM element ID or exact code
             foreach ($existingNodes as $ex) {
-                if ($ex->node_code === "osm_{$nodeId}" || $ex->osm_id === (string) $nodeId) {
-                    $isDuplicate = true;
+                if (($ex->osm_id && (string) $ex->osm_id === (string) $nodeId) ||
+                    $ex->node_code === "osm_{$nodeId}" ||
+                    $ex->node_code === "osm_node_{$nodeId}") {
+                    $duplicateStatus = 'already_imported';
                     $existingMatch = $ex;
-                    break;
-                }
-                $dist = self::haversineDistance($coords['lat'], $coords['lon'], (float) $ex->latitude, (float) $ex->longitude);
-                if ($dist < 25.0) { // within 25 meters
-                    $isDuplicate = true;
-                    $existingMatch = $ex;
+                    $matchReason = "Already imported in village (matches OSM Node #{$nodeId})";
                     break;
                 }
             }
 
-            $feature['is_duplicate'] = $isDuplicate;
-            $feature['existing_id'] = $existingMatch?->id;
-            $feature['selected'] = !$isDuplicate;
+            // 2. Possible duplicate (spatial proximity within 25m, distinct or missing OSM ID)
+            if ($duplicateStatus === 'new') {
+                foreach ($existingNodes as $ex) {
+                    $dist = self::haversineDistance($coords['lat'], $coords['lon'], (float) $ex->latitude, (float) $ex->longitude);
+                    if ($dist < 25.0) {
+                        $duplicateStatus = 'possible_duplicate';
+                        $existingMatch = $ex;
+                        $distToMatch = round($dist, 1);
+                        $matchReason = "Nearby existing '{$ex->name}' ({$distToMatch}m away)";
+                        break;
+                    }
+                }
+            }
 
-            if ($isDuplicate) {
-                $duplicatesCount++;
+            if ($duplicateStatus === 'already_imported') {
+                $alreadyImportedCount++;
+            } elseif ($duplicateStatus === 'possible_duplicate') {
+                $possibleDuplicatesCount++;
                 $duplicateWarnings[] = [
                     'type' => 'node',
                     'name' => $feature['name'],
                     'osm_id' => $nodeId,
                     'existing_name' => $existingMatch->name,
-                    'reason' => 'Existing record with matching spatial coordinates or OSM ID found in village.',
+                    'reason' => $matchReason,
+                    'distance_meters' => $distToMatch,
                 ];
+            } else {
+                $newFeaturesCount++;
             }
+
+            $feature['duplicate_status'] = $duplicateStatus;
+            $feature['is_duplicate'] = ($duplicateStatus === 'already_imported');
+            $feature['is_possible_duplicate'] = ($duplicateStatus === 'possible_duplicate');
+            $feature['is_new'] = ($duplicateStatus === 'new');
+            $feature['match_reason'] = $matchReason;
+            $feature['existing_id'] = $existingMatch?->id;
+            $feature['existing_name'] = $existingMatch?->name;
+            $feature['distance_meters'] = $distToMatch;
+            // Only genuinely new features are selected by default.
+            $feature['selected'] = ($duplicateStatus === 'new');
 
             $catKey = $feature['category'];
             if (isset($categories[$catKey])) {
@@ -464,8 +527,12 @@ OVERPASS;
                     if ($centerCoords) {
                         $feature = self::classifyPointFeature($el['id'], $centerCoords, $tags, 'way');
                         if ($feature) {
+                            $feature['duplicate_status'] = 'new';
                             $feature['is_duplicate'] = false;
+                            $feature['is_possible_duplicate'] = false;
+                            $feature['is_new'] = true;
                             $feature['selected'] = true;
+                            $newFeaturesCount++;
                             $catKey = $feature['category'];
                             if (isset($categories[$catKey])) {
                                 $categories[$catKey][] = $feature;
@@ -481,15 +548,20 @@ OVERPASS;
         $networkTopology = self::buildRoadTopology($roadWays, $nodeCoords, $existingEdges);
 
         foreach ($networkTopology['edges'] as $edgeFeature) {
-            $isDuplicate = $edgeFeature['is_duplicate'];
-            if ($isDuplicate) {
-                $duplicatesCount++;
+            $dupStatus = $edgeFeature['duplicate_status'] ?? 'new';
+            if ($dupStatus === 'already_imported') {
+                $alreadyImportedCount++;
+            } elseif ($dupStatus === 'possible_duplicate') {
+                $possibleDuplicatesCount++;
                 $duplicateWarnings[] = [
                     'type' => 'edge',
                     'name' => $edgeFeature['name'],
                     'osm_id' => $edgeFeature['osm_id'],
-                    'reason' => 'Existing lifeline edge connects same nodes.',
+                    'reason' => $edgeFeature['match_reason'] ?? 'Nearby existing lifeline with overlapping endpoints',
+                    'existing_name' => $edgeFeature['existing_name'] ?? null,
                 ];
+            } else {
+                $newFeaturesCount++;
             }
 
             if ($edgeFeature['infrastructure_type'] === 'bridge') {
@@ -504,7 +576,10 @@ OVERPASS;
             'categories' => $categories,
             'all_features' => $allFeatures,
             'duplicate_warnings' => $duplicateWarnings,
-            'duplicates_count' => $duplicatesCount,
+            'new_features_count' => $newFeaturesCount,
+            'possible_duplicates_count' => $possibleDuplicatesCount,
+            'already_imported_count' => $alreadyImportedCount,
+            'duplicates_count' => $alreadyImportedCount + $possibleDuplicatesCount,
             'network_topology' => [
                 'junction_nodes_count' => count($networkTopology['junction_nodes']),
                 'road_segments_count' => count($networkTopology['edges']),
@@ -672,6 +747,8 @@ OVERPASS;
                         ];
 
                         $edgeId = "osm_way_{$wayId}_{$segmentStart}_{$i}";
+                        $dupInfo = self::classifyEdgeDuplicate($srcCoord, $tgtCoord, $wayId, $edgeId, $existingEdges);
+
                         $edges[] = [
                             'id' => $edgeId,
                             'osm_id' => $wayId,
@@ -692,8 +769,14 @@ OVERPASS;
                             'geometry' => $geometry,
                             'verification_status' => 'imported',
                             'confidence_score' => 75,
-                            'is_duplicate' => self::isDuplicateEdge($srcCoord, $tgtCoord, $existingEdges),
-                            'selected' => !self::isDuplicateEdge($srcCoord, $tgtCoord, $existingEdges),
+                            'duplicate_status' => $dupInfo['status'],
+                            'is_duplicate' => $dupInfo['is_duplicate'],
+                            'is_possible_duplicate' => $dupInfo['is_possible_duplicate'],
+                            'is_new' => $dupInfo['is_new'],
+                            'selected' => $dupInfo['selected'],
+                            'match_reason' => $dupInfo['match_reason'],
+                            'existing_id' => $dupInfo['existing_id'],
+                            'existing_name' => $dupInfo['existing_name'],
                         ];
                     }
                     $segmentStart = $i;
@@ -733,27 +816,95 @@ OVERPASS;
     }
 
     /**
-     * Duplicate check for edges based on spatial endpoint proximity.
+     * Check duplicate status for edges: exact match vs possible duplicate vs new.
      */
-    protected static function isDuplicateEdge(?array $srcCoord, ?array $tgtCoord, $existingEdges): bool
+    protected static function classifyEdgeDuplicate(?array $srcCoord, ?array $tgtCoord, int|string $wayId, string $edgeId, $existingEdges): array
     {
-        if (!$srcCoord || !$tgtCoord) return false;
+        if (!$srcCoord || !$tgtCoord) {
+            return [
+                'status' => 'new',
+                'is_duplicate' => false,
+                'is_possible_duplicate' => false,
+                'is_new' => true,
+                'selected' => true,
+                'match_reason' => null,
+                'existing_id' => null,
+                'existing_name' => null,
+            ];
+        }
 
+        // 1. Exact match (Already Imported): same OSM way ID or edge code in this village
+        foreach ($existingEdges as $edge) {
+            if (($edge->osm_id && (string) $edge->osm_id === (string) $wayId) || $edge->edge_code === $edgeId) {
+                return [
+                    'status' => 'already_imported',
+                    'is_duplicate' => true,
+                    'is_possible_duplicate' => false,
+                    'is_new' => false,
+                    'selected' => false,
+                    'match_reason' => "Already imported in village (matches OSM Way #{$wayId})",
+                    'existing_id' => $edge->id,
+                    'existing_name' => $edge->name,
+                ];
+            }
+        }
+
+        // 2. Possible duplicate: both endpoints within 25m of existing edge endpoints
         foreach ($existingEdges as $edge) {
             $s = $edge->source;
             $t = $edge->target;
             if ($s && $t) {
                 $d1 = self::haversineDistance($srcCoord['lat'], $srcCoord['lon'], (float) $s->latitude, (float) $s->longitude);
                 $d2 = self::haversineDistance($tgtCoord['lat'], $tgtCoord['lon'], (float) $t->latitude, (float) $t->longitude);
-                if ($d1 < 30.0 && $d2 < 30.0) return true;
+                if ($d1 < 25.0 && $d2 < 25.0) {
+                    return [
+                        'status' => 'possible_duplicate',
+                        'is_duplicate' => false,
+                        'is_possible_duplicate' => true,
+                        'is_new' => false,
+                        'selected' => false,
+                        'match_reason' => "Overlaps endpoints with existing '{$edge->name}'",
+                        'existing_id' => $edge->id,
+                        'existing_name' => $edge->name,
+                    ];
+                }
 
                 $d1Rev = self::haversineDistance($srcCoord['lat'], $srcCoord['lon'], (float) $t->latitude, (float) $t->longitude);
                 $d2Rev = self::haversineDistance($tgtCoord['lat'], $tgtCoord['lon'], (float) $s->latitude, (float) $s->longitude);
-                if ($d1Rev < 30.0 && $d2Rev < 30.0) return true;
+                if ($d1Rev < 25.0 && $d2Rev < 25.0) {
+                    return [
+                        'status' => 'possible_duplicate',
+                        'is_duplicate' => false,
+                        'is_possible_duplicate' => true,
+                        'is_new' => false,
+                        'selected' => false,
+                        'match_reason' => "Overlaps endpoints with existing '{$edge->name}' (reverse direction)",
+                        'existing_id' => $edge->id,
+                        'existing_name' => $edge->name,
+                    ];
+                }
             }
         }
 
-        return false;
+        return [
+            'status' => 'new',
+            'is_duplicate' => false,
+            'is_possible_duplicate' => false,
+            'is_new' => true,
+            'selected' => true,
+            'match_reason' => null,
+            'existing_id' => null,
+            'existing_name' => null,
+        ];
+    }
+
+    /**
+     * Duplicate check for edges based on spatial endpoint proximity.
+     */
+    protected static function isDuplicateEdge(?array $srcCoord, ?array $tgtCoord, $existingEdges): bool
+    {
+        $res = self::classifyEdgeDuplicate($srcCoord, $tgtCoord, 0, '', $existingEdges);
+        return $res['is_duplicate'] || $res['is_possible_duplicate'];
     }
 
     /**
@@ -770,8 +921,29 @@ OVERPASS;
         $skippedDuplicates = 0;
         $skippedVerified = 0;
 
-        $nodeFeatures = array_filter($approvedFeatures, fn($f) => ($f['osm_type'] ?? '') === 'node' || !isset($f['source_osm_id']));
-        $edgeFeatures = array_filter($approvedFeatures, fn($f) => isset($f['source_osm_id']));
+        // Filter out any exact duplicate ('already_imported') to guarantee idempotency
+        $approvedFeatures = array_filter($approvedFeatures, function ($f) {
+            return ($f['duplicate_status'] ?? '') !== 'already_imported' && !($f['is_duplicate'] ?? false);
+        });
+
+        $nodeFeatures = array_filter($approvedFeatures, fn($f) => ($f['osm_type'] ?? '') === 'node' || in_array($f['category'] ?? '', ['schools', 'health', 'water', 'settlements', 'facilities']));
+        $edgeFeatures = array_filter($approvedFeatures, fn($f) => ($f['osm_type'] ?? '') === 'way' || in_array($f['category'] ?? '', ['roads', 'bridges', 'trails', 'lifelines']) || isset($f['source_osm_id']));
+
+        // Synthesize endpoint node identifiers for edge features with coordinate arrays if missing
+        foreach ($edgeFeatures as &$ef) {
+            if (empty($ef['source_osm_id']) && !empty($ef['coordinates']) && is_array($ef['coordinates'])) {
+                $firstCoord = $ef['coordinates'][0] ?? null;
+                $lastCoord = end($ef['coordinates']) ?: null;
+                if ($firstCoord && $lastCoord) {
+                    $osmBase = $ef['osm_id'] ?? rand(1000, 9999);
+                    $ef['source_osm_id'] = "j_{$osmBase}_src";
+                    $ef['target_osm_id'] = "j_{$osmBase}_tgt";
+                    $ef['source_coords'] = ['lat' => $firstCoord['lat'] ?? 0, 'lon' => $firstCoord['lng'] ?? ($firstCoord['lon'] ?? 0)];
+                    $ef['target_coords'] = ['lat' => $lastCoord['lat'] ?? 0, 'lon' => $lastCoord['lng'] ?? ($lastCoord['lon'] ?? 0)];
+                }
+            }
+        }
+        unset($ef);
 
         DB::beginTransaction();
         try {
@@ -808,9 +980,9 @@ OVERPASS;
 
                 $nodeAttrs = [
                     'village_id' => $village->id,
-                    'name' => $pf['name'],
-                    'latitude' => (float) $pf['latitude'],
-                    'longitude' => (float) $pf['longitude'],
+                    'name' => $pf['name'] ?? 'Discovered Facility',
+                    'latitude' => (float) ($pf['latitude'] ?? ($pf['lat'] ?? ($pf['coordinates'][0]['lat'] ?? $village->center_lat))),
+                    'longitude' => (float) ($pf['longitude'] ?? ($pf['lon'] ?? ($pf['lng'] ?? ($pf['coordinates'][0]['lng'] ?? $village->center_lng)))),
                     'node_code' => $nodeCode,
                     'source' => 'osm',
                     'verification_status' => 'imported',
@@ -881,8 +1053,8 @@ OVERPASS;
                                 $jNodeAttrs = [
                                     'village_id' => $village->id,
                                     'name' => "Road Junction #{$jOsmId}",
-                                    'latitude' => (float) $coord['lat'],
-                                    'longitude' => (float) $coord['lon'],
+                                    'latitude' => (float) ($coord['lat'] ?? 0),
+                                    'longitude' => (float) ($coord['lon'] ?? ($coord['lng'] ?? 0)),
                                     'node_code' => $jCode,
                                     'source' => 'osm',
                                     'verification_status' => 'imported',
@@ -1002,6 +1174,9 @@ OVERPASS;
                 'imported_nodes' => $createdNodes,
                 'imported_edges' => $createdEdges,
                 'imported_facilities' => $createdFacilities,
+                'nodes_created' => $createdNodes,
+                'edges_created' => $createdEdges,
+                'facilities_created' => $createdFacilities,
                 'skipped_duplicates' => $skippedDuplicates,
                 'skipped_verified' => $skippedVerified,
                 'village_statistics' => $stats,
