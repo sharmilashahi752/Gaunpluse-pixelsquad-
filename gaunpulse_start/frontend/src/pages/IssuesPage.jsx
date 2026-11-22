@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
   AlertTriangle,
@@ -8,12 +8,14 @@ import {
   ExternalLink,
   Eye,
   Filter,
+  Image as ImageIcon,
   Layers,
   Loader2,
   MapPin,
   Plus,
   RefreshCw,
   Search,
+  ShieldAlert,
   ShieldCheck,
   X,
 } from 'lucide-react';
@@ -21,6 +23,8 @@ import { Card, CardHeader, EmptyState, FeatureNotice, LiveLabel, PageIntro, Stat
 import { deduplicateVillages, formatVillageLabel } from '../utils/villageUtils';
 import { useVillageSelection } from '../context/VillageSelectionContext';
 import { cachedFetchJson, invalidateApiCache } from '../utils/apiCache';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 
 const CATEGORIES = [
   { value: 'damaged_bridge', label: 'Damaged Bridge' },
@@ -59,10 +63,11 @@ const statusTones = {
 };
 
 export default function IssuesPage({ onNavigate }) {
-  const { villages: contextVillages } = useVillageSelection();
+  const { selectedVillageId, villages: contextVillages } = useVillageSelection();
   const [issues, setIssues] = useState([]);
   const [villages, setVillages] = useState(contextVillages || []);
   const [villageEdges, setVillageEdges] = useState([]);
+  const [loadingEdges, setLoadingEdges] = useState(false);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
@@ -82,6 +87,7 @@ export default function IssuesPage({ onNavigate }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(null);
   const [submitError, setSubmitError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Status update state
   const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -101,13 +107,15 @@ export default function IssuesPage({ onNavigate }) {
     longitude: 85.5815,
   });
   const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const fileInputRef = useRef(null);
 
   // Load issues and villages
   const loadData = async (force = false) => {
     if (issues.length === 0) setLoading(true);
     try {
       const [dataIssues, dataVillages] = await Promise.all([
-        cachedFetchJson('http://127.0.0.1:8000/api/issues', {}, {
+        cachedFetchJson(`${API_BASE_URL}/api/issues`, {}, {
           force,
           ttlMs: 45000,
           onBackgroundUpdate: (fresh) => {
@@ -116,7 +124,7 @@ export default function IssuesPage({ onNavigate }) {
         }),
         contextVillages && contextVillages.length > 0
           ? Promise.resolve(contextVillages)
-          : cachedFetchJson('http://127.0.0.1:8000/api/villages', {}, { ttlMs: 120000 }),
+          : cachedFetchJson(`${API_BASE_URL}/api/villages`, {}, { ttlMs: 120000 }),
       ]);
 
       const issueList = dataIssues.data || dataIssues || [];
@@ -125,12 +133,18 @@ export default function IssuesPage({ onNavigate }) {
       setIssues(issueList);
       setVillages(villageList);
 
+      // Default to globally selected village if available, or first village
       if (villageList.length > 0 && !formData.village_id) {
+        const preferredId = selectedVillageId && villageList.some((v) => Number(v.id) === Number(selectedVillageId))
+          ? Number(selectedVillageId)
+          : villageList[0].id;
+
+        const matched = villageList.find((v) => Number(v.id) === Number(preferredId)) || villageList[0];
         setFormData((prev) => ({
           ...prev,
-          village_id: villageList[0].id,
-          latitude: villageList[0].center_lat || 27.8635,
-          longitude: villageList[0].center_lng || 85.5815,
+          village_id: String(matched.id),
+          latitude: matched.center_lat ? parseFloat(matched.center_lat) : 27.8635,
+          longitude: matched.center_lng ? parseFloat(matched.center_lng) : 85.5815,
         }));
       }
     } catch (err) {
@@ -144,64 +158,224 @@ export default function IssuesPage({ onNavigate }) {
     loadData();
   }, []);
 
-  // When village changes in modal, load its edges
+  // When village changes in modal, load its edges & reset invalid edge
   useEffect(() => {
-    if (!formData.village_id) return;
-    fetch(`http://127.0.0.1:8000/api/villages/${formData.village_id}/network`)
-      .then((res) => res.json())
-      .then((data) => {
-        setVillageEdges(data.edges || []);
+    if (!formData.village_id) {
+      setVillageEdges([]);
+      return;
+    }
+    setLoadingEdges(true);
+    fetch(`${API_BASE_URL}/api/villages/${formData.village_id}/network`)
+      .then((res) => {
+        if (!res.ok) throw new Error('Could not load network edges');
+        return res.json();
       })
-      .catch(() => setVillageEdges([]));
+      .then((data) => {
+        const edges = data.edges || [];
+        setVillageEdges(edges);
+        // If current edge_id does not belong to newly loaded edges, reset it
+        setFormData((prev) => {
+          if (prev.edge_id && !edges.some((e) => String(e.id) === String(prev.edge_id))) {
+            return { ...prev, edge_id: '' };
+          }
+          return prev;
+        });
+      })
+      .catch((err) => {
+        console.warn('Could not load village edges:', err);
+        setVillageEdges([]);
+      })
+      .finally(() => {
+        setLoadingEdges(false);
+      });
   }, [formData.village_id]);
 
-  // Handle Form Submit
+  // Photo selection with preview and size validation
+  const handlePhotoChange = (e) => {
+    const file = e.target.files?.[0] || null;
+    if (!file) {
+      setPhotoFile(null);
+      setPhotoPreview(null);
+      return;
+    }
+
+    // Client-side file size check (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setFieldErrors((prev) => ({ ...prev, photo: 'Photo size exceeds the 5MB limit. Please choose a smaller image.' }));
+      setPhotoFile(null);
+      setPhotoPreview(null);
+      return;
+    }
+
+    // Check allowed image MIME types
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      setFieldErrors((prev) => ({ ...prev, photo: 'Invalid image format. Allowed formats: JPEG, PNG, WebP.' }));
+      setPhotoFile(null);
+      setPhotoPreview(null);
+      return;
+    }
+
+    setFieldErrors((prev) => {
+      const copy = { ...prev };
+      delete copy.photo;
+      return copy;
+    });
+    setPhotoFile(file);
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPhotoPreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemovePhoto = () => {
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Handle Form Submit with Robust Error Classification & Form Data Preservation
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return; // Prevent duplicate submissions
+
     setIsSubmitting(true);
     setSubmitError(null);
     setSubmitSuccess(null);
+    setFieldErrors({});
+
+    // Client-side validations
+    const errors = {};
+    if (!formData.village_id) {
+      errors.village_id = 'Please select a village.';
+    }
+    if (!formData.title || formData.title.trim().length < 5) {
+      errors.title = 'Title must be at least 5 characters long.';
+    }
+    if (!formData.description || formData.description.trim().length < 15) {
+      errors.description = 'Description must be at least 15 characters long.';
+    }
+    if (isNaN(formData.latitude) || formData.latitude < -90 || formData.latitude > 90) {
+      errors.latitude = 'Latitude must be between -90 and 90.';
+    }
+    if (isNaN(formData.longitude) || formData.longitude < -180 || formData.longitude > 180) {
+      errors.longitude = 'Longitude must be between -180 and 180.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setSubmitError('Please check the highlighted fields.');
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       const postData = new FormData();
       postData.append('village_id', formData.village_id);
       if (formData.edge_id) postData.append('edge_id', formData.edge_id);
-      postData.append('title', formData.title);
+      postData.append('title', formData.title.trim());
       postData.append('category', formData.category);
       postData.append('severity', formData.severity);
-      postData.append('description', formData.description);
+      postData.append('description', formData.description.trim());
       postData.append('latitude', formData.latitude);
       postData.append('longitude', formData.longitude);
       if (photoFile) postData.append('photo', photoFile);
 
-      const res = await fetch('http://127.0.0.1:8000/api/issues', {
-        method: 'POST',
-        headers: { Accept: 'application/json' },
-        body: postData,
-      });
-
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.message || 'Validation error saving issue.');
+      let res;
+      try {
+        res = await fetch(`${API_BASE_URL}/api/issues`, {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+          },
+          body: postData,
+        });
+      } catch (fetchErr) {
+        // Network connection error / server offline
+        console.error('Network fetch error contacting Laravel:', fetchErr);
+        throw new Error('NETWORK_UNAVAILABLE');
       }
 
-      setSubmitSuccess(`Report successfully filed and persisted to MySQL database! Tracking code: ${json.data?.tracking_code || 'GP-REC'}`);
-      // Reset form
-      setFormData((prev) => ({
-        ...prev,
-        title: '',
-        description: '',
-        edge_id: '',
-      }));
-      setPhotoFile(null);
-      // Invalidate cache & refresh list
+      let json = {};
+      try {
+        json = await res.json();
+      } catch (jsonErr) {
+        console.warn('Response was not valid JSON:', jsonErr);
+      }
+
+      if (!res.ok) {
+        if (res.status === 401) {
+          throw new Error('AUTH_EXPIRED');
+        } else if (res.status === 403) {
+          throw new Error('PERMISSION_DENIED');
+        } else if (res.status === 413) {
+          throw new Error('UPLOAD_TOO_LARGE');
+        } else if (res.status === 422) {
+          // Validation errors from Laravel
+          const serverErrors = {};
+          if (json.errors) {
+            Object.keys(json.errors).forEach((key) => {
+              serverErrors[key] = json.errors[key][0];
+            });
+          }
+          setFieldErrors(serverErrors);
+          throw new Error('VALIDATION_ERROR');
+        } else if (res.status >= 500) {
+          throw new Error('SERVER_ERROR');
+        } else {
+          throw new Error(json.message || `HTTP_ERROR_${res.status}`);
+        }
+      }
+
+      // Success
+      const trackingCode = json.data?.tracking_code || 'GP-REC';
+      setSubmitSuccess(`Report successfully filed and persisted to MySQL database! Tracking code: ${trackingCode}`);
+
+      // Invalidate caches & refresh list immediately
       invalidateApiCache('api/issues');
       invalidateApiCache('api/dashboard');
       invalidateApiCache('api/reports');
       loadData(true);
-      setTimeout(() => setShowCreateModal(false), 1800);
+
+      // Reset form fields only on confirmed success
+      setTimeout(() => {
+        setFormData({
+          village_id: formData.village_id,
+          edge_id: '',
+          title: '',
+          category: 'damaged_bridge',
+          severity: 'critical',
+          description: '',
+          latitude: formData.latitude,
+          longitude: formData.longitude,
+        });
+        setPhotoFile(null);
+        setPhotoPreview(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        setShowCreateModal(false);
+      }, 1600);
     } catch (err) {
-      setSubmitError(err.message);
+      console.error('Issue submission error:', err);
+      // Map error codes to friendly explanations per Step 4
+      if (err.message === 'NETWORK_UNAVAILABLE') {
+        setSubmitError('Unable to connect to the GaunPulse server. Please check your connection and try again.');
+      } else if (err.message === 'AUTH_EXPIRED') {
+        setSubmitError('Your session has expired. Please sign in again.');
+      } else if (err.message === 'PERMISSION_DENIED') {
+        setSubmitError("You don't have permission to submit a report for this village.");
+      } else if (err.message === 'UPLOAD_TOO_LARGE') {
+        setSubmitError('The photo could not be uploaded because it exceeds the 5MB size limit. Please choose a smaller photo and try again.');
+      } else if (err.message === 'VALIDATION_ERROR') {
+        setSubmitError('Please check the highlighted fields.');
+      } else if (err.message === 'SERVER_ERROR') {
+        setSubmitError('Your report could not be saved. Please try again.');
+      } else {
+        setSubmitError(err.message || 'An unexpected error occurred while saving the report.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -214,7 +388,7 @@ export default function IssuesPage({ onNavigate }) {
     setStatusMessage(null);
 
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/issues/${selectedIssue.id}/status`, {
+      const res = await fetch(`${API_BASE_URL}/api/issues/${selectedIssue.id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
@@ -258,6 +432,8 @@ export default function IssuesPage({ onNavigate }) {
     return matchesSearch && matchesCategory && matchesSeverity && matchesStatus;
   });
 
+  const dedupedVillages = deduplicateVillages(villages);
+
   return (
     <div className="page-stack">
       <PageIntro
@@ -266,7 +442,7 @@ export default function IssuesPage({ onNavigate }) {
         description="Review, verify, and resolve rural infrastructure disruptions recorded in the municipal database. Persists directly to MySQL and calculates priority weights."
         actions={
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button className="button button--secondary" type="button" onClick={loadData}>
+            <button className="button button--secondary" type="button" onClick={() => loadData(true)}>
               <RefreshCw size={15} /> Refresh
             </button>
             <button
@@ -275,6 +451,7 @@ export default function IssuesPage({ onNavigate }) {
               onClick={() => {
                 setSubmitSuccess(null);
                 setSubmitError(null);
+                setFieldErrors({});
                 setShowCreateModal(true);
               }}
             >
@@ -334,6 +511,7 @@ export default function IssuesPage({ onNavigate }) {
           >
             <option value="">All Statuses</option>
             <option value="submitted">Submitted</option>
+            <option value="under_review">Under Review</option>
             <option value="verified">Verified</option>
             <option value="in_progress">In Progress</option>
             <option value="resolved">Resolved</option>
@@ -401,7 +579,14 @@ export default function IssuesPage({ onNavigate }) {
                     }}
                   >
                     <td>
-                      <strong>{item.title}</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {item.photo_url && (
+                          <span title="Has photo attachment" style={{ color: '#176342', display: 'inline-flex' }}>
+                            <Camera size={13} />
+                          </span>
+                        )}
+                        <strong>{item.title}</strong>
+                      </div>
                       <small style={{ display: 'block', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
                         {item.tracking_code || `GP-ISSUE-${item.id}`} {item.edge ? `· Linked to ${item.edge.name}` : ''}
                       </small>
@@ -453,8 +638,8 @@ export default function IssuesPage({ onNavigate }) {
 
       {/* CREATE ISSUE MODAL */}
       {showCreateModal && (
-        <div className="modal-backdrop">
-          <div className="modal-card">
+        <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && !isSubmitting && setShowCreateModal(false)}>
+          <div className="modal-card" style={{ maxWidth: '620px' }}>
             <div className="modal-header">
               <div>
                 <span className="eyebrow">Citizen & Field Reporting</span>
@@ -463,8 +648,9 @@ export default function IssuesPage({ onNavigate }) {
               <button
                 type="button"
                 className="modal-close-btn"
-                onClick={() => setShowCreateModal(false)}
+                onClick={() => !isSubmitting && setShowCreateModal(false)}
                 aria-label="Close"
+                disabled={isSubmitting}
               >
                 <X size={18} />
               </button>
@@ -479,40 +665,57 @@ export default function IssuesPage({ onNavigate }) {
 
             {submitError && (
               <div style={{ padding: '12px 14px', background: 'var(--danger-bg)', border: '1px solid rgba(198,79,69,0.3)', borderRadius: 'var(--radius-md)', color: 'var(--danger)', fontSize: '12.5px', marginBottom: '16px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <AlertCircle size={16} />
-                {submitError}
+                <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                <span>{submitError}</span>
               </div>
             )}
 
             <form onSubmit={handleSubmit} className="form-stack">
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                {/* Village Selector */}
                 <div>
-                  <label htmlFor="create-village">Village *</label>
+                  <label htmlFor="create-village" style={{ fontWeight: 600 }}>Village *</label>
                   <select
                     id="create-village"
                     required
                     value={formData.village_id}
+                    style={{ borderColor: fieldErrors.village_id ? 'var(--danger)' : undefined }}
                     onChange={(e) => {
                       const vId = e.target.value;
                       const sel = villages.find((v) => String(v.id) === String(vId));
+                      // CRITICAL: Changing villages clears edge_id to prevent cross-village ownership bugs
                       setFormData((prev) => ({
                         ...prev,
                         village_id: vId,
-                        latitude: sel?.center_lat || prev.latitude,
-                        longitude: sel?.center_lng || prev.longitude,
+                        edge_id: '',
+                        latitude: sel?.center_lat ? parseFloat(sel.center_lat) : prev.latitude,
+                        longitude: sel?.center_lng ? parseFloat(sel.center_lng) : prev.longitude,
                       }));
+                      setFieldErrors((prev) => {
+                        const copy = { ...prev };
+                        delete copy.village_id;
+                        delete copy.edge_id;
+                        return copy;
+                      });
                     }}
                   >
-                    {deduplicateVillages(villages).map((v) => (
+                    <option value="" disabled>-- Select Village --</option>
+                    {dedupedVillages.map((v) => (
                       <option key={v.id} value={v.id}>
                         {formatVillageLabel(v)}
                       </option>
                     ))}
                   </select>
+                  {fieldErrors.village_id && (
+                    <small style={{ color: 'var(--danger)', fontSize: '11px', display: 'block', marginTop: '2px' }}>
+                      {fieldErrors.village_id}
+                    </small>
+                  )}
                 </div>
 
+                {/* Issue Category */}
                 <div>
-                  <label htmlFor="create-category">Issue Category *</label>
+                  <label htmlFor="create-category" style={{ fontWeight: 600 }}>Issue Category *</label>
                   <select
                     id="create-category"
                     required
@@ -528,12 +731,24 @@ export default function IssuesPage({ onNavigate }) {
                 </div>
               </div>
 
+              {/* Optional Infrastructure Asset */}
               <div>
-                <label htmlFor="create-edge">Linked Infrastructure Asset (Optional)</label>
+                <label htmlFor="create-edge" style={{ fontWeight: 600 }}>
+                  Linked Infrastructure Asset (Optional)
+                  {loadingEdges && <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-secondary)', marginLeft: 6 }}>loading village assets...</span>}
+                </label>
                 <select
                   id="create-edge"
                   value={formData.edge_id}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, edge_id: e.target.value }))}
+                  style={{ borderColor: fieldErrors.edge_id ? 'var(--danger)' : undefined }}
+                  onChange={(e) => {
+                    setFormData((prev) => ({ ...prev, edge_id: e.target.value }));
+                    setFieldErrors((prev) => {
+                      const copy = { ...prev };
+                      delete copy.edge_id;
+                      return copy;
+                    });
+                  }}
                 >
                   <option value="">-- No specific road or bridge linked --</option>
                   {villageEdges.map((e) => (
@@ -542,35 +757,80 @@ export default function IssuesPage({ onNavigate }) {
                     </option>
                   ))}
                 </select>
+                {fieldErrors.edge_id && (
+                  <small style={{ color: 'var(--danger)', fontSize: '11px', display: 'block', marginTop: '2px' }}>
+                    {fieldErrors.edge_id}
+                  </small>
+                )}
               </div>
 
+              {/* Title */}
               <div>
-                <label htmlFor="create-title">Issue Title *</label>
+                <label htmlFor="create-title" style={{ fontWeight: 600 }}>Issue Title *</label>
                 <input
                   id="create-title"
                   type="text"
                   required
-                  placeholder="e.g. Bridge B main support cable sheared by flood torrent"
+                  placeholder="e.g. Bridge main support cable sheared by flood torrent"
                   value={formData.title}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
+                  style={{ borderColor: fieldErrors.title ? 'var(--danger)' : undefined }}
+                  onChange={(e) => {
+                    setFormData((prev) => ({ ...prev, title: e.target.value }));
+                    if (fieldErrors.title) {
+                      setFieldErrors((prev) => {
+                        const copy = { ...prev };
+                        delete copy.title;
+                        return copy;
+                      });
+                    }
+                  }}
                 />
+                {fieldErrors.title && (
+                  <small style={{ color: 'var(--danger)', fontSize: '11px', display: 'block', marginTop: '2px' }}>
+                    {fieldErrors.title}
+                  </small>
+                )}
               </div>
 
+              {/* Description & Impact */}
               <div>
-                <label htmlFor="create-description">Description & Community Impact *</label>
+                <label htmlFor="create-description" style={{ fontWeight: 600 }}>
+                  Description & Community Impact * (min 15 characters)
+                </label>
                 <textarea
                   id="create-description"
                   required
                   rows={3}
-                  placeholder="Describe observed damage, impassable sections, and which settlements or facilities are cut off (min 15 characters)..."
+                  placeholder="Describe observed damage, impassable sections, and which settlements or facilities are cut off..."
                   value={formData.description}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+                  style={{ borderColor: fieldErrors.description ? 'var(--danger)' : undefined }}
+                  onChange={(e) => {
+                    setFormData((prev) => ({ ...prev, description: e.target.value }));
+                    if (fieldErrors.description) {
+                      setFieldErrors((prev) => {
+                        const copy = { ...prev };
+                        delete copy.description;
+                        return copy;
+                      });
+                    }
+                  }}
                 />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
+                  {fieldErrors.description ? (
+                    <small style={{ color: 'var(--danger)', fontSize: '11px' }}>
+                      {fieldErrors.description}
+                    </small>
+                  ) : <span />}
+                  <small style={{ color: formData.description.length < 15 ? 'var(--text-secondary)' : 'var(--success)', fontSize: '11px' }}>
+                    {formData.description.length} / 15 chars min
+                  </small>
+                </div>
               </div>
 
+              {/* Severity & Coordinates */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label htmlFor="create-severity">Severity *</label>
+                  <label htmlFor="create-severity" style={{ fontWeight: 600 }}>Severity *</label>
                   <select
                     id="create-severity"
                     required
@@ -586,46 +846,91 @@ export default function IssuesPage({ onNavigate }) {
                 </div>
 
                 <div>
-                  <label htmlFor="create-lat">Latitude *</label>
+                  <label htmlFor="create-lat" style={{ fontWeight: 600 }}>Latitude *</label>
                   <input
                     id="create-lat"
                     type="number"
                     step="0.0001"
                     required
                     value={formData.latitude}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, latitude: parseFloat(e.target.value) }))}
+                    style={{ borderColor: fieldErrors.latitude ? 'var(--danger)' : undefined }}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, latitude: parseFloat(e.target.value) || 0 }))}
                   />
+                  {fieldErrors.latitude && (
+                    <small style={{ color: 'var(--danger)', fontSize: '11px', display: 'block', marginTop: '2px' }}>
+                      {fieldErrors.latitude}
+                    </small>
+                  )}
                 </div>
 
                 <div>
-                  <label htmlFor="create-lng">Longitude *</label>
+                  <label htmlFor="create-lng" style={{ fontWeight: 600 }}>Longitude *</label>
                   <input
                     id="create-lng"
                     type="number"
                     step="0.0001"
                     required
                     value={formData.longitude}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, longitude: parseFloat(e.target.value) }))}
+                    style={{ borderColor: fieldErrors.longitude ? 'var(--danger)' : undefined }}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, longitude: parseFloat(e.target.value) || 0 }))}
                   />
+                  {fieldErrors.longitude && (
+                    <small style={{ color: 'var(--danger)', fontSize: '11px', display: 'block', marginTop: '2px' }}>
+                      {fieldErrors.longitude}
+                    </small>
+                  )}
                 </div>
               </div>
 
+              {/* Photo Upload with Preview */}
               <div>
-                <label htmlFor="create-photo">Attach Photo / Evidence (Optional)</label>
-                <input
-                  id="create-photo"
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={(e) => setPhotoFile(e.target.files[0] || null)}
-                  style={{ padding: '6px', fontSize: '12px' }}
-                />
+                <label htmlFor="create-photo" style={{ fontWeight: 600 }}>Attach Photo / Evidence (Optional, max 5MB)</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
+                  <input
+                    id="create-photo"
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    onChange={handlePhotoChange}
+                    style={{ flex: 1, padding: '6px', fontSize: '12px' }}
+                  />
+                  {photoFile && (
+                    <button
+                      type="button"
+                      className="button button--secondary"
+                      onClick={handleRemovePhoto}
+                      style={{ fontSize: '11px', padding: '5px 10px' }}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                {fieldErrors.photo && (
+                  <small style={{ color: 'var(--danger)', fontSize: '11px', display: 'block', marginTop: '4px' }}>
+                    {fieldErrors.photo}
+                  </small>
+                )}
+                {photoPreview && (
+                  <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <img
+                      src={photoPreview}
+                      alt="Upload preview"
+                      style={{ width: '60px', height: '60px', borderRadius: 'var(--radius-sm)', objectFit: 'cover', border: '1px solid var(--border)' }}
+                    />
+                    <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                      {photoFile?.name} ({Math.round(photoFile.size / 1024)} KB)
+                    </span>
+                  </div>
+                )}
               </div>
 
+              {/* Actions */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
                 <button
                   type="button"
                   className="button button--secondary"
                   onClick={() => setShowCreateModal(false)}
+                  disabled={isSubmitting}
                 >
                   Cancel
                 </button>
@@ -650,8 +955,8 @@ export default function IssuesPage({ onNavigate }) {
 
       {/* ISSUE DETAIL & STATUS MODAL */}
       {selectedIssue && (
-        <div className="modal-backdrop">
-          <div className="modal-card modal-card--lg">
+        <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && setSelectedIssue(null)}>
+          <div className="modal-card modal-card--lg" style={{ maxWidth: '680px' }}>
             <div className="modal-header">
               <div>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px' }}>
@@ -682,6 +987,29 @@ export default function IssuesPage({ onNavigate }) {
                   <span style={{ fontVariantNumeric: 'tabular-nums' }}><strong>Coordinates:</strong> {selectedIssue.latitude}, {selectedIssue.longitude}</span>
                   {selectedIssue.reporter_name && <span><strong>Reporter:</strong> {selectedIssue.reporter_name} ({selectedIssue.reporter_phone || 'Verified'})</span>}
                 </div>
+
+                {/* Display Photo Evidence if available */}
+                {selectedIssue.photo_url && (
+                  <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
+                    <strong style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
+                      Attached Photographic Evidence:
+                    </strong>
+                    <a href={selectedIssue.photo_url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block' }}>
+                      <img
+                        src={selectedIssue.photo_url}
+                        alt={selectedIssue.title}
+                        style={{
+                          maxHeight: '200px',
+                          maxWidth: '100%',
+                          borderRadius: 'var(--radius-md)',
+                          border: '1px solid var(--border)',
+                          objectFit: 'cover',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
+                        }}
+                      />
+                    </a>
+                  </div>
+                )}
               </div>
 
               {/* Status Update Action Box */}

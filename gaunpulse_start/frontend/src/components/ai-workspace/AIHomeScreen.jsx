@@ -29,31 +29,48 @@ import {
   Wrench,
 } from 'lucide-react';
 import { Card, StatusBadge } from '../ui';
-
-const INITIAL_MESSAGES = [
-  {
-    role: 'assistant',
-    text: 'Namaste! I am your **GaunPulse AI assistant**.\n\nI can help you prioritize urgent repairs, simulate road and bridge disruptions, generate village reports, or prepare action plans.\n\nAsk me any question in English or Nepali, or select one of the common tasks above.',
-    timestamp: 'Just now',
-  },
-];
-
-const SUGGESTION_CHIPS = [
-  'Which issue should Ward 3 inspect first?',
-  'What happens if the bridge is blocked?',
-  "Show me this month's infrastructure problems.",
-  'मेरो गाउँमा कुन समस्या सबैभन्दा जरुरी छ?',
-];
+import { useVillageSelection } from '../../context/VillageSelectionContext';
+import { deduplicateVillages, formatVillageLabel } from '../../utils/villageUtils';
+import { cachedFetchJson } from '../../utils/apiCache';
 
 export default function AIHomeScreen({ onSelectTask, onNavigate }) {
+  const { selectedVillageId, setSelectedVillageId, selectedVillage, villages: contextVillages } = useVillageSelection();
+  const [villages, setVillages] = useState(contextVillages || []);
+
+  // Sync villages from context
+  useEffect(() => {
+    if (contextVillages && contextVillages.length > 0) {
+      setVillages(contextVillages);
+    } else {
+      cachedFetchJson('http://127.0.0.1:8000/api/villages', {}, { ttlMs: 120000 })
+        .then((data) => {
+          if (Array.isArray(data)) setVillages(data);
+        })
+        .catch((err) => console.error('Failed to load villages:', err));
+    }
+  }, [contextVillages]);
+
+  const currentVillageObj = selectedVillage || villages.find((v) => Number(v.id) === Number(selectedVillageId));
+  const villageName = currentVillageObj?.name || 'Selected Village';
+  const villageWard = currentVillageObj?.ward_no ? `Ward ${currentVillageObj.ward_no}` : 'Ward 1';
+
+  const INITIAL_MESSAGES = [
+    {
+      role: 'assistant',
+      text: `Namaste! I am your **GaunPulse AI assistant** for **${villageName}**.\n\nI can help you prioritize urgent repairs, simulate road and bridge disruptions, generate village reports, or prepare action plans.\n\nAsk me any question in English or Nepali, or select one of the common tasks above.`,
+      timestamp: 'Just now',
+    },
+  ];
+
   const [messages, setMessages] = useState(() => {
     try {
-      const saved = sessionStorage.getItem('gaunpulse_ai_home_chat');
+      const saved = sessionStorage.getItem(`gaunpulse_ai_home_chat_${selectedVillageId || 1}`);
       return saved ? JSON.parse(saved) : INITIAL_MESSAGES;
     } catch {
       return INITIAL_MESSAGES;
     }
   });
+
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [importingPlan, setImportingPlan] = useState({});
@@ -61,14 +78,28 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
   const [stats, setStats] = useState(null);
   const messagesEndRef = useRef(null);
 
+  // When village changes, update messages
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(`gaunpulse_ai_home_chat_${selectedVillageId || 1}`);
+      if (saved) {
+        setMessages(JSON.parse(saved));
+      } else {
+        setMessages(INITIAL_MESSAGES);
+      }
+    } catch {
+      setMessages(INITIAL_MESSAGES);
+    }
+  }, [selectedVillageId]);
+
   // Save conversation state
   useEffect(() => {
     try {
-      sessionStorage.setItem('gaunpulse_ai_home_chat', JSON.stringify(messages));
+      sessionStorage.setItem(`gaunpulse_ai_home_chat_${selectedVillageId || 1}`, JSON.stringify(messages));
     } catch (e) {
       console.warn('Could not persist AI messages:', e);
     }
-  }, [messages]);
+  }, [messages, selectedVillageId]);
 
   // Auto-scroll chat to bottom
   useEffect(() => {
@@ -85,7 +116,7 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
 
   const clearChat = () => {
     setMessages(INITIAL_MESSAGES);
-    sessionStorage.removeItem('gaunpulse_ai_home_chat');
+    sessionStorage.removeItem(`gaunpulse_ai_home_chat_${selectedVillageId || 1}`);
   };
 
   const handleSendMessage = async (textToSend) => {
@@ -112,7 +143,7 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
         },
         body: JSON.stringify({
           message: query,
-          village_id: 1,
+          village_id: Number(selectedVillageId),
           history: messages.slice(-4).map((m) => ({ role: m.role, content: m.text })),
         }),
       });
@@ -125,7 +156,7 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
       const data = await res.json();
       const assistantMessage = {
         role: 'assistant',
-        text: data.reply || 'I analyzed the village database.',
+        text: data.reply || `I analyzed records for ${villageName}.`,
         language: data.language,
         tools_called: data.tools_called || [],
         draft_action_plan: data.draft_action_plan || null,
@@ -167,12 +198,12 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
           Accept: 'application/json',
         },
         body: JSON.stringify({
-          village_id: plan.village_id || 1,
-          issue_id: plan.issue_id || 1,
+          village_id: plan.village_id || Number(selectedVillageId),
+          issue_id: plan.issue_id || null,
           title: plan.title,
           priority: plan.priority === 'Critical' ? 'Critical' : 'High',
           responsible_team: plan.responsible_team || 'Municipal Infrastructure Unit',
-          ward: plan.ward || 'Ward 4',
+          ward: plan.ward || villageWard,
           status: 'pending',
           progress_percentage: 0,
           target_completion_date: dueDateStr,
@@ -193,6 +224,15 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
     }
   };
 
+  const suggestionChips = [
+    `Which issue should we inspect first in ${villageName}?`,
+    `What happens if a bridge in ${villageName} is blocked?`,
+    `Show me infrastructure problems in ${villageName}.`,
+    `${villageName} मा कुन समस्या सबैभन्दा जरुरी छ?`,
+  ];
+
+  const dedupedVillages = deduplicateVillages(villages);
+
   return (
     <div className="ai-home">
       {/* 1. Welcoming Assistant Hero */}
@@ -201,13 +241,37 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
           <span className="ai-home-hero__badge">
             <Sparkles size={14} /> GaunPulse AI
           </span>
-          <span className="ai-home-hero__lang">
-            <Globe size={13} /> Nepali & English
-          </span>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {/* Village Selector in Hero */}
+            <select
+              value={selectedVillageId || ''}
+              onChange={(e) => setSelectedVillageId(Number(e.target.value))}
+              style={{
+                padding: '4px 10px',
+                borderRadius: 8,
+                border: '1px solid #c8d8cc',
+                fontSize: 11.5,
+                color: '#176342',
+                fontWeight: 700,
+                background: '#ffffff',
+                cursor: 'pointer',
+              }}
+            >
+              {dedupedVillages.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {formatVillageLabel(v)}
+                </option>
+              ))}
+            </select>
+
+            <span className="ai-home-hero__lang">
+              <Globe size={13} /> Nepali & English
+            </span>
+          </div>
         </div>
         <h1 className="ai-home-hero__title">How can I help your village today?</h1>
         <p className="ai-home-hero__subtitle">
-          Ask a question or choose what you'd like to do.
+          Ask a question or choose what you'd like to do in <strong>{villageName}</strong>.
         </p>
       </div>
 
@@ -228,7 +292,7 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
             <span className="ai-task-card__eyebrow">Find Urgent Problems</span>
             <h3 className="ai-task-card__title">What should we fix first?</h3>
             <p className="ai-task-card__desc">
-              Discover which issues need attention first based on safety risk and village access.
+              Discover which issues in {villageName} need attention first based on safety risk and village access.
             </p>
           </div>
           <button className="button button--secondary ai-task-card__btn" type="button">
@@ -251,7 +315,7 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
             <span className="ai-task-card__eyebrow">Check Infrastructure</span>
             <h3 className="ai-task-card__title">Explore road & bridge impacts</h3>
             <p className="ai-task-card__desc">
-              See how damaged roads and bridges affect communities and cut off essential facilities.
+              Simulate closures on {villageName}'s network to see how damaged roads and bridges cut off access.
             </p>
           </div>
           <button className="button button--secondary ai-task-card__btn" type="button">
@@ -274,7 +338,7 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
             <span className="ai-task-card__eyebrow">Create a Report</span>
             <h3 className="ai-task-card__title">Understand village trends</h3>
             <p className="ai-task-card__desc">
-              Turn village complaint records and infrastructure evidence into clear visual charts.
+              Turn complaint records and infrastructure evidence into clear visual charts for {villageName}.
             </p>
           </div>
           <button className="button button--secondary ai-task-card__btn" type="button">
@@ -297,7 +361,7 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
             <span className="ai-task-card__eyebrow">Plan a Repair</span>
             <h3 className="ai-task-card__title">Prepare a draft action plan</h3>
             <p className="ai-task-card__desc">
-              Draft a practical action plan with task checklists ready for municipal council review.
+              Draft a practical action plan with task checklists ready for municipal council review in {villageName}.
             </p>
           </div>
           <button className="button button--secondary ai-task-card__btn" type="button">
@@ -315,7 +379,7 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
             </div>
             <div>
               <h3 className="ai-chat-card__title">GaunPulse AI Conversation</h3>
-              <p className="ai-chat-card__sub">Evidence-backed answers from your village database and graph simulations</p>
+              <p className="ai-chat-card__sub">Evidence-backed answers for {villageName} from MySQL and NetworkX simulations</p>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -357,7 +421,7 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
                     return (
                       <div style={{ marginTop: 10, background: '#ffffff', border: '1px solid #c8d8cc', borderRadius: 8, padding: 12 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, color: '#176342', fontWeight: 700, fontSize: 12 }}>
-                          <Network size={14} /> Calculated Access Impact:
+                          <Network size={14} /> Calculated Access Impact in {villageName}:
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
                           <div style={{ background: '#fef2f2', padding: 8, borderRadius: 6 }}>
@@ -366,7 +430,7 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
                           </div>
                           <div style={{ background: '#f8faf8', padding: 8, borderRadius: 6 }}>
                             <span style={{ fontSize: 10, color: '#556e62', display: 'block', fontWeight: 600 }}>AFFECTED SETTLEMENT</span>
-                            <strong style={{ fontSize: 13, color: '#092d22' }}>{res.isolated_settlements?.[0]?.settlement || 'Ridge Settlements'}</strong>
+                            <strong style={{ fontSize: 13, color: '#092d22' }}>{res.isolated_settlements?.[0]?.settlement || 'Isolated Ridge'}</strong>
                           </div>
                         </div>
                       </div>
@@ -400,7 +464,7 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
                     )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                       <small style={{ color: '#78350f', fontSize: 11 }}>
-                        Requires human municipal signoff.
+                        Requires human municipal signoff in {villageName}.
                       </small>
                       {importedPlanSuccess[index] ? (
                         <span style={{ color: '#166534', fontWeight: 600, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
@@ -422,7 +486,7 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
                   </div>
                 )}
 
-                {/* Optional Expandable Technical Calculations (Clean UX for Non-Tech Users) */}
+                {/* Optional Expandable Technical Calculations */}
                 {message.tools_called && message.tools_called.length > 0 && (
                   <details className="ai-details-toggle">
                     <summary>View supporting calculation details & data sources</summary>
@@ -445,7 +509,7 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
                 <Bot size={16} />
               </div>
               <div className="ai-chat-bubble__body" style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#556e62' }}>
-                <Loader2 size={15} className="spin" /> GaunPulse AI is analyzing village records...
+                <Loader2 size={15} className="spin" /> GaunPulse AI is analyzing {villageName} records...
               </div>
             </div>
           )}
@@ -455,7 +519,7 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
         {/* Quick Suggestion Chips */}
         <div className="ai-chips-wrap">
           <span style={{ fontSize: 11, color: '#687c73', fontWeight: 600 }}>Try asking:</span>
-          {SUGGESTION_CHIPS.map((chip, idx) => (
+          {suggestionChips.map((chip, idx) => (
             <button
               key={idx}
               className="ai-chip"
@@ -480,7 +544,7 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask about your village, reports or infrastructure..."
+            placeholder={`Ask about ${villageName}, reports or infrastructure...`}
             disabled={loading}
           />
           <button
@@ -499,7 +563,7 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
           <div>
             <span className="eyebrow" style={{ color: '#176342', fontWeight: 700 }}>Village Context</span>
-            <h4 style={{ margin: '2px 0', fontSize: 14, color: '#092d22' }}>Active Municipal Intelligence</h4>
+            <h4 style={{ margin: '2px 0', fontSize: 14, color: '#092d22' }}>Active Municipal Intelligence: {villageName}</h4>
             <p style={{ margin: 0, fontSize: 12, color: '#687c73' }}>
               Connected to <strong>{stats?.monitored_villages ?? 18} registered villages</strong> across Nepal · {stats?.active_issues ?? 7} active community reports.
             </p>

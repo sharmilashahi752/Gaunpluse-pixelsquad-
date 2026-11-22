@@ -9,6 +9,7 @@ import {
   Info,
   Layers,
   Loader2,
+  MapPin,
   RefreshCw,
   Save,
   ShieldAlert,
@@ -16,8 +17,13 @@ import {
   Wrench,
 } from 'lucide-react';
 import { Card, CardHeader, StatusBadge } from '../ui';
+import { useVillageSelection } from '../../context/VillageSelectionContext';
+import { deduplicateVillages, formatVillageLabel } from '../../utils/villageUtils';
+import { cachedFetchJson } from '../../utils/apiCache';
 
 export default function AIRepairPlanningSection({ onNavigate }) {
+  const { selectedVillageId, setSelectedVillageId, selectedVillage, villages: contextVillages } = useVillageSelection();
+  const [villages, setVillages] = useState(contextVillages || []);
   const [issues, setIssues] = useState([]);
   const [selectedIssueId, setSelectedIssueId] = useState('');
   const [draftPlan, setDraftPlan] = useState(null);
@@ -25,10 +31,11 @@ export default function AIRepairPlanningSection({ onNavigate }) {
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [error, setError] = useState(null);
+  const [loadingIssues, setLoadingIssues] = useState(false);
 
   // Editable form state
   const [title, setTitle] = useState('');
-  const [ward, setWard] = useState('Ward 4');
+  const [ward, setWard] = useState('Ward 1');
   const [priority, setPriority] = useState('Critical');
   const [responsibleTeam, setResponsibleTeam] = useState('Rapid Response Bridge Engineering Unit');
   const [targetDays, setTargetDays] = useState(7);
@@ -37,9 +44,34 @@ export default function AIRepairPlanningSection({ onNavigate }) {
   const [temporaryMeasures, setTemporaryMeasures] = useState('');
   const [unknowns, setUnknowns] = useState('');
 
-  // Load issues on mount
+  // Sync villages from context
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/api/issues?village_id=1')
+    if (contextVillages && contextVillages.length > 0) {
+      setVillages(contextVillages);
+    } else {
+      cachedFetchJson('http://127.0.0.1:8000/api/villages', {}, { ttlMs: 120000 })
+        .then((data) => {
+          if (Array.isArray(data)) setVillages(data);
+        })
+        .catch((err) => console.error('Failed to load villages:', err));
+    }
+  }, [contextVillages]);
+
+  const currentVillageObj = selectedVillage || villages.find((v) => Number(v.id) === Number(selectedVillageId));
+  const villageName = currentVillageObj?.name || 'Selected Village';
+  const villageWard = currentVillageObj?.ward_no ? `Ward ${currentVillageObj.ward_no}` : 'Ward 1';
+
+  // Load issues when selectedVillageId changes
+  useEffect(() => {
+    if (!selectedVillageId) return;
+
+    setLoadingIssues(true);
+    setError(null);
+    setDraftPlan(null);
+    setSavedSuccess(false);
+    setSelectedIssueId('');
+
+    fetch(`http://127.0.0.1:8000/api/issues?village_id=${selectedVillageId}`)
       .then((r) => r.json())
       .then((data) => {
         const raw = Array.isArray(data) ? data : (data.data || []);
@@ -48,11 +80,17 @@ export default function AIRepairPlanningSection({ onNavigate }) {
           setSelectedIssueId(String(raw[0].id));
         }
       })
-      .catch((err) => console.error('Failed to load issues for repair planning:', err));
-  }, []);
+      .catch((err) => {
+        console.error('Failed to load issues for repair planning:', err);
+        setError('Could not load issues for the selected village.');
+      })
+      .finally(() => {
+        setLoadingIssues(false);
+      });
+  }, [selectedVillageId]);
 
   const handleGenerateDraft = async () => {
-    if (!selectedIssueId) return;
+    if (!selectedIssueId && issues.length > 0) return;
     setGenerating(true);
     setError(null);
     setSavedSuccess(false);
@@ -102,12 +140,16 @@ export default function AIRepairPlanningSection({ onNavigate }) {
         unks = 'Upstream source turbidity levels after cloudburst events.';
       }
 
-      setTitle(`Draft: Rapid Intervention for ${selected?.title || 'Lifeline Asset'}`);
-      setWard(selected?.ward || 'Ward 4');
-      setPriority(sev === 'critical' ? 'Critical' : 'High');
+      const planTitle = selected
+        ? `Draft: Rapid Intervention for ${selected.title}`
+        : `Draft: Infrastructure Maintenance Plan for ${villageName}`;
+
+      setTitle(planTitle);
+      setWard(selected?.ward ? `Ward ${selected.ward}` : villageWard);
+      setPriority(sev.toLowerCase() === 'critical' ? 'Critical' : 'High');
       setResponsibleTeam(team);
       setTargetDays(sev.toLowerCase() === 'critical' ? 5 : 10);
-      setDescription(selected?.description || 'Infrastructure disruption requiring technical intervention.');
+      setDescription(selected?.description || `Priority infrastructure intervention in ${villageName}.`);
       setInspectionTasks(steps);
       setTemporaryMeasures(measures);
       setUnknowns(unks);
@@ -148,8 +190,8 @@ export default function AIRepairPlanningSection({ onNavigate }) {
           Accept: 'application/json',
         },
         body: JSON.stringify({
-          village_id: 1,
-          issue_id: Number(selectedIssueId),
+          village_id: Number(selectedVillageId),
+          issue_id: selectedIssueId ? Number(selectedIssueId) : null,
           title: title,
           priority: priority,
           responsible_team: responsibleTeam,
@@ -177,17 +219,18 @@ export default function AIRepairPlanningSection({ onNavigate }) {
   };
 
   const selectedIssue = issues.find((i) => String(i.id) === String(selectedIssueId));
+  const dedupedVillages = deduplicateVillages(villages);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Human-Centered Task Header (Phase 10) */}
+      {/* Header */}
       <div>
         <span className="eyebrow" style={{ color: '#176342', fontWeight: 700 }}>Municipal Action Plan</span>
         <h2 style={{ margin: '4px 0', fontSize: 22, color: '#092d22', fontFamily: 'Georgia, serif' }}>
           Let's plan the next steps
         </h2>
         <p style={{ margin: 0, fontSize: 13, color: '#556e62' }}>
-          Prepare a practical, editable action plan with inspection tasks ready for authorized review.
+          Prepare a practical, editable action plan with inspection tasks ready for authorized review in <strong>{villageName}</strong>.
         </p>
       </div>
 
@@ -201,35 +244,116 @@ export default function AIRepairPlanningSection({ onNavigate }) {
         </div>
       </details>
 
-      {/* Issue Selector & Action Bar */}
+      {/* Village & Issue Selector Card */}
       <Card style={{ padding: '14px 18px' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 320 }}>
-            <label style={{ fontSize: 10.5, color: '#687c73', fontWeight: 600 }}>SELECT REGISTERED DISRUPTION ISSUE</label>
-            <select
-              value={selectedIssueId}
-              onChange={(e) => setSelectedIssueId(e.target.value)}
-              style={{ padding: '7px 12px', borderRadius: 6, border: '1px solid #c8d8cc', fontSize: 12, color: '#176342', fontWeight: 600, background: '#ffffff' }}
-            >
-              {issues.map((iss) => (
-                <option key={iss.id} value={iss.id}>
-                  {iss.title} ({iss.tracking_code || `GP-${iss.id}`} · {iss.severity})
-                </option>
-              ))}
-            </select>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+            {/* Village Selector */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 220 }}>
+              <label style={{ fontSize: 10.5, color: '#687c73', fontWeight: 600 }}>SELECT VILLAGE CONTEXT</label>
+              <select
+                value={selectedVillageId || ''}
+                onChange={(e) => setSelectedVillageId(Number(e.target.value))}
+                style={{
+                  padding: '7px 12px',
+                  borderRadius: 6,
+                  border: '1px solid #c8d8cc',
+                  fontSize: 12,
+                  color: '#176342',
+                  fontWeight: 600,
+                  background: '#ffffff',
+                }}
+              >
+                {dedupedVillages.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {formatVillageLabel(v)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Issue Selector */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 280 }}>
+              <label style={{ fontSize: 10.5, color: '#687c73', fontWeight: 600 }}>
+                SELECT REGISTERED DISRUPTION ISSUE ({issues.length} AVAILABLE)
+              </label>
+              {loadingIssues ? (
+                <div style={{ padding: '7px 12px', fontSize: 12, color: '#687c73' }}>
+                  <Loader2 size={13} className="spin" style={{ display: 'inline', marginRight: 6 }} />
+                  Loading issues for {villageName}...
+                </div>
+              ) : issues.length > 0 ? (
+                <select
+                  value={selectedIssueId}
+                  onChange={(e) => setSelectedIssueId(e.target.value)}
+                  style={{
+                    padding: '7px 12px',
+                    borderRadius: 6,
+                    border: '1px solid #c8d8cc',
+                    fontSize: 12,
+                    color: '#176342',
+                    fontWeight: 600,
+                    background: '#ffffff',
+                  }}
+                >
+                  {issues.map((iss) => (
+                    <option key={iss.id} value={iss.id}>
+                      {iss.title} ({iss.tracking_code || `GP-${iss.id}`} · {iss.severity})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div style={{ fontSize: 12, color: '#b45309', fontWeight: 500, padding: '7px 0' }}>
+                  No issues registered for this village.
+                </div>
+              )}
+            </div>
           </div>
 
           <button
             type="button"
             className="button button--secondary"
             onClick={handleGenerateDraft}
-            disabled={generating}
+            disabled={generating || (issues.length === 0 && !selectedIssueId)}
             style={{ fontSize: 12, padding: '7px 16px' }}
           >
             {generating ? <Loader2 size={13} className="spin" /> : <RefreshCw size={13} />} Regenerate Suggested Draft
           </button>
         </div>
       </Card>
+
+      {/* Empty State Banner if no issues */}
+      {!loadingIssues && issues.length === 0 && (
+        <div
+          style={{
+            background: '#fefce8',
+            border: '1px solid #fef08a',
+            borderRadius: 8,
+            padding: '14px 18px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            fontSize: 12.5,
+            color: '#854d0e',
+          }}
+        >
+          <div>
+            <strong>No active disruption reports registered in {villageName}.</strong>
+            <p style={{ margin: '4px 0 0', fontSize: 11.5, color: '#a16207' }}>
+              Action plans are generated from verified community or municipal issue records. You can register an issue or select a different village.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="button button--primary"
+            onClick={() => onNavigate && onNavigate('issues-alerts')}
+            style={{ fontSize: 11.5, padding: '6px 14px', whiteSpace: 'nowrap' }}
+          >
+            Register Disruption Report <ArrowRight size={13} />
+          </button>
+        </div>
+      )}
 
       {error && (
         <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 16px', color: '#991b1b', fontSize: 12 }}>
@@ -240,7 +364,7 @@ export default function AIRepairPlanningSection({ onNavigate }) {
       {savedSuccess && (
         <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '12px 18px', color: '#166534', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
-            <CheckCircle2 size={18} color="#15803d" /> Action Plan successfully persisted in municipal MySQL records!
+            <CheckCircle2 size={18} color="#15803d" /> Action Plan successfully persisted in municipal MySQL records for {villageName}!
           </span>
           <button
             type="button"
@@ -262,7 +386,7 @@ export default function AIRepairPlanningSection({ onNavigate }) {
                 DRAFT ACTION PLAN · EDITABLE MUNICIPAL WORKFLOW
               </span>
               <span style={{ fontSize: 11, color: '#687c73' }}>
-                Linked Issue ID #{selectedIssueId} · Tracking: {selectedIssue?.tracking_code}
+                {villageName} {selectedIssue ? `· Issue #${selectedIssue.id} (${selectedIssue.tracking_code || `GP-${selectedIssue.id}`})` : ''}
               </span>
             </div>
 
@@ -390,7 +514,7 @@ export default function AIRepairPlanningSection({ onNavigate }) {
           {/* Action Buttons */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 14, borderTop: '1px solid #edf0eb' }}>
             <span style={{ fontSize: 11, color: '#687c73', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              <ShieldCheck size={14} color="#176342" /> Saves as official Action Plan with status: <code>pending</code>
+              <ShieldCheck size={14} color="#176342" /> Saves to {villageName} action plans with status: <code>pending</code>
             </span>
 
             <div style={{ display: 'flex', gap: 8 }}>

@@ -9,6 +9,7 @@ import {
   Languages,
   Loader2,
   Lock,
+  MapPin,
   MessageSquareText,
   Search,
   Send,
@@ -17,12 +18,47 @@ import {
   Users,
 } from 'lucide-react';
 import { Card, PageIntro, StatusBadge } from '../ui';
+import { useVillageSelection } from '../../context/VillageSelectionContext';
+import { deduplicateVillages, formatVillageLabel } from '../../utils/villageUtils';
+import { cachedFetchJson } from '../../utils/apiCache';
 
 export default function AICitizenAssistanceSection({ onNavigate }) {
+  const { selectedVillageId, setSelectedVillageId, selectedVillage, villages: contextVillages } = useVillageSelection();
+  const [villages, setVillages] = useState(contextVillages || []);
   const [language, setLanguage] = useState('ne'); // 'ne' or 'en'
   const [trackingCode, setTrackingCode] = useState('');
   const [lookupResult, setLookupResult] = useState(null);
   const [lookupLoading, setLookupLoading] = useState(false);
+  const [villageIssues, setVillageIssues] = useState([]);
+
+  // Sync villages from context
+  useEffect(() => {
+    if (contextVillages && contextVillages.length > 0) {
+      setVillages(contextVillages);
+    } else {
+      cachedFetchJson('http://127.0.0.1:8000/api/villages', {}, { ttlMs: 120000 })
+        .then((data) => {
+          if (Array.isArray(data)) setVillages(data);
+        })
+        .catch((err) => console.error('Failed to load villages:', err));
+    }
+  }, [contextVillages]);
+
+  const currentVillageObj = selectedVillage || villages.find((v) => Number(v.id) === Number(selectedVillageId));
+  const villageName = currentVillageObj?.name || 'Selected Village';
+
+  // Fetch current village issues for sample tracking codes and lookup
+  useEffect(() => {
+    if (!selectedVillageId) return;
+    fetch(`http://127.0.0.1:8000/api/issues?village_id=${selectedVillageId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const items = Array.isArray(data) ? data : (data.data || []);
+        setVillageIssues(items);
+      })
+      .catch((e) => console.warn('Could not load issues for citizen assistance:', e));
+  }, [selectedVillageId]);
+
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
@@ -30,8 +66,7 @@ export default function AICitizenAssistanceSection({ onNavigate }) {
       suggested: [
         'मेरो सडकको गुनासो कहाँ पुगेको छ?',
         'How can I report a damaged bridge?',
-        'GP-BRG-01 को स्थिति के छ?',
-        'वडा ४ मा कुन कुन बाटो चालू छन्?',
+        'वडामा कुन कुन बाटो चालू छन्?',
       ],
     },
   ]);
@@ -52,23 +87,41 @@ export default function AICitizenAssistanceSection({ onNavigate }) {
     setLookupResult(null);
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/issues?village_id=1');
+      // 1. Search in current village
+      const res = await fetch(`http://127.0.0.1:8000/api/issues?village_id=${selectedVillageId}`);
       const data = await res.json();
       const items = Array.isArray(data) ? data : (data.data || []);
-      const matched = items.find(
+      let matched = items.find(
         (i) => (i.tracking_code || '').toUpperCase() === code || `GP-${i.id}` === code
       );
+
+      let matchedVillage = villageName;
+
+      // 2. If not found in current village, search all issues to provide cross-village clarity
+      if (!matched) {
+        const allRes = await fetch('http://127.0.0.1:8000/api/issues');
+        const allData = await allRes.json();
+        const allItems = Array.isArray(allData) ? allData : (allData.data || []);
+        matched = allItems.find(
+          (i) => (i.tracking_code || '').toUpperCase() === code || `GP-${i.id}` === code
+        );
+        if (matched) {
+          matchedVillage = matched.village?.name || `Village ID ${matched.village_id}`;
+        }
+      }
 
       if (matched) {
         setLookupResult({
           found: true,
+          matchedVillage,
+          isCurrentVillage: matchedVillage === villageName,
           issue: {
             title: matched.title,
             tracking_code: matched.tracking_code || `GP-${matched.id}`,
             status: matched.status || 'verified',
             category: matched.category,
             severity: matched.severity,
-            ward: matched.ward || '4',
+            ward: matched.ward || '1',
             created_at: matched.created_at,
           },
         });
@@ -104,7 +157,7 @@ export default function AICitizenAssistanceSection({ onNavigate }) {
         },
         body: JSON.stringify({
           message: query,
-          village_id: 1,
+          village_id: Number(selectedVillageId),
           language: language,
         }),
       });
@@ -132,9 +185,12 @@ export default function AICitizenAssistanceSection({ onNavigate }) {
     }
   };
 
+  const sampleCodes = villageIssues.map((i) => i.tracking_code || `GP-${i.id}`).slice(0, 3);
+  const dedupedVillages = deduplicateVillages(villages);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Privacy Safeguard Banner */}
+      {/* Privacy Safeguard Banner & Village Context */}
       <div
         style={{
           background: '#f4f8f4',
@@ -144,6 +200,7 @@ export default function AICitizenAssistanceSection({ onNavigate }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          flexWrap: 'wrap',
           gap: 12,
           fontSize: 12,
           color: '#274b39',
@@ -152,18 +209,41 @@ export default function AICitizenAssistanceSection({ onNavigate }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <ShieldCheck size={20} color="#176342" style={{ flexShrink: 0 }} />
           <div>
-            <strong>Citizen Privacy & Public Transparency:</strong> Private citizen identities, phone numbers, and home addresses are never exposed or processed by AI. Only public infrastructure status and safety updates are communicated.
+            <strong>Citizen Privacy & Public Transparency:</strong> Private citizen identities, phone numbers, and home addresses are never exposed or processed by AI. Public infrastructure status for <strong>{villageName}</strong> is communicated.
           </div>
         </div>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#e3f3e3', padding: '4px 8px', borderRadius: 8, fontSize: 11 }}>
-          <Languages size={14} color="#176342" />
-          <button
-            type="button"
-            onClick={() => setLanguage(language === 'ne' ? 'en' : 'ne')}
-            style={{ border: 'none', background: 'transparent', fontWeight: 700, color: '#176342', cursor: 'pointer' }}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* Village Selector */}
+          <select
+            value={selectedVillageId || ''}
+            onChange={(e) => setSelectedVillageId(Number(e.target.value))}
+            style={{
+              padding: '4px 8px',
+              borderRadius: 6,
+              border: '1px solid #c8d8cc',
+              fontSize: 11,
+              color: '#176342',
+              fontWeight: 600,
+              background: '#ffffff',
+            }}
           >
-            {language === 'ne' ? 'नेपाली (Devanagari)' : 'English'}
-          </button>
+            {dedupedVillages.map((v) => (
+              <option key={v.id} value={v.id}>
+                {formatVillageLabel(v)}
+              </option>
+            ))}
+          </select>
+
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#e3f3e3', padding: '4px 8px', borderRadius: 8, fontSize: 11 }}>
+            <Languages size={14} color="#176342" />
+            <button
+              type="button"
+              onClick={() => setLanguage(language === 'ne' ? 'en' : 'ne')}
+              style={{ border: 'none', background: 'transparent', fontWeight: 700, color: '#176342', cursor: 'pointer' }}
+            >
+              {language === 'ne' ? 'नेपाली (Devanagari)' : 'English'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -181,7 +261,7 @@ export default function AICitizenAssistanceSection({ onNavigate }) {
                   {language === 'ne' ? 'उजुरी स्थिति खोज (Tracking Lookup)' : 'Check Issue Tracking Status'}
                 </strong>
                 <span style={{ fontSize: 10.5, color: '#687c73' }}>
-                  {language === 'ne' ? 'आफ्नो ट्र्याकिङ कोड हाल्नुहोस्' : 'Enter municipal code (e.g., GP-BRG-01)'}
+                  {language === 'ne' ? `गाउँ: ${villageName} · ट्र्याकिङ कोड हाल्नुहोस्` : `Village: ${villageName} · Enter tracking code`}
                 </span>
               </div>
             </div>
@@ -190,7 +270,7 @@ export default function AICitizenAssistanceSection({ onNavigate }) {
               <input
                 value={trackingCode}
                 onChange={(e) => setTrackingCode(e.target.value)}
-                placeholder="GP-BRG-01"
+                placeholder={sampleCodes[0] || 'GP-BRG-01'}
                 style={{ flex: 1, padding: '7px 10px', borderRadius: 6, border: '1px solid #c8d8cc', fontSize: 12, fontWeight: 700, textTransform: 'uppercase' }}
               />
               <button
@@ -204,30 +284,32 @@ export default function AICitizenAssistanceSection({ onNavigate }) {
             </form>
 
             {/* Quick Demo Code Buttons */}
-            <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 10, color: '#687c73' }}>Try sample code:</span>
-              {['GP-BRG-01', 'GP-RD-02', 'GP-WTR-03'].map((code) => (
-                <button
-                  key={code}
-                  type="button"
-                  onClick={() => {
-                    setTrackingCode(code);
-                  }}
-                  style={{
-                    background: '#f0f6f2',
-                    border: '1px solid #d2e4d5',
-                    borderRadius: 4,
-                    padding: '2px 6px',
-                    fontSize: 10,
-                    color: '#176342',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                  }}
-                >
-                  {code}
-                </button>
-              ))}
-            </div>
+            {sampleCodes.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 10, color: '#687c73' }}>Registered in {villageName}:</span>
+                {sampleCodes.map((code) => (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => {
+                      setTrackingCode(code);
+                    }}
+                    style={{
+                      background: '#f0f6f2',
+                      border: '1px solid #d2e4d5',
+                      borderRadius: 4,
+                      padding: '2px 6px',
+                      fontSize: 10,
+                      color: '#176342',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {code}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Lookup Result Card */}
             {lookupResult && (
@@ -243,12 +325,12 @@ export default function AICitizenAssistanceSection({ onNavigate }) {
                       </span>
                     </div>
                     <span style={{ display: 'block', color: '#687c73', fontSize: 11, marginBottom: 6 }}>
-                      Code: {lookupResult.issue.tracking_code} · Ward {lookupResult.issue.ward} · Severity: {lookupResult.issue.severity}
+                      Code: {lookupResult.issue.tracking_code} · {lookupResult.matchedVillage} · Ward {lookupResult.issue.ward} · Severity: {lookupResult.issue.severity}
                     </span>
                     <p style={{ margin: 0, fontSize: 11.5, color: '#14532d', lineHeight: 1.4 }}>
                       {language === 'ne'
-                        ? 'तपाईंको उजुरी नगरपालिकामा दर्ता भइसकेको छ। वडा प्राविधिक टोलीले स्थलगत निरीक्षण योजना तयार गरिरहेको छ।'
-                        : 'Issue officially verified in municipal records. Technical inspection team has been scheduled.'}
+                        ? `तपाईंको उजुरी ${lookupResult.matchedVillage} को नगरपालिका अभिलेखमा दर्ता भइसकेको छ। वडा प्राविधिक टोलीले निरीक्षण अगाडि बढाएको छ।`
+                        : `Issue officially verified in municipal records for ${lookupResult.matchedVillage}. Technical inspection team has been scheduled.`}
                     </p>
                   </div>
                 ) : (
@@ -305,7 +387,7 @@ export default function AICitizenAssistanceSection({ onNavigate }) {
             </span>
             <div>
               <strong>{language === 'ne' ? 'नागरिक सहायता सहायक' : 'Citizen Assistance Agent'}</strong>
-              <span>{language === 'ne' ? 'ग्रामीण पूर्वाधार तथा उजुरी सहयोग' : 'Bilingual Support & Guidance'}</span>
+              <span>{language === 'ne' ? `${villageName} पूर्वाधार तथा उजुरी सहयोग` : `${villageName} Support & Guidance`}</span>
             </div>
             <StatusBadge tone="green">
               {language === 'ne' ? 'अनलाइन' : 'Online'}
@@ -359,7 +441,7 @@ export default function AICitizenAssistanceSection({ onNavigate }) {
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={language === 'ne' ? 'सडक, पुल, वा आफ्नो उजुरीबारे सोध्नुहोस्...' : 'Ask about road status or enter your inquiry...'}
+              placeholder={language === 'ne' ? `${villageName} को सडक वा पुलबारे सोध्नुहोस्...` : `Ask about ${villageName} road status or report...`}
               disabled={loading}
             />
             <button className="button button--primary" type="submit" disabled={loading || !input.trim()}>

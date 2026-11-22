@@ -10,6 +10,7 @@ import {
   HelpCircle,
   Languages,
   Loader2,
+  MapPin,
   RefreshCw,
   Send,
   ShieldAlert,
@@ -20,25 +21,48 @@ import {
   Wrench,
 } from 'lucide-react';
 import { Card, PageIntro, StatusBadge } from '../ui';
-
-const INITIAL_MESSAGES = [
-  {
-    role: 'assistant',
-    text: 'Namaste! I am the **GaunPulse AI Coordinator**.\n\nI orchestrate intelligence across all specialized agents: **Problem Prioritization**, **NetworkX Impact Simulator**, and **Repair Action Planning**.\n\nYou can ask multi-step municipal questions, such as:\n• "Analyze Ward 4 and tell me which infrastructure problem we should inspect first."\n• "What happens if Bridge B is blocked? Show affected households and draft an action plan."\n• "पुल बिग्रिएपछि कुन बस्ती प्रभावित हुन्छ र मर्मत योजना कस्तो बनाउने?"',
-    tools_called: [],
-    suggested_questions: [
-      'What happens if Bridge B is blocked? Show impact and draft plan.',
-      'Which issues should Ward 4 inspect first?',
-      'पुल बिग्रिएपछि कुन बस्ती प्रभावित हुन्छ?',
-      'Draft an action plan for the bridge failure',
-    ],
-  },
-];
+import { useVillageSelection } from '../../context/VillageSelectionContext';
+import { deduplicateVillages, formatVillageLabel } from '../../utils/villageUtils';
+import { cachedFetchJson } from '../../utils/apiCache';
 
 export default function AICoordinatorSection({ onNavigate, onSelectTab }) {
+  const { selectedVillageId, setSelectedVillageId, selectedVillage, villages: contextVillages } = useVillageSelection();
+  const [villages, setVillages] = useState(contextVillages || []);
+
+  // Sync villages from context
+  useEffect(() => {
+    if (contextVillages && contextVillages.length > 0) {
+      setVillages(contextVillages);
+    } else {
+      cachedFetchJson('http://127.0.0.1:8000/api/villages', {}, { ttlMs: 120000 })
+        .then((data) => {
+          if (Array.isArray(data)) setVillages(data);
+        })
+        .catch((err) => console.error('Failed to load villages:', err));
+    }
+  }, [contextVillages]);
+
+  const currentVillageObj = selectedVillage || villages.find((v) => Number(v.id) === Number(selectedVillageId));
+  const villageName = currentVillageObj?.name || 'Selected Village';
+  const villageWard = currentVillageObj?.ward_no ? `Ward ${currentVillageObj.ward_no}` : 'Ward 1';
+
+  const INITIAL_MESSAGES = [
+    {
+      role: 'assistant',
+      text: `Namaste! I am the **GaunPulse AI Coordinator** for **${villageName}**.\n\nI orchestrate intelligence across all specialized agents: **Problem Prioritization**, **NetworkX Impact Simulator**, and **Repair Action Planning**.\n\nYou can ask multi-step municipal questions, such as:\n• "Analyze ${villageWard} and tell me which infrastructure problem we should inspect first."\n• "What happens if a primary lifeline road or bridge is blocked? Show affected households and draft an action plan."\n• "पुल बिग्रिएपछि कुन बस्ती प्रभावित हुन्छ र मर्मत योजना कस्तो बनाउने?"`,
+      tools_called: [],
+      suggested_questions: [
+        `Which issues should ${villageName} inspect first?`,
+        `What happens if a bridge in ${villageName} is blocked?`,
+        `पुल वा बाटो अवरुद्ध हुँदा कुन बस्ती प्रभावित हुन्छ?`,
+        `Draft an action plan for the top disruption in ${villageName}`,
+      ],
+    },
+  ];
+
   const [messages, setMessages] = useState(() => {
     try {
-      const saved = sessionStorage.getItem('gaunpulse_coordinator_messages');
+      const saved = sessionStorage.getItem(`gaunpulse_coordinator_messages_${selectedVillageId || 1}`);
       return saved ? JSON.parse(saved) : INITIAL_MESSAGES;
     } catch {
       return INITIAL_MESSAGES;
@@ -52,13 +76,27 @@ export default function AICoordinatorSection({ onNavigate, onSelectTab }) {
   const [errorMsg, setErrorMsg] = useState(null);
   const messagesEndRef = useRef(null);
 
+  // Update initial messages when village changes
   useEffect(() => {
     try {
-      sessionStorage.setItem('gaunpulse_coordinator_messages', JSON.stringify(messages));
+      const saved = sessionStorage.getItem(`gaunpulse_coordinator_messages_${selectedVillageId || 1}`);
+      if (saved) {
+        setMessages(JSON.parse(saved));
+      } else {
+        setMessages(INITIAL_MESSAGES);
+      }
+    } catch {
+      setMessages(INITIAL_MESSAGES);
+    }
+  }, [selectedVillageId]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(`gaunpulse_coordinator_messages_${selectedVillageId || 1}`, JSON.stringify(messages));
     } catch (e) {
       console.warn('Could not persist coordinator messages:', e);
     }
-  }, [messages]);
+  }, [messages, selectedVillageId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -66,7 +104,7 @@ export default function AICoordinatorSection({ onNavigate, onSelectTab }) {
 
   const clearChat = () => {
     setMessages(INITIAL_MESSAGES);
-    sessionStorage.removeItem('gaunpulse_coordinator_messages');
+    sessionStorage.removeItem(`gaunpulse_coordinator_messages_${selectedVillageId || 1}`);
   };
 
   const sendMessage = async (textToSend) => {
@@ -90,7 +128,7 @@ export default function AICoordinatorSection({ onNavigate, onSelectTab }) {
         },
         body: JSON.stringify({
           message: query,
-          village_id: 1,
+          village_id: Number(selectedVillageId),
           language: langParam,
           history: messages.slice(-4).map((m) => ({ role: m.role, content: m.text })),
         }),
@@ -146,12 +184,12 @@ export default function AICoordinatorSection({ onNavigate, onSelectTab }) {
           Accept: 'application/json',
         },
         body: JSON.stringify({
-          village_id: plan.village_id || 1,
-          issue_id: plan.issue_id || 1,
+          village_id: plan.village_id || Number(selectedVillageId),
+          issue_id: plan.issue_id || null,
           title: plan.title,
           priority: plan.priority === 'Critical' ? 'Critical' : 'High',
           responsible_team: plan.responsible_team || 'Municipal Infrastructure Unit',
-          ward: plan.ward || 'Ward 4',
+          ward: plan.ward || villageWard,
           status: 'pending',
           progress_percentage: 0,
           target_completion_date: dueDateStr,
@@ -172,9 +210,11 @@ export default function AICoordinatorSection({ onNavigate, onSelectTab }) {
     }
   };
 
+  const dedupedVillages = deduplicateVillages(villages);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Coordinator Protocol Banner */}
+      {/* Coordinator Protocol Banner with Village Selector */}
       <div
         style={{
           background: '#f4f8f4',
@@ -184,6 +224,7 @@ export default function AICoordinatorSection({ onNavigate, onSelectTab }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          flexWrap: 'wrap',
           gap: 12,
           fontSize: 12,
           color: '#274b39',
@@ -192,10 +233,31 @@ export default function AICoordinatorSection({ onNavigate, onSelectTab }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <BrainCircuit size={20} color="#176342" style={{ flexShrink: 0 }} />
           <div>
-            <strong>Multi-Agent Orchestrator:</strong> The Coordinator dispatches requests to the Problem Prioritization, NetworkX Impact Simulation, and Repair Planning agents, attributing sources and requiring human approval.
+            <strong>Multi-Agent Orchestrator:</strong> The Coordinator combines Problem Prioritization, NetworkX Impact Simulation, and Repair Planning agents for <strong>{villageName}</strong>.
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {/* Village Context Selector */}
+          <select
+            value={selectedVillageId || ''}
+            onChange={(e) => setSelectedVillageId(Number(e.target.value))}
+            style={{
+              padding: '4px 8px',
+              borderRadius: 6,
+              border: '1px solid #c8d8cc',
+              fontSize: 11,
+              color: '#176342',
+              fontWeight: 600,
+              background: '#ffffff',
+            }}
+          >
+            {dedupedVillages.map((v) => (
+              <option key={v.id} value={v.id}>
+                {formatVillageLabel(v)}
+              </option>
+            ))}
+          </select>
+
           <button
             className="button button--secondary"
             type="button"
@@ -215,7 +277,7 @@ export default function AICoordinatorSection({ onNavigate, onSelectTab }) {
           </span>
           <div>
             <strong>GaunPulse AI Coordinator</strong>
-            <span>Multi-Agent Cross-Disciplinary Decision Support</span>
+            <span>Multi-Agent Decision Support for {villageName}</span>
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#e3f3e3', color: '#176342', fontSize: 10.5, padding: '3px 8px', borderRadius: 10, fontWeight: 700 }}>
@@ -289,7 +351,7 @@ export default function AICoordinatorSection({ onNavigate, onSelectTab }) {
                               <div>
                                 <span style={{ color: '#687c73', display: 'block', fontSize: 10 }}>ISOLATED SETTLEMENT</span>
                                 <strong style={{ color: '#176342', fontSize: 12.5 }}>
-                                  {res.isolated_settlements?.[0]?.settlement || 'Settlement B (Tallo Gaun)'}
+                                  {res.isolated_settlements?.[0]?.settlement || 'Isolated Neighborhood'}
                                 </strong>
                               </div>
                               <div>
@@ -343,7 +405,7 @@ export default function AICoordinatorSection({ onNavigate, onSelectTab }) {
 
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 10, borderTop: '1px solid #f5ebd8' }}>
                       <span style={{ fontSize: 11, color: '#78350f' }}>
-                        ⚖️ Human municipal signoff required to authorize budget.
+                        ⚖️ Human municipal signoff required to authorize budget in {villageName}.
                       </span>
 
                       {planImportSuccess[index] ? (
@@ -401,7 +463,7 @@ export default function AICoordinatorSection({ onNavigate, onSelectTab }) {
                 }}
               >
                 <Loader2 size={16} className="spin" style={{ color: '#176342' }} />
-                <span>AI Coordinator is delegating to specialized agents & computing NetworkX paths...</span>
+                <span>AI Coordinator is delegating to specialized agents for {villageName}...</span>
               </div>
             </div>
           )}
@@ -415,10 +477,10 @@ export default function AICoordinatorSection({ onNavigate, onSelectTab }) {
           </span>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'nowrap' }}>
             {[
-              'What happens if Bridge B is blocked? Show impact and draft plan.',
-              'Which issues should Ward 4 inspect first?',
-              'पुल बिग्रिएपछि कुन बस्ती प्रभावित हुन्छ?',
-              'Draft an action plan for the bridge failure',
+              `Which issues should ${villageName} inspect first?`,
+              `What happens if a bridge in ${villageName} is blocked?`,
+              `पुल वा बाटो अवरुद्ध हुँदा कुन बस्ती प्रभावित हुन्छ?`,
+              `Draft an action plan for the top disruption in ${villageName}`,
             ].map((q, i) => (
               <button
                 key={i}
@@ -451,7 +513,7 @@ export default function AICoordinatorSection({ onNavigate, onSelectTab }) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             disabled={loading}
-            placeholder="Ask across agents (e.g., analyze ward, simulate bridge failure, and prepare draft plan)..."
+            placeholder={`Ask across agents for ${villageName} (e.g., analyze ward, simulate bridge failure, and prepare draft plan)...`}
           />
           <button
             className="button button--primary"
@@ -463,7 +525,7 @@ export default function AICoordinatorSection({ onNavigate, onSelectTab }) {
         </form>
 
         <p className="agent-chat__privacy">
-          <ShieldCheck size={13} /> Role-based authorization enforced. Private citizen data redacted. Municipal signoff required for budget and repairs.
+          <ShieldCheck size={13} /> Role-based authorization enforced for {villageName}. Private citizen data redacted. Municipal signoff required for budget and repairs.
         </p>
       </Card>
     </div>

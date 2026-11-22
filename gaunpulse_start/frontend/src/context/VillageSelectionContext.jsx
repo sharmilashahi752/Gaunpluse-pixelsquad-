@@ -43,6 +43,22 @@ export function VillageSelectionProvider({ children }) {
     fetchVillages();
   }, [fetchVillages]);
 
+  const selectedVillage = useMemo(() => {
+    if (!villages || villages.length === 0) return null;
+    const found = villages.find((v) => Number(v.id) === Number(selectedVillageId));
+    return found || villages[0];
+  }, [villages, selectedVillageId]);
+
+  // Ensure selectedVillageId defaults to first valid village if unselected or invalid
+  useEffect(() => {
+    if (villages.length > 0) {
+      const exists = villages.some((v) => Number(v.id) === Number(selectedVillageId));
+      if (!exists) {
+        setSelectedVillageIdState(villages[0].id);
+      }
+    }
+  }, [villages, selectedVillageId]);
+
   const setSelectedVillageId = useCallback((value) => {
     const villageId = Number(value);
     const nextValue = Number.isInteger(villageId) && villageId > 0 ? villageId : null;
@@ -64,14 +80,15 @@ export function VillageSelectionProvider({ children }) {
 
   const value = useMemo(
     () => ({
-      selectedVillageId,
+      selectedVillageId: selectedVillage?.id ?? selectedVillageId,
+      selectedVillage,
       setSelectedVillageId,
       villages,
       setVillages,
       loadingVillages,
       refreshVillages,
     }),
-    [selectedVillageId, setSelectedVillageId, villages, loadingVillages, refreshVillages]
+    [selectedVillage, selectedVillageId, setSelectedVillageId, villages, loadingVillages, refreshVillages]
   );
 
   return <VillageSelectionContext.Provider value={value}>{children}</VillageSelectionContext.Provider>;

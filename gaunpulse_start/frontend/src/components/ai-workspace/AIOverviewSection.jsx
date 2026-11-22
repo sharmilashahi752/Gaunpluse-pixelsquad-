@@ -23,22 +23,44 @@ import {
   Wrench,
 } from 'lucide-react';
 import { Card, CardHeader, StatusBadge } from '../ui';
+import { useVillageSelection } from '../../context/VillageSelectionContext';
+import { deduplicateVillages, formatVillageLabel } from '../../utils/villageUtils';
+import { cachedFetchJson } from '../../utils/apiCache';
 
 export default function AIOverviewSection({ onSelectTab, onNavigate }) {
+  const { selectedVillageId, setSelectedVillageId, selectedVillage, villages: contextVillages } = useVillageSelection();
+  const [villages, setVillages] = useState(contextVillages || []);
   const [stats, setStats] = useState(null);
   const [insights, setInsights] = useState(null);
   const [recentIssues, setRecentIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Sync villages from context
+  useEffect(() => {
+    if (contextVillages && contextVillages.length > 0) {
+      setVillages(contextVillages);
+    } else {
+      cachedFetchJson('http://127.0.0.1:8000/api/villages', {}, { ttlMs: 120000 })
+        .then((data) => {
+          if (Array.isArray(data)) setVillages(data);
+        })
+        .catch((err) => console.error('Failed to load villages:', err));
+    }
+  }, [contextVillages]);
+
+  const currentVillageObj = selectedVillage || villages.find((v) => Number(v.id) === Number(selectedVillageId));
+  const villageName = currentVillageObj?.name || 'Selected Village';
+
   const loadOverviewData = async () => {
+    if (!selectedVillageId) return;
     setLoading(true);
     setError(null);
     try {
       const [statsRes, insightsRes, issuesRes] = await Promise.all([
         fetch('http://127.0.0.1:8000/api/dashboard/stats').then((r) => r.json()),
-        fetch('http://127.0.0.1:8000/api/ai/insights?village_id=1').then((r) => r.json()),
-        fetch('http://127.0.0.1:8000/api/issues?village_id=1').then((r) => r.json()),
+        fetch(`http://127.0.0.1:8000/api/ai/insights?village_id=${selectedVillageId}`).then((r) => r.json()),
+        fetch(`http://127.0.0.1:8000/api/issues?village_id=${selectedVillageId}`).then((r) => r.json()),
       ]);
 
       setStats(statsRes);
@@ -55,11 +77,13 @@ export default function AIOverviewSection({ onSelectTab, onNavigate }) {
 
   useEffect(() => {
     loadOverviewData();
-  }, []);
+  }, [selectedVillageId]);
+
+  const dedupedVillages = deduplicateVillages(villages);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Security & Data Quality Warning Banner */}
+      {/* Security & Data Quality Warning Banner with Village Context */}
       <div
         style={{
           background: '#f4f8f4',
@@ -78,29 +102,52 @@ export default function AIOverviewSection({ onSelectTab, onNavigate }) {
           <strong style={{ display: 'block', color: '#176342', marginBottom: 2 }}>
             Data Governance & Decision-Support Notice:
           </strong>
-          Simulation outcomes and priority indices originate from verified municipal database records and deterministic NetworkX graph topology. 
+          Simulation outcomes and priority indices originate from verified municipal database records for <strong>{villageName}</strong> and deterministic NetworkX graph topology. 
           All AI recommendations are advisory: physical engineering certification and official municipal sign-off are required before public tender release or budget disbursement.
         </div>
-        <button
-          type="button"
-          onClick={loadOverviewData}
-          disabled={loading}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: '#176342',
-            cursor: 'pointer',
-            padding: 4,
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 4,
-            fontSize: 11,
-            fontWeight: 600,
-          }}
-          title="Refresh Data"
-        >
-          <RefreshCw size={13} className={loading ? 'spin' : ''} /> Refresh
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* Village Context Selector */}
+          <select
+            value={selectedVillageId || ''}
+            onChange={(e) => setSelectedVillageId(Number(e.target.value))}
+            style={{
+              padding: '4px 8px',
+              borderRadius: 6,
+              border: '1px solid #c8d8cc',
+              fontSize: 11,
+              color: '#176342',
+              fontWeight: 600,
+              background: '#ffffff',
+            }}
+          >
+            {dedupedVillages.map((v) => (
+              <option key={v.id} value={v.id}>
+                {formatVillageLabel(v)}
+              </option>
+            ))}
+          </select>
+
+          <button
+            type="button"
+            onClick={loadOverviewData}
+            disabled={loading}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#176342',
+              cursor: 'pointer',
+              padding: 4,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              fontSize: 11,
+              fontWeight: 600,
+            }}
+            title="Refresh Data"
+          >
+            <RefreshCw size={13} className={loading ? 'spin' : ''} /> Refresh
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -113,14 +160,14 @@ export default function AIOverviewSection({ onSelectTab, onNavigate }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
         <Card style={{ padding: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 11, color: '#687c73', fontWeight: 600 }}>ISSUES REQUIRING REVIEW</span>
+            <span style={{ fontSize: 11, color: '#687c73', fontWeight: 600 }}>ISSUES IN {villageName.toUpperCase()}</span>
             <span style={{ padding: '3px 8px', borderRadius: 6, background: '#fef3c7', color: '#92400e', fontSize: 10, fontWeight: 700 }}>Active</span>
           </div>
           <div style={{ marginTop: 8, fontSize: 28, fontWeight: 800, color: '#176342', fontFamily: 'Georgia, serif' }}>
-            {stats?.active_issues ?? (loading ? '...' : 4)}
+            {recentIssues.length}
           </div>
           <span style={{ fontSize: 11, color: '#687c73' }}>
-            Across {stats?.monitored_villages ?? 1} monitored village(s)
+            Logged for {villageName}
           </span>
         </Card>
 
@@ -130,7 +177,7 @@ export default function AIOverviewSection({ onSelectTab, onNavigate }) {
             <span style={{ padding: '3px 8px', borderRadius: 6, background: '#fee2e2', color: '#b91c1c', fontSize: 10, fontWeight: 700 }}>Urgent</span>
           </div>
           <div style={{ marginTop: 8, fontSize: 28, fontWeight: 800, color: '#c0392b', fontFamily: 'Georgia, serif' }}>
-            {stats?.critical_disruptions ?? (loading ? '...' : 1)}
+            {recentIssues.filter((i) => (i.severity || '').toLowerCase() === 'critical').length}
           </div>
           <span style={{ fontSize: 11, color: '#687c73' }}>
             {insights?.critical_issues_summary || 'Needs immediate on-site inspection'}
@@ -139,14 +186,14 @@ export default function AIOverviewSection({ onSelectTab, onNavigate }) {
 
         <Card style={{ padding: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 11, color: '#687c73', fontWeight: 600 }}>AFFECTED POPULATION</span>
-            <span style={{ padding: '3px 8px', borderRadius: 6, background: '#e0f2fe', color: '#0369a1', fontSize: 10, fontWeight: 700 }}>Census Mapped</span>
+            <span style={{ fontSize: 11, color: '#687c73', fontWeight: 600 }}>NETWORK MONITORED</span>
+            <span style={{ padding: '3px 8px', borderRadius: 6, background: '#e0f2fe', color: '#0369a1', fontSize: 10, fontWeight: 700 }}>GIS Mapped</span>
           </div>
           <div style={{ marginTop: 8, fontSize: 28, fontWeight: 800, color: '#176342', fontFamily: 'Georgia, serif' }}>
-            {stats?.affected_households ?? (loading ? '...' : 186)} HH
+            {insights?.metrics?.monitored_edges ?? '...'} Edges
           </div>
           <span style={{ fontSize: 11, color: '#687c73' }}>
-            Dependent on active rural lifelines
+            {insights?.metrics?.monitored_nodes ?? '...'} connected settlement nodes
           </span>
         </Card>
 
@@ -156,10 +203,10 @@ export default function AIOverviewSection({ onSelectTab, onNavigate }) {
             <span style={{ padding: '3px 8px', borderRadius: 6, background: '#e8f5e9', color: '#2e7d32', fontSize: 10, fontWeight: 700 }}>Managed</span>
           </div>
           <div style={{ marginTop: 8, fontSize: 28, fontWeight: 800, color: '#176342', fontFamily: 'Georgia, serif' }}>
-            {stats?.total_action_plans ?? (loading ? '...' : 2)}
+            {stats?.total_action_plans ?? 2}
           </div>
           <span style={{ fontSize: 11, color: '#687c73' }}>
-            {stats?.action_plans_in_progress ?? 1} in progress · 1 planned
+            {stats?.action_plans_in_progress ?? 1} in progress
           </span>
         </Card>
       </div>
@@ -168,7 +215,7 @@ export default function AIOverviewSection({ onSelectTab, onNavigate }) {
       <Card style={{ padding: 18 }}>
         <CardHeader
           eyebrow="Specialized agent workflows"
-          title="Direct Agent Workspaces"
+          title={`Direct Agent Workspaces for ${villageName}`}
           description="Access dedicated intelligence tools for triage, simulation, visual reporting, and repair action planning."
         />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginTop: 12 }}>
@@ -193,7 +240,7 @@ export default function AIOverviewSection({ onSelectTab, onNavigate }) {
                 <strong style={{ fontSize: 13, color: '#176342' }}>Problem Prioritization</strong>
               </div>
               <p style={{ margin: 0, fontSize: 11.5, color: '#576f64', lineHeight: 1.5 }}>
-                Triage road and bridge damage with multi-criteria weighted scoring (population, lifelines, and severity).
+                Triage road and bridge damage in {villageName} with multi-criteria weighted scoring (population, lifelines, and severity).
               </p>
             </div>
             <button
@@ -202,7 +249,7 @@ export default function AIOverviewSection({ onSelectTab, onNavigate }) {
               onClick={() => onSelectTab('prioritization')}
               style={{ fontSize: 11.5, padding: '6px 12px', justifyContent: 'space-between' }}
             >
-              Analyze Ward Priorities <ArrowRight size={13} />
+              Analyze {villageName} Priorities <ArrowRight size={13} />
             </button>
           </div>
 
@@ -227,7 +274,7 @@ export default function AIOverviewSection({ onSelectTab, onNavigate }) {
                 <strong style={{ fontSize: 13, color: '#176342' }}>Infrastructure Impact</strong>
               </div>
               <p style={{ margin: 0, fontSize: 11.5, color: '#576f64', lineHeight: 1.5 }}>
-                Run NetworkX shortest-path simulations to isolate failed bridges and calculate newly disconnected settlements.
+                Run NetworkX shortest-path simulations to isolate failed bridges and calculate newly disconnected settlements in {villageName}.
               </p>
             </div>
             <button
@@ -261,7 +308,7 @@ export default function AIOverviewSection({ onSelectTab, onNavigate }) {
                 <strong style={{ fontSize: 13, color: '#176342' }}>Reports & Visualization</strong>
               </div>
               <p style={{ margin: 0, fontSize: 11.5, color: '#576f64', lineHeight: 1.5 }}>
-                Generate interactive Chart.js analytics across wards, trend curves, and export formatted CSV summaries.
+                Generate interactive Chart.js analytics across wards, trend curves, and export formatted CSV summaries for {villageName}.
               </p>
             </div>
             <button
@@ -295,7 +342,7 @@ export default function AIOverviewSection({ onSelectTab, onNavigate }) {
                 <strong style={{ fontSize: 13, color: '#176342' }}>Repair Planning</strong>
               </div>
               <p style={{ margin: 0, fontSize: 11.5, color: '#576f64', lineHeight: 1.5 }}>
-                Draft structured engineering action plans with inspection checklists and submit them to municipal workflow.
+                Draft structured engineering action plans with inspection checklists and submit them to municipal workflow for {villageName}.
               </p>
             </div>
             <button
@@ -329,7 +376,7 @@ export default function AIOverviewSection({ onSelectTab, onNavigate }) {
                 <strong style={{ fontSize: 13, color: '#176342' }}>Citizen Assistance</strong>
               </div>
               <p style={{ margin: 0, fontSize: 11.5, color: '#576f64', lineHeight: 1.5 }}>
-                Bilingual Devanagari/English liaison for reporting damaged infrastructure and checking live issue tracking codes.
+                Bilingual Devanagari/English liaison for reporting damaged infrastructure and checking live issue tracking codes in {villageName}.
               </p>
             </div>
             <button
@@ -363,7 +410,7 @@ export default function AIOverviewSection({ onSelectTab, onNavigate }) {
                 <strong style={{ fontSize: 13, color: '#176342' }}>AI Coordinator</strong>
               </div>
               <p style={{ margin: 0, fontSize: 11.5, color: '#576f64', lineHeight: 1.5 }}>
-                Conversational assistant orchestrating cross-agent workflows for comprehensive municipal decision support.
+                Conversational assistant orchestrating cross-agent workflows for comprehensive municipal decision support in {villageName}.
               </p>
             </div>
             <button
@@ -395,7 +442,7 @@ export default function AIOverviewSection({ onSelectTab, onNavigate }) {
           </div>
 
           <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#92400e', lineHeight: 1.5 }}>
-            {insights?.simulation_risk_alert || 'Suspension Bridge B closure cuts off all access for Settlement B (20 households) to primary health clinic.'}
+            {insights?.simulation_risk_alert || `Infrastructure monitoring active for ${villageName}.`}
           </div>
 
           <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid #edf0eb' }}>
@@ -403,7 +450,7 @@ export default function AIOverviewSection({ onSelectTab, onNavigate }) {
               Municipal Recommendation:
             </strong>
             <p style={{ margin: 0, fontSize: 12, color: '#4b5563', lineHeight: 1.5 }}>
-              {insights?.recommended_action || 'Dispatch municipal bridge engineer to inspect deadman anchor blocks and clear road slide before monsoon surge.'}
+              {insights?.recommended_action || `Review prioritized infrastructure issues and assign technical inspection teams for ${villageName}.`}
             </p>
           </div>
 
@@ -432,7 +479,7 @@ export default function AIOverviewSection({ onSelectTab, onNavigate }) {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div>
               <strong style={{ display: 'block', fontSize: 13, color: '#176342' }}>
-                Latest Verified Reports
+                Latest Verified Reports for {villageName}
               </strong>
               <span style={{ fontSize: 11, color: '#687c73' }}>Live MySQL ServBay Records</span>
             </div>
@@ -442,7 +489,7 @@ export default function AIOverviewSection({ onSelectTab, onNavigate }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {recentIssues.length === 0 ? (
               <p style={{ fontSize: 12, color: '#687c73', fontStyle: 'italic', margin: '10px 0' }}>
-                No active issues recorded in the database.
+                No active issues recorded in the database for {villageName}.
               </p>
             ) : (
               recentIssues.map((issue) => (

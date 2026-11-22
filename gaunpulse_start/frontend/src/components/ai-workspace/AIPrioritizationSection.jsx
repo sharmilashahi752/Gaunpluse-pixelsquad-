@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   ArrowRight,
@@ -21,32 +21,59 @@ import {
   Wrench,
 } from 'lucide-react';
 import { Card, CardHeader, StatusBadge } from '../ui';
+import { useVillageSelection } from '../../context/VillageSelectionContext';
+import { deduplicateVillages, formatVillageLabel } from '../../utils/villageUtils';
+import { cachedFetchJson } from '../../utils/apiCache';
 
 export default function AIPrioritizationSection({ onNavigate, onSelectTab }) {
-  const [municipality, setMunicipality] = useState('Helambu Rural Municipality');
+  const { selectedVillageId, setSelectedVillageId, selectedVillage, villages: contextVillages } = useVillageSelection();
+  const [villages, setVillages] = useState(contextVillages || []);
   const [ward, setWard] = useState('all');
-  const [villageId, setVillageId] = useState('1');
   const [category, setCategory] = useState('all');
   const [issues, setIssues] = useState([]);
-  const [prioritiesData, setPrioritiesData] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState(null);
   const [overrideNotes, setOverrideNotes] = useState({});
   const [overrideSaved, setOverrideSaved] = useState({});
+  const [villageNetwork, setVillageNetwork] = useState(null);
+
+  // Sync villages from context
+  useEffect(() => {
+    if (contextVillages && contextVillages.length > 0) {
+      setVillages(contextVillages);
+    } else {
+      cachedFetchJson('http://127.0.0.1:8000/api/villages', {}, { ttlMs: 120000 })
+        .then((data) => {
+          if (Array.isArray(data)) setVillages(data);
+        })
+        .catch((err) => console.error('Failed to load villages:', err));
+    }
+  }, [contextVillages]);
+
+  const currentVillageObj = selectedVillage || villages.find((v) => Number(v.id) === Number(selectedVillageId));
+  const villageName = currentVillageObj?.name || 'Selected Village';
+  const municipality = currentVillageObj?.municipality || 'Municipal Territory';
 
   const fetchAndAnalyzePriorities = async () => {
+    if (!selectedVillageId) return;
     setAnalyzing(true);
     try {
-      const [prioRes, issuesRes] = await Promise.all([
-        fetch('http://127.0.0.1:8000/api/priorities').then((r) => r.json()),
-        fetch(`http://127.0.0.1:8000/api/issues?village_id=${villageId}`).then((r) => r.json()),
+      const [issuesRes, networkRes] = await Promise.all([
+        cachedFetchJson(`http://127.0.0.1:8000/api/issues?village_id=${selectedVillageId}`, {}, {
+          ttlMs: 30000,
+        }),
+        cachedFetchJson(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/network`, {}, {
+          ttlMs: 60000,
+        }).catch(() => null),
       ]);
 
-      setPrioritiesData(prioRes);
       const rawIssues = Array.isArray(issuesRes) ? issuesRes : (issuesRes.data || []);
       setIssues(rawIssues);
-      if (rawIssues.length > 0 && !selectedIssue) {
+      setVillageNetwork(networkRes);
+      if (rawIssues.length > 0) {
         setSelectedIssue(rawIssues[0]);
+      } else {
+        setSelectedIssue(null);
       }
     } catch (err) {
       console.error('Failed to analyze priorities:', err);
@@ -57,7 +84,7 @@ export default function AIPrioritizationSection({ onNavigate, onSelectTab }) {
 
   useEffect(() => {
     fetchAndAnalyzePriorities();
-  }, [villageId]);
+  }, [selectedVillageId]);
 
   // Deterministic Scoring Breakdown
   const calculateIssueScore = (iss) => {
@@ -70,30 +97,31 @@ export default function AIPrioritizationSection({ onNavigate, onSelectTab }) {
     else if (sev === 'high') sevScore = 75;
     else if (sev === 'medium') sevScore = 50;
 
-    // 2. Affected Population Factor (30%)
-    // Bridge B or single point of failure isolates 20 HH; road slides partially affect 35 HH
-    let popScore = 50;
-    let affectedHH = 15;
+    // 2. Affected Population Factor (30%) - read from actual issue or settlement estimates
+    let affectedHH = iss.citizens_affected ? Math.max(1, Math.round(iss.citizens_affected / 5)) : 15;
+    let popScore = Math.min(100, Math.max(30, affectedHH * 3));
     if (cat.includes('bridge')) {
-      popScore = 90;
-      affectedHH = 20;
+      popScore = Math.max(popScore, 85);
+      affectedHH = Math.max(affectedHH, 20);
     } else if (cat.includes('road')) {
-      popScore = 70;
-      affectedHH = 35;
+      popScore = Math.max(popScore, 70);
+      affectedHH = Math.max(affectedHH, 25);
     } else if (cat.includes('water')) {
-      popScore = 80;
-      affectedHH = 28;
+      popScore = Math.max(popScore, 80);
+      affectedHH = Math.max(affectedHH, 22);
     }
 
     // 3. Service Disruption (25%) - schools / health posts cut off
     let disruptionScore = 40;
-    let cutoffServices = ['Local Market Access'];
+    const facilities = villageNetwork?.facilities || [];
+    const facilityNames = facilities.map((f) => f.name).filter(Boolean);
+    let cutoffServices = facilityNames.length > 0 ? facilityNames.slice(0, 2) : ['Local Health Post / School Corridors'];
+
     if (cat.includes('bridge') || sev === 'critical') {
       disruptionScore = 90;
-      cutoffServices = ['Bhotenamlang Primary Health Post', 'Janahit Secondary School'];
     } else if (cat.includes('water')) {
       disruptionScore = 85;
-      cutoffServices = ['Communal Tapstand Network'];
+      cutoffServices = ['Communal Tapstand & WASH Network'];
     }
 
     // 4. Verification Quality (15%)
@@ -112,25 +140,29 @@ export default function AIPrioritizationSection({ onNavigate, onSelectTab }) {
       affectedHH,
       cutoffServices,
       confidence: isVerified ? 'High (Field Verified)' : 'Medium (Citizen Report Pending Verification)',
-      missingData: isVerified ? null : 'Recent geotechnical shear test reading missing; verification visit required.',
+      missingData: isVerified ? null : 'Field engineering inspection recommended to verify physical defect depth.',
     };
   };
 
-  const filteredIssues = issues.filter((iss) => {
-    if (category !== 'all' && iss.category !== category) return false;
-    if (ward !== 'all') {
-      const w = iss.ward || '4';
-      if (String(w) !== String(ward)) return false;
-    }
-    return true;
-  });
+  const filteredIssues = useMemo(() => {
+    return issues.filter((iss) => {
+      if (category !== 'all' && iss.category !== category) return false;
+      if (ward !== 'all') {
+        const w = iss.ward || currentVillageObj?.ward_no || '1';
+        if (String(w) !== String(ward)) return false;
+      }
+      return true;
+    });
+  }, [issues, category, ward, currentVillageObj]);
 
-  const rankedIssues = filteredIssues
-    .map((iss) => ({
-      ...iss,
-      analysis: calculateIssueScore(iss),
-    }))
-    .sort((a, b) => b.analysis.compositeScore - a.analysis.compositeScore);
+  const rankedIssues = useMemo(() => {
+    return filteredIssues
+      .map((iss) => ({
+        ...iss,
+        analysis: calculateIssueScore(iss),
+      }))
+      .sort((a, b) => b.analysis.compositeScore - a.analysis.compositeScore);
+  }, [filteredIssues, villageNetwork]);
 
   const handleSaveOverride = (issueId) => {
     setOverrideSaved((prev) => ({ ...prev, [issueId]: true }));
@@ -141,7 +173,7 @@ export default function AIPrioritizationSection({ onNavigate, onSelectTab }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Human-Centered Task Header (Phase 7) */}
+      {/* Human-Centered Task Header */}
       <div>
         <span className="eyebrow" style={{ color: '#176342', fontWeight: 700 }}>Priority Ranking</span>
         <h2 style={{ margin: '4px 0', fontSize: 22, color: '#092d22', fontFamily: 'Georgia, serif' }}>
@@ -152,7 +184,7 @@ export default function AIPrioritizationSection({ onNavigate, onSelectTab }) {
         </p>
       </div>
 
-      {/* Expandable Scoring Methodology (Hidden by default for non-technical users) */}
+      {/* Expandable Scoring Methodology */}
       <details className="ai-details-toggle">
         <summary>
           <Sliders size={14} /> View scoring methodology & criteria weights
@@ -166,15 +198,22 @@ export default function AIPrioritizationSection({ onNavigate, onSelectTab }) {
       <Card style={{ padding: '14px 18px' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
-            {/* Municipality */}
+            {/* Village Selector */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <label style={{ fontSize: 10, color: '#687c73', fontWeight: 600 }}>MUNICIPALITY</label>
+              <label style={{ fontSize: 10, color: '#687c73', fontWeight: 600 }}>MUNICIPALITY & VILLAGE</label>
               <select
-                value={municipality}
-                onChange={(e) => setMunicipality(e.target.value)}
-                style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #c8d8cc', fontSize: 12, color: '#176342', fontWeight: 600, background: '#ffffff' }}
+                value={selectedVillageId}
+                onChange={(e) => {
+                  setSelectedVillageId(e.target.value);
+                  setSelectedIssue(null);
+                }}
+                style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #c8d8cc', fontSize: 12, color: '#176342', fontWeight: 600, background: '#ffffff', minWidth: 200 }}
               >
-                <option value="Helambu Rural Municipality">Helambu Rural Municipality</option>
+                {deduplicateVillages(villages).map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {formatVillageLabel(v)}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -186,22 +225,12 @@ export default function AIPrioritizationSection({ onNavigate, onSelectTab }) {
                 onChange={(e) => setWard(e.target.value)}
                 style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #c8d8cc', fontSize: 12, color: '#176342', fontWeight: 600, background: '#ffffff' }}
               >
-                <option value="all">All Wards (1-7)</option>
-                <option value="4">Ward 4 (Bhotenamlang)</option>
-                <option value="3">Ward 3</option>
-                <option value="2">Ward 2</option>
-              </select>
-            </div>
-
-            {/* Village */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <label style={{ fontSize: 10, color: '#687c73', fontWeight: 600 }}>VILLAGE</label>
-              <select
-                value={villageId}
-                onChange={(e) => setVillageId(e.target.value)}
-                style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #c8d8cc', fontSize: 12, color: '#176342', fontWeight: 600, background: '#ffffff' }}
-              >
-                <option value="1">Bhotenamlang (Model Village)</option>
+                <option value="all">All Wards</option>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((w) => (
+                  <option key={w} value={String(w)}>
+                    Ward {w}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -215,8 +244,10 @@ export default function AIPrioritizationSection({ onNavigate, onSelectTab }) {
               >
                 <option value="all">All Lifelines</option>
                 <option value="damaged_bridge">Bridges & Crossings</option>
-                <option value="road_block">Roads & Trails</option>
+                <option value="damaged_road">Roads & Trails</option>
                 <option value="water_supply">Water Supply</option>
+                <option value="health_post_access">Health Access</option>
+                <option value="school_access">School Access</option>
               </select>
             </div>
           </div>
@@ -228,238 +259,245 @@ export default function AIPrioritizationSection({ onNavigate, onSelectTab }) {
             disabled={analyzing}
             style={{ fontSize: 12, padding: '8px 18px' }}
           >
-            {analyzing ? <Loader2 size={14} className="spin" /> : <Sliders size={14} />} Analyze Priorities
+            {analyzing ? <Loader2 size={14} className="spin" /> : <Sliders size={14} />} Re-calculate Priorities
           </button>
         </div>
       </Card>
 
-      {/* Main Workspace Layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.8fr) minmax(320px, 1.2fr)', gap: 16 }}>
-        {/* Ranked Issues Table */}
-        <Card style={{ padding: 18 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div>
-              <strong style={{ display: 'block', fontSize: 13, color: '#176342' }}>
-                Priority-Ranked Infrastructure Interventions
-              </strong>
-              <span style={{ fontSize: 11, color: '#687c73' }}>
-                Sorted by computed Priority Index ({rankedIssues.length} issues analyzed)
-              </span>
-            </div>
-            <span style={{ fontSize: 11, color: '#176342', background: '#e3f3e3', padding: '3px 8px', borderRadius: 6, fontWeight: 700 }}>
-              Live Ranking
-            </span>
-          </div>
-
-          <div className="table-scroll">
-            <table className="data-table" style={{ fontSize: 12 }}>
-              <thead>
-                <tr>
-                  <th>Rank</th>
-                  <th>Infrastructure Disruption</th>
-                  <th>Impact Score</th>
-                  <th>Affected Pop.</th>
-                  <th>Urgency</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rankedIssues.map((item, idx) => {
-                  const isSelected = selectedIssue?.id === item.id;
-                  const score = item.analysis.compositeScore;
-                  return (
-                    <tr
-                      key={item.id}
-                      style={{
-                        background: isSelected ? '#f0f7f1' : 'transparent',
-                        cursor: 'pointer',
-                      }}
-                      onClick={() => setSelectedIssue(item)}
-                    >
-                      <td>
-                        <span
-                          style={{
-                            display: 'inline-grid',
-                            placeItems: 'center',
-                            width: 22,
-                            height: 22,
-                            borderRadius: '50%',
-                            background: idx === 0 ? '#c0392b' : (idx === 1 ? '#d97706' : '#176342'),
-                            color: '#ffffff',
-                            fontWeight: 800,
-                            fontSize: 10.5,
-                          }}
-                        >
-                          #{idx + 1}
-                        </span>
-                      </td>
-                      <td>
-                        <strong>{item.title}</strong>
-                        <small style={{ display: 'block', color: '#687c73', fontSize: 10.5 }}>
-                          {item.tracking_code || `GP-${item.id}`} · Ward {item.ward || '4'}
-                        </small>
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <strong style={{ color: score >= 80 ? '#c0392b' : (score >= 60 ? '#d97706' : '#176342'), fontSize: 13 }}>
-                            {score}
-                          </strong>
-                          <span style={{ fontSize: 10, color: '#687c73' }}>/ 100</span>
-                        </div>
-                      </td>
-                      <td>
-                        <strong>{item.analysis.affectedHH} HH</strong>
-                      </td>
-                      <td>
-                        <span
-                          style={{
-                            fontSize: 10,
-                            fontWeight: 700,
-                            padding: '2px 6px',
-                            borderRadius: 4,
-                            background: score >= 80 ? '#fee2e2' : (score >= 60 ? '#fef3c7' : '#e0f2fe'),
-                            color: score >= 80 ? '#991b1b' : (score >= 60 ? '#92400e' : '#075985'),
-                          }}
-                        >
-                          {score >= 80 ? 'Immediate Inspection' : (score >= 60 ? 'High Priority' : 'Routine')}
-                        </span>
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="text-button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedIssue(item);
-                          }}
-                          style={{ fontSize: 11 }}
-                        >
-                          Inspect <ArrowRight size={11} />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      {/* Empty State when no issues exist for the selected village */}
+      {rankedIssues.length === 0 && !analyzing && (
+        <Card style={{ padding: '36px 20px', textAlign: 'center' }}>
+          <CheckCircle2 size={36} color="#176342" style={{ margin: '0 auto 12px' }} />
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: '#092d22', margin: '0 0 6px' }}>
+            No Active Infrastructure Issues in {villageName}
+          </h3>
+          <p style={{ fontSize: 13, color: '#687c73', margin: '0 0 16px', maxWidth: 480, marginInline: 'auto' }}>
+            There are currently no registered disruption issues or field alerts recorded in MySQL for this village. You can report an issue or import infrastructure.
+          </p>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+            <button
+              type="button"
+              className="button button--primary"
+              onClick={() => onNavigate && onNavigate('issues-alerts')}
+            >
+              Report New Field Issue <ArrowRight size={14} />
+            </button>
+            <button
+              type="button"
+              className="button button--secondary"
+              onClick={() => onNavigate && onNavigate('village-data')}
+            >
+              Open Village Data Manager
+            </button>
           </div>
         </Card>
+      )}
 
-        {/* Selected Issue Calculation Breakdown & Official Override */}
-        {selectedIssue && (
+      {/* Main Workspace Layout */}
+      {rankedIssues.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.8fr) minmax(320px, 1.2fr)', gap: 16 }}>
+          {/* Ranked Issues Table */}
           <Card style={{ padding: 18 }}>
-            <div style={{ borderBottom: '1px solid #edf0eb', paddingBottom: 10, marginBottom: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 10.5, color: '#687c73', fontWeight: 600 }}>AUDIT BREAKDOWN</span>
-                <span style={{ fontSize: 10, background: '#e3f3e3', color: '#176342', padding: '2px 6px', borderRadius: 4, fontWeight: 700 }}>
-                  Confidence: {selectedIssue.analysis?.confidence.split(' ')[0]}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div>
+                <strong style={{ display: 'block', fontSize: 13, color: '#176342' }}>
+                  Priority-Ranked Infrastructure Interventions
+                </strong>
+                <span style={{ fontSize: 11, color: '#687c73' }}>
+                  Sorted by computed Priority Index for {villageName} ({rankedIssues.length} issues)
                 </span>
               </div>
-              <strong style={{ display: 'block', fontSize: 14, color: '#176342', marginTop: 4 }}>
-                {selectedIssue.title}
-              </strong>
-              <span style={{ fontSize: 11, color: '#687c73' }}>
-                Tracking: {selectedIssue.tracking_code || `GP-${selectedIssue.id}`} · {selectedIssue.category?.replace('_', ' ')}
+              <span style={{ fontSize: 11, color: '#176342', background: '#e3f3e3', padding: '3px 8px', borderRadius: 6, fontWeight: 700 }}>
+                Live Ranking
               </span>
             </div>
 
-            {/* Score Breakdown Bars */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
-                  <span>Population Impact (30% weight)</span>
-                  <strong>{selectedIssue.analysis?.popScore}/100 ({selectedIssue.analysis?.affectedHH} HH)</strong>
-                </div>
-                <div style={{ height: 6, background: '#e5e7eb', borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{ width: `${selectedIssue.analysis?.popScore}%`, height: '100%', background: '#176342' }} />
-                </div>
-              </div>
-
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
-                  <span>Essential Services Disruption (25% weight)</span>
-                  <strong>{selectedIssue.analysis?.disruptionScore}/100</strong>
-                </div>
-                <div style={{ height: 6, background: '#e5e7eb', borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{ width: `${selectedIssue.analysis?.disruptionScore}%`, height: '100%', background: '#d97706' }} />
-                </div>
-                <small style={{ fontSize: 10, color: '#687c73', display: 'block', marginTop: 2 }}>
-                  Cut off: {selectedIssue.analysis?.cutoffServices?.join(', ')}
-                </small>
-              </div>
-
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
-                  <span>Structural Physical Severity (30% weight)</span>
-                  <strong>{selectedIssue.analysis?.sevScore}/100 ({selectedIssue.severity})</strong>
-                </div>
-                <div style={{ height: 6, background: '#e5e7eb', borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{ width: `${selectedIssue.analysis?.sevScore}%`, height: '100%', background: '#c0392b' }} />
-                </div>
-              </div>
-
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
-                  <span>Ground Field Verification (15% weight)</span>
-                  <strong>{selectedIssue.analysis?.verScore}/100</strong>
-                </div>
-                <div style={{ height: 6, background: '#e5e7eb', borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{ width: `${selectedIssue.analysis?.verScore}%`, height: '100%', background: '#0284c7' }} />
-                </div>
-              </div>
-            </div>
-
-            {/* Missing Data Warning */}
-            {selectedIssue.analysis?.missingData && (
-              <div style={{ marginTop: 14, background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6, padding: '8px 12px', fontSize: 11, color: '#92400e' }}>
-                <strong style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
-                  <Info size={12} /> Missing Ground Telemetry:
-                </strong>
-                {selectedIssue.analysis.missingData}
-              </div>
-            )}
-
-            {/* Official Review / Override Documenter */}
-            <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid #edf0eb' }}>
-              <label style={{ fontSize: 11, fontWeight: 700, color: '#176342', display: 'block', marginBottom: 4 }}>
-                Document Official Municipal Override / Review Notes:
-              </label>
-              <textarea
-                rows={2}
-                placeholder="Enter justification if modifying inspection rank (e.g., upcoming election route, critical ambulance bypass)..."
-                value={overrideNotes[selectedIssue.id] || ''}
-                onChange={(e) => setOverrideNotes({ ...overrideNotes, [selectedIssue.id]: e.target.value })}
-                style={{ width: '100%', borderRadius: 6, border: '1px solid #cfdecf', padding: 8, fontSize: 11, fontFamily: 'inherit' }}
-              />
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-                {overrideSaved[selectedIssue.id] ? (
-                  <span style={{ fontSize: 11, color: '#166534', display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
-                    <CheckCircle2 size={13} /> Review recorded in audit trail
-                  </span>
-                ) : <span />}
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button
-                    type="button"
-                    className="button button--secondary"
-                    onClick={() => handleSaveOverride(selectedIssue.id)}
-                    style={{ fontSize: 11, padding: '5px 12px' }}
-                  >
-                    <Save size={12} /> Save Review Note
-                  </button>
-                  <button
-                    type="button"
-                    className="button button--primary"
-                    onClick={() => onSelectTab('planning')}
-                    style={{ fontSize: 11, padding: '5px 12px' }}
-                  >
-                    Create Action Plan <Wrench size={12} />
-                  </button>
-                </div>
-              </div>
+            <div className="table-scroll">
+              <table className="data-table" style={{ fontSize: 12 }}>
+                <thead>
+                  <tr>
+                    <th>Rank</th>
+                    <th>Infrastructure Disruption</th>
+                    <th>Impact Score</th>
+                    <th>Affected Pop.</th>
+                    <th>Urgency</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rankedIssues.map((item, idx) => {
+                    const isSelected = selectedIssue?.id === item.id;
+                    const score = item.analysis.compositeScore;
+                    return (
+                      <tr
+                        key={item.id}
+                        style={{
+                          background: isSelected ? '#f0f7f1' : 'transparent',
+                          cursor: 'pointer',
+                        }}
+                        onClick={() => setSelectedIssue(item)}
+                      >
+                        <td>
+                          <span
+                            style={{
+                              display: 'inline-grid',
+                              placeItems: 'center',
+                              width: 22,
+                              height: 22,
+                              borderRadius: '50%',
+                              background: idx === 0 ? '#c0392b' : (idx === 1 ? '#d97706' : '#176342'),
+                              color: '#ffffff',
+                              fontWeight: 800,
+                              fontSize: 10.5,
+                            }}
+                          >
+                            #{idx + 1}
+                          </span>
+                        </td>
+                        <td>
+                          <strong>{item.title}</strong>
+                          <small style={{ display: 'block', color: '#687c73', fontSize: 10.5 }}>
+                            {item.tracking_code || `GP-${item.id}`} · Ward {item.ward || currentVillageObj?.ward_no || '1'}
+                          </small>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <strong style={{ color: score >= 80 ? '#c0392b' : (score >= 60 ? '#d97706' : '#176342'), fontSize: 13 }}>
+                              {score}
+                            </strong>
+                            <span style={{ fontSize: 10, color: '#687c73' }}>/ 100</span>
+                          </div>
+                        </td>
+                        <td>
+                          <strong>{item.analysis.affectedHH} HH</strong>
+                        </td>
+                        <td>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              padding: '2px 6px',
+                              borderRadius: 4,
+                              background: score >= 80 ? '#fee2e2' : (score >= 60 ? '#fef3c7' : '#e0f2fe'),
+                              color: score >= 80 ? '#991b1b' : (score >= 60 ? '#92400e' : '#075985'),
+                            }}
+                          >
+                            {score >= 80 ? 'Immediate Inspection' : (score >= 60 ? 'High Priority' : 'Routine')}
+                          </span>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="text-button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedIssue(item);
+                            }}
+                            style={{ fontSize: 11 }}
+                          >
+                            Inspect <ArrowRight size={11} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </Card>
-        )}
-      </div>
+
+          {/* Selected Issue Calculation Breakdown & Official Override */}
+          {selectedIssue && (
+            <Card style={{ padding: 18 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div>
+                  <strong style={{ display: 'block', fontSize: 13, color: '#176342' }}>
+                    Transparent Priority Breakdown
+                  </strong>
+                  <span style={{ fontSize: 10.5, color: '#687c73' }}>
+                    {selectedIssue.tracking_code || `GP-${selectedIssue.id}`} · {selectedIssue.title}
+                  </span>
+                </div>
+                <StatusBadge tone={(selectedIssue.severity || '').toLowerCase() === 'critical' ? 'red' : 'orange'}>
+                  {selectedIssue.severity}
+                </StatusBadge>
+              </div>
+
+              {/* Sub-Criteria Progress Bars */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
+                    <span style={{ color: '#4b5563' }}>Population At Risk (30%)</span>
+                    <strong>{selectedIssue.analysis?.popScore || 70} / 100</strong>
+                  </div>
+                  <div style={{ height: 5, background: '#e5e7eb', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${selectedIssue.analysis?.popScore || 70}%`, background: '#b91c1c' }} />
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
+                    <span style={{ color: '#4b5563' }}>Service Disruption Factor (25%)</span>
+                    <strong>{selectedIssue.analysis?.disruptionScore || 60} / 100</strong>
+                  </div>
+                  <div style={{ height: 5, background: '#e5e7eb', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${selectedIssue.analysis?.disruptionScore || 60}%`, background: '#d97706' }} />
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
+                    <span style={{ color: '#4b5563' }}>Structural Hazard Severity (30%)</span>
+                    <strong>{selectedIssue.analysis?.sevScore || 80} / 100</strong>
+                  </div>
+                  <div style={{ height: 5, background: '#e5e7eb', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${selectedIssue.analysis?.sevScore || 80}%`, background: '#176342' }} />
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
+                    <span style={{ color: '#4b5563' }}>Verification Confidence (15%)</span>
+                    <strong>{selectedIssue.analysis?.verScore || 70} / 100</strong>
+                  </div>
+                  <div style={{ height: 5, background: '#e5e7eb', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${selectedIssue.analysis?.verScore || 70}%`, background: '#2563eb' }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Explainable Insights Box */}
+              <div style={{ background: '#f8faf8', border: '1px solid #e2ece3', borderRadius: 8, padding: '10px 12px', fontSize: 11.5, color: '#274b39', lineHeight: 1.5, marginBottom: 14 }}>
+                <strong style={{ display: 'block', color: '#176342', marginBottom: 2 }}>Analysis Details:</strong>
+                {selectedIssue.description || 'Infrastructure disruption requiring rapid municipal technical intervention.'}
+                <div style={{ marginTop: 6, fontSize: 11, color: '#556e62' }}>
+                  <strong>Lifelines Affected:</strong> {selectedIssue.analysis?.cutoffServices?.join(', ') || 'Local trail corridor'}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <button
+                  type="button"
+                  className="button button--primary"
+                  onClick={() => onSelectTab && onSelectTab('planning')}
+                  style={{ fontSize: 11.5, padding: '7px 14px', justifyContent: 'center' }}
+                >
+                  Draft Repair Action Plan <Wrench size={13} />
+                </button>
+                <button
+                  type="button"
+                  className="button button--secondary"
+                  onClick={() => onSelectTab && onSelectTab('impact')}
+                  style={{ fontSize: 11.5, padding: '7px 14px', justifyContent: 'center' }}
+                >
+                  Simulate Network Impact <Network size={13} />
+                </button>
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -4,6 +4,35 @@ from config import LARAVEL_API_URL, REQUEST_TIMEOUT
 from simulator import run_simulation
 
 
+async def get_village_details(village_id: int = 1) -> Dict[str, Any]:
+    """Retrieve official administrative metadata, readiness status, and summary counts from Laravel."""
+    try:
+        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
+            resp = await client.get(f"{LARAVEL_API_URL}/villages/{village_id}")
+            if resp.status_code == 200:
+                village_data = resp.json()
+            else:
+                return {"error": f"Village ID {village_id} not found in database (HTTP {resp.status_code})"}
+
+            readiness_resp = await client.get(f"{LARAVEL_API_URL}/villages/{village_id}/network-readiness")
+            readiness = readiness_resp.json() if readiness_resp.status_code == 200 else {}
+
+            return {
+                "village_id": village_id,
+                "name": village_data.get("name"),
+                "local_name": village_data.get("local_name"),
+                "ward_no": village_data.get("ward_no", "1"),
+                "municipality": village_data.get("municipality"),
+                "district": village_data.get("district"),
+                "province": village_data.get("province"),
+                "status": village_data.get("status", "active"),
+                "verification_status": village_data.get("verification_status", "verified"),
+                "readiness": readiness,
+            }
+    except Exception as exc:
+        return {"error": f"Failed to retrieve village details: {str(exc)}"}
+
+
 async def get_village_issues(village_id: int = 1, issues_list: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
     """Retrieve authorized village issue reports from Laravel, sanitizing private citizen data."""
     if issues_list is None:

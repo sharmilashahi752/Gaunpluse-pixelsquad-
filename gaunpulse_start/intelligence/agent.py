@@ -1,7 +1,7 @@
 import re
 import httpx
 from typing import Any, Dict, List, Optional
-from config import GEMINI_API_KEY, OPENAI_API_KEY, AI_MODEL, REQUEST_TIMEOUT
+from config import GEMINI_API_KEY, OPENAI_API_KEY, AI_MODEL, REQUEST_TIMEOUT, LARAVEL_API_URL
 from schemas import (
     AIChatMessage,
     AIChatRequest,
@@ -22,7 +22,7 @@ class GaunPulseAIAgent:
     """
     GaunPulse AI Decision-Support Agent for Rural Infrastructure Intelligence.
     Coordinates tool execution against Laravel and NetworkX, synthesizing
-    evidence-backed insights in English and Nepali.
+    evidence-backed insights in English and Nepali for any village in Nepal.
     """
 
     SYSTEM_PROMPT_EN = (
@@ -66,10 +66,16 @@ class GaunPulseAIAgent:
                 language="ne" if is_nepali else "en",
                 tools_called=[],
                 suggested_questions=[
-                    "What happens if Bridge B is blocked?",
-                    "Which issues are currently critical in Ward 4?",
+                    "Which issues are currently critical?",
+                    "What happens if our main bridge or road fails?",
                 ],
             )
+
+        # Retrieve village administrative metadata dynamically
+        village_details = await tools.get_village_details(village_id=village_id)
+        village_name = village_details.get("name") or f"Village {village_id}"
+        village_muni = village_details.get("municipality") or "Municipality"
+        village_ward = f"Ward {village_details.get('ward_no', '1')}"
 
         tools_called: List[AIToolCall] = []
         draft_plan: Optional[DraftActionPlan] = None
@@ -79,41 +85,36 @@ class GaunPulseAIAgent:
         # TOOL SELECTION & INTENT DETECTION
         # ==========================================
 
-        # Intent 1: Simulation (Failure, closure, what happens if bridge/road fails)
         is_sim_intent = any(w in lower_msg for w in [
-            "simulate", "what happens if", "blocked", "closed", "collapse", "bridge b", "bridge",
+            "simulate", "what happens if", "blocked", "closed", "collapse", "bridge b", "bridge", "road",
             "पुल", "बाटो", "अवरुद्ध", "के हुन्छ", "प्रभावित", "बन्द", "सिमुलेसन"
         ])
 
-        # Intent 2: Action Plan Drafting
         is_plan_intent = any(w in lower_msg for w in [
             "action plan", "draft plan", "repair plan", "intervention",
             "कार्ययोजना", "मर्मत योजना", "योजना बनाउ", "योजना"
         ])
 
-        # Intent 3: Priorities Ranking
         is_priority_intent = any(w in lower_msg for w in [
             "priority", "priorities", "rank", "inspect first", "fix first",
             "प्राथमिकता", "पहिले कुन", "प्राथमिकीकरण"
         ])
 
-        # Intent 4: Citizen Assistance & Tracking Code Lookup
         tracking_code_match = re.search(r'\b(gp-[a-z0-9-]+)\b', lower_msg)
         is_citizen_intent = bool(tracking_code_match) or any(w in lower_msg for w in [
             "my issue", "track", "tracking code", "report a damaged", "how can i report",
             "गुनासो", "उजुरी", "कहाँ पुगेको", "स्थिति", "कसरी दर्ता"
         ])
 
-        # Intent 5: General Issues list
         is_issues_intent = any(w in lower_msg for w in [
             "issues", "problems", "alerts", "reports", "disruptions",
             "समस्या", "विवरण", "के के छन्"
         ])
 
-        # Execute appropriate tools
         network_data = request.network_data
         issues_data = request.issues_data
 
+        # 1. Citizen Assistance Tool Call
         if is_citizen_intent:
             matched_code = tracking_code_match.group(1).upper() if tracking_code_match else None
             issues_res = await tools.get_village_issues(village_id=village_id, issues_list=issues_data)
@@ -121,17 +122,17 @@ class GaunPulseAIAgent:
             if matched_code and "issues" in issues_res:
                 matching_issue = next((i for i in issues_res["issues"] if (i.get("tracking_code") or "").upper() == matched_code), None)
             elif "issues" in issues_res and issues_res["issues"]:
-                # Default to first road/bridge issue for general inquiry
                 matching_issue = issues_res["issues"][0]
 
             tools_called.append(AIToolCall(
                 tool="lookup_citizen_issue",
                 agent="Citizen Assistance Agent",
-                args={"tracking_code": matched_code or (matching_issue.get("tracking_code") if matching_issue else "GP-BRG-01")},
-                result={"found": bool(matching_issue), "issue": matching_issue},
+                args={"tracking_code": matched_code or (matching_issue.get("tracking_code") if matching_issue else "GP-01")},
+                result={"found": bool(matching_issue), "issue": matching_issue, "village": village_name},
             ))
             relevant_links.append({"label": "Report New Issue", "url": "#/issues-alerts"})
 
+        # 2. Priorities Ranking Tool Call
         if is_priority_intent or (is_plan_intent and not is_sim_intent):
             prio_res = await tools.get_repair_priorities(village_id=village_id, issues_list=issues_data)
             tools_called.append(AIToolCall(
@@ -141,9 +142,53 @@ class GaunPulseAIAgent:
                 result=prio_res,
             ))
 
+        # 3. Simulation Tool Call
         if is_sim_intent:
-            # Determine edge (default to Bridge B, id=2)
-            edge_id = 2
+            # Ensure network data is loaded for this village
+            if not network_data:
+                try:
+                    async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
+                        resp = await client.get(f"{LARAVEL_API_URL}/villages/{village_id}/network")
+                        if resp.status_code == 200:
+                            network_data = resp.json()
+                except Exception as exc:
+                    network_data = None
+
+            available_edges = network_data.get("edges", []) if network_data else []
+
+            if not available_edges:
+                # Guidance if village has no mapped edges
+                empty_msg_ne = (
+                    f"**{village_name}** को लागि कुनै सडक वा पुलको नक्साङ्कन (Graph) भेटिएन। "
+                    f"सिमुलेसन चलाउनुअघि कृपया 'Village Data Manager' मा गएर OpenStreetMap डेटा आयात गर्नुहोस्।"
+                )
+                empty_msg_en = (
+                    f"Village **{village_name}** currently has no mapped road or bridge edges in its network graph. "
+                    f"Please visit the **Village Data Manager** to discover or map infrastructure lifelines before running an impact simulation."
+                )
+                return AIChatResponse(
+                    reply=empty_msg_ne if is_nepali else empty_msg_en,
+                    language="ne" if is_nepali else "en",
+                    tools_called=[],
+                    relevant_links=[{"label": "Village Data Manager", "url": "#/village-data"}],
+                    suggested_questions=[
+                        f"Which issues are registered in {village_name}?",
+                        f"How can I report a problem in {village_name}?",
+                    ],
+                )
+
+            # Match edge from user query or select the first edge belonging to this village
+            edge_id = None
+            for e in available_edges:
+                e_name = (e.get("name") or "").lower()
+                e_code = (e.get("edge_code") or "").lower()
+                if (e_name and e_name in lower_msg) or (e_code and e_code in lower_msg):
+                    edge_id = e.get("id")
+                    break
+
+            if edge_id is None:
+                edge_id = available_edges[0].get("id")
+
             sim_res = await tools.simulate_infrastructure_failure(
                 edge_id=edge_id,
                 village_id=village_id,
@@ -156,29 +201,54 @@ class GaunPulseAIAgent:
                 result=sim_res,
             ))
             relevant_links.append({"label": "Open Impact Simulator", "url": "#/simulations"})
-            relevant_links.append({"label": "View Bridge on Map", "url": "#/village-map"})
+            relevant_links.append({"label": f"View {village_name} Map", "url": "#/village-map"})
 
+        # 4. Action Plan Drafting Tool Call
         if is_plan_intent:
-            # Issue to draft for (default to issue 1 or 2)
-            issue_id = 1
+            # Look up registered issues for this village
+            issues_res = await tools.get_village_issues(village_id=village_id, issues_list=issues_data)
+            village_issues = issues_res.get("issues", [])
+
             matching_issue = None
-            if issues_data:
-                matching_issue = next((iss for iss in issues_data if iss.get("id") == issue_id), None)
+            issue_id = None
+
+            if village_issues:
+                # Check if specific issue title or code matches
+                for iss in village_issues:
+                    if (iss.get("title") or "").lower() in lower_msg or (iss.get("tracking_code") or "").lower() in lower_msg:
+                        matching_issue = iss
+                        issue_id = iss.get("id")
+                        break
+                if not matching_issue:
+                    matching_issue = village_issues[0]
+                    issue_id = matching_issue.get("id")
+            else:
+                issue_id = None
+                matching_issue = {
+                    "id": None,
+                    "title": f"Primary Lifeline Maintenance in {village_name}",
+                    "category": "road_bridge",
+                    "severity": "High",
+                    "description": f"Preventative structural assessment and clearing for critical rural lifelines in {village_name}.",
+                    "ward": village_details.get("ward_no", "1"),
+                }
+
             plan_res = await tools.generate_action_plan_draft(
-                issue_id=issue_id,
+                issue_id=issue_id or 0,
                 village_id=village_id,
                 issue_data=matching_issue,
             )
             tools_called.append(AIToolCall(
                 tool="generate_action_plan_draft",
                 agent="Repair Planning Agent",
-                args={"issue_id": issue_id, "village_id": village_id},
+                args={"issue_id": issue_id or 0, "village_id": village_id},
                 result=plan_res,
             ))
             if "error" not in plan_res:
                 draft_plan = DraftActionPlan(**plan_res)
             relevant_links.append({"label": "Action Plans Management", "url": "#/action-plans"})
 
+        # 5. Issues List Tool Call
         if is_issues_intent and not is_sim_intent and not is_plan_intent and not is_priority_intent and not is_citizen_intent:
             issues_res = await tools.get_village_issues(village_id=village_id, issues_list=issues_data)
             tools_called.append(AIToolCall(
@@ -187,7 +257,7 @@ class GaunPulseAIAgent:
                 args={"village_id": village_id},
                 result=issues_res,
             ))
-            relevant_links.append({"label": "View Issues & Alerts", "url": "#/issues-alerts"})
+            relevant_links.append({"label": f"View {village_name} Issues", "url": "#/issues-alerts"})
 
         # Default fallback tool: load village issues
         if not tools_called:
@@ -200,19 +270,21 @@ class GaunPulseAIAgent:
             ))
 
         # ==========================================
-        # SYNTHESIS (External LLM or Deterministic Engine)
+        # SYNTHESIS
         # ==========================================
         reply = await self._synthesize_response(
             message=message,
             is_nepali=is_nepali,
             tools_called=tools_called,
             draft_plan=draft_plan,
+            village_name=village_name,
+            village_ward=village_ward,
         )
 
         suggested_questions = [
-            "पुल बिग्रिएपछि कुन बस्ती प्रभावित हुन्छ?" if is_nepali else "What happens if Bridge B is blocked?",
-            "वडा ४ को लागि मर्मत कार्ययोजना तयार गर्नुहोस्।" if is_nepali else "Draft a rapid repair action plan for the bridge failure",
-            "कुन पूर्वाधार समस्यालाई पहिलो प्राथमिकता दिने?" if is_nepali else "Which issues have the highest priority score in Bhotenamlang?",
+            f"कुन पूर्वाधार समस्यालाई पहिलो प्राथमिकता दिने?" if is_nepali else f"Which issues have the highest priority in {village_name}?",
+            f"बाटो वा पुल अवरुद्ध हुँदा कुन बस्ती प्रभावित हुन्छ?" if is_nepali else f"What happens if a primary lifeline fails in {village_name}?",
+            f"{village_name} को लागि मर्मत कार्ययोजना तयार गर्नुहोस्।" if is_nepali else f"Draft a rapid repair action plan for {village_name}",
         ]
 
         return AIChatResponse(
@@ -230,16 +302,17 @@ class GaunPulseAIAgent:
         is_nepali: bool,
         tools_called: List[AIToolCall],
         draft_plan: Optional[DraftActionPlan],
+        village_name: str = "Village",
+        village_ward: str = "Ward 1",
     ) -> str:
         """Synthesize response using real tool data, supporting Gemini/OpenAI if configured or deterministic engine."""
-        # Try external API if configured
         if GEMINI_API_KEY:
             try:
                 res = await self._call_gemini(message, is_nepali, tools_called)
                 if res:
                     return res
             except Exception:
-                pass  # Fallback seamlessly to deterministic engine
+                pass
 
         if OPENAI_API_KEY:
             try:
@@ -249,16 +322,17 @@ class GaunPulseAIAgent:
             except Exception:
                 pass
 
-        # Built-in Deterministic Engine based on real tool calculations
-        return self._deterministic_synthesis(is_nepali, tools_called, draft_plan)
+        return self._deterministic_synthesis(is_nepali, tools_called, draft_plan, village_name, village_ward)
 
     def _deterministic_synthesis(
         self,
         is_nepali: bool,
         tools_called: List[AIToolCall],
         draft_plan: Optional[DraftActionPlan],
+        village_name: str = "Village",
+        village_ward: str = "Ward 1",
     ) -> str:
-        # Check action plan draft call first if generated
+        # Check action plan draft call first
         if draft_plan:
             sim_call = next((t for t in tools_called if t.tool == "simulate_infrastructure_failure"), None)
             sim_extra_en = ""
@@ -271,7 +345,7 @@ class GaunPulseAIAgent:
 
             if is_nepali:
                 return (
-                    f"मैले **{draft_plan.title}** को लागि एउटा प्राविधिक मस्यौदा कार्ययोजना तयार गरेको छु।\n\n"
+                    f"मैले **{village_name}** को लागि **{draft_plan.title}** प्राविधिक मस्यौदा कार्ययोजना तयार गरेको छु।\n\n"
                     f"• **जिम्मेवार निकाय:** {draft_plan.responsible_team}\n"
                     f"• **प्राथमिकता तह:** {draft_plan.priority}\n"
                     f"{sim_extra_ne}"
@@ -281,7 +355,7 @@ class GaunPulseAIAgent:
                 )
             else:
                 return (
-                    f"I have prepared an evidence-based draft action plan: **{draft_plan.title}**.\n\n"
+                    f"I have prepared an evidence-based draft action plan for **{village_name}**: **{draft_plan.title}**.\n\n"
                     f"• **Responsible Team:** {draft_plan.responsible_team}\n"
                     f"• **Assessed Priority:** {draft_plan.priority}\n"
                     f"{sim_extra_en}"
@@ -299,43 +373,46 @@ class GaunPulseAIAgent:
             r = sim_call.result
             hh = r.get("affected_households", 0)
             iso = r.get("isolated_settlements", [])
-            iso_name = iso[0].get("settlement", "Settlement B") if iso else "Settlement B"
+            iso_name = iso[0].get("settlement", "local community") if iso else "local community"
             facs = [f.get("facility") for f in r.get("essential_facilities_affected", [])]
-            fac_str = ", ".join(facs[:2]) if facs else "health post and secondary school"
+            fac_str = ", ".join(facs[:2]) if facs else "health post and school"
+
+            # Determine actual edge name
+            blocked_info = r.get("blocked_edges_info", [])
+            edge_name = blocked_info[0].get("name") if blocked_info else f"Edge #{sim_call.args.get('edge_id')}"
 
             if is_nepali:
                 return (
-                    f"नेटवर्कएक्स (NetworkX) सिमुलेसन अनुसार, **सस्पेन्सन ब्रिज बी (Bridge B)** अवरुद्ध हुँदा "
+                    f"नेटवर्कएक्स (NetworkX) सिमुलेसन अनुसार, **{village_name}** मा **{edge_name}** अवरुद्ध हुँदा "
                     f"**{iso_name}** का कुल **{hh} घरधुरीहरू** पूर्ण रूपमा विच्छेद हुन पुग्छन्।\n\n"
                     f"📍 **प्रभावित आवश्यक सुविधाहरू:** {fac_str}।\n"
-                    f"⏱️ **मार्ग अवस्था:** वैकल्पिक बाटो उपलब्ध छैन; बस्ती पूर्ण रूपमा सम्पर्कविहीन हुन्छ।\n\n"
-                    f"⚠️ **सिफारिस:** यो बस्तीको एकमात्र जीवनरेखा भएकाले वडा प्राविधिक टोलीले तत्काल लठ्ठा (suspension cable) "
-                    f"र एन्कर ब्लकको स्थलगत निरीक्षण गर्नुपर्छ।"
+                    f"⏱️ **मार्ग अवस्था:** {r.get('summary_explanation', 'वैकल्पिक बाटो सीमित वा उपलब्ध छैन; बस्ती सम्पर्कविहीन हुन्छ।')}\n\n"
+                    f"⚠️ **सिफारिस:** यो बस्तीको मुख्य जीवनरेखा भएकाले वडा प्राविधिक टोलीले तत्काल स्थलगत निरीक्षण गर्नुपर्छ।"
                 )
             else:
                 return (
-                    f"According to the **NetworkX graph impact simulation**, if **Suspension Bridge B** fails, "
-                    f"**{iso_name}** ({hh} households) becomes **completely isolated** from essential village lifelines.\n\n"
-                    f"• **Newly Disconnected Households:** {hh} HH (zero accessible routes remaining)\n"
+                    f"According to the **NetworkX graph impact simulation**, if **{edge_name}** fails in **{village_name}**, "
+                    f"**{iso_name}** ({hh} households) becomes **isolated** from essential village lifelines.\n\n"
+                    f"• **Newly Disconnected Households:** {hh} HH\n"
                     f"• **Essential Facilities Cut Off:** {fac_str}\n"
-                    f"• **Alternative Detour:** None (this footbridge represents a single point of failure)\n\n"
-                    f"🔍 **Recommendation:** Because this link isolates an entire settlement, it should be prioritized for "
-                    f"immediate structural anchor inspection and temporary safety netting."
+                    f"• **Impact Assessment:** {r.get('summary_explanation', 'Single point of access disruption')}\n\n"
+                    f"🔍 **Recommendation:** Because this link impacts village access, it should be prioritized for "
+                    f"immediate engineering inspection and safety stabilization."
                 )
 
         # Check priorities call
         prio_call = next((t for t in tools_called if t.tool == "get_repair_priorities"), None)
         if prio_call and "error" not in prio_call.result:
             ranked = prio_call.result.get("ranked_issues", [])
-            top_issue = ranked[0]["issue"]["title"] if ranked else "Bridge B suspension failure"
+            top_issue = ranked[0]["issue"]["title"] if ranked else f"Critical infrastructure disruption in {village_name}"
             if is_nepali:
                 return (
-                    f"गाउँपल्स प्राथमिकता निर्धारण प्रणाली अनुसार हाल **'{top_issue}'** सबैभन्दा उच्च प्राथमिकतामा छ।\n\n"
+                    f"गाउँपल्स प्राथमिकता निर्धारण प्रणाली अनुसार **{village_name}** मा हाल **'{top_issue}'** सबैभन्दा उच्च प्राथमिकतामा छ।\n\n"
                     f"यो मूल्याङ्कन प्रभावित घरधुरी (३०%), सेवा विच्छेद (२५%), क्षतिको गम्भीरता (३०%), र प्राविधिक प्रमाणीकरण (१५%) को भारित सूत्रमा आधारित छ।"
                 )
             else:
                 return (
-                    f"Based on the **GaunPulse Priority Scoring Algorithm**, the top prioritized intervention is:\n"
+                    f"Based on the **GaunPulse Priority Scoring Algorithm** for **{village_name}**, the top prioritized intervention is:\n"
                     f"**{top_issue}**\n\n"
                     f"Weighted criteria: Affected Population (30%), Disrupted Essential Services (25%), Severity (30%), and Field Verification (15%)."
                 )
@@ -344,24 +421,25 @@ class GaunPulseAIAgent:
         issues_call = next((t for t in tools_called if t.tool == "get_village_issues"), None)
         if issues_call and "error" not in issues_call.result:
             count = issues_call.result.get("total_issues", 0)
+            issues_list = issues_call.result.get("issues", [])
+            sample_titles = [f"• **{i.get('title')}** ({i.get('severity', 'Medium')})" for i in issues_list[:3]]
+            sample_str = "\n".join(sample_titles) if sample_titles else f"No active issues recorded in {village_name}."
+
             if is_nepali:
                 return (
-                    f"भोटेनाम्लाङ नमुना गाउँमा हाल **{count} वटा पूर्वाधार समस्याहरू** दर्ता भएका छन्।\n\n"
-                    f"प्रमुख समस्याहरूमा सस्पेन्सन ब्रिज बी को लठ्ठा क्षति (गम्भीर), चौतारी घुम्ती नजिकको पहिरो, र मुख्य खानेपानी पाइप फुट्नु समावेश छन्।"
+                    f"**{village_name}** मा हाल **{count} वटा पूर्वाधार समस्याहरू** नगरपालिका प्रणालीमा दर्ता भएका छन्।\n\n"
+                    f"{sample_str}"
                 )
             else:
                 return (
-                    f"There are currently **{count} registered infrastructure issues** in the municipal database for this village.\n\n"
-                    f"Key disruptions include:\n"
-                    f"1. **Bridge B suspension cable damage** (Critical · 20 HH isolated upon failure)\n"
-                    f"2. **Debris slide blocking Road 1** (High · partial tractor blockage)\n"
-                    f"3. **Main HDPE water transmission rupture** (High · reservoir maintenance trail)"
+                    f"There are currently **{count} registered infrastructure issues** in the municipal database for **{village_name}**.\n\n"
+                    f"{sample_str}"
                 )
 
         return (
-            "गाउँपल्स एआई सक्रिय छ। तपाईं ग्रामीण सडक, पुल, खानेपानी, र सिमुलेसन सम्बन्धी प्रश्न सोध्न सक्नुहुन्छ।"
+            f"गाउँपल्स एआई सक्रिय छ। तपाईं {village_name} को सडक, पुल, खानेपानी, र सिमुलेसन सम्बन्धी प्रश्न सोध्न सक्नुहुन्छ।"
             if is_nepali else
-            "GaunPulse AI is active and connected to MySQL and NetworkX. You can ask about village lifelines, simulate closures, or draft repair plans."
+            f"GaunPulse AI is active for {village_name}. You can ask about village lifelines, simulate closures, or draft repair plans."
         )
 
     async def get_insights(
@@ -369,10 +447,26 @@ class GaunPulseAIAgent:
         village_id: int = 1,
         issues_list: Optional[List[Dict[str, Any]]] = None,
     ) -> AIInsightsResponse:
-        """Generate database-backed proactive insights for the dashboard."""
+        """Generate database-backed proactive insights for any village in Nepal."""
+        village_details = await tools.get_village_details(village_id=village_id)
+        village_name = village_details.get("name") or f"Village {village_id}"
+
         if issues_list is None:
             issues_data = await tools.get_village_issues(village_id=village_id)
             issues_list = issues_data.get("issues", [])
+
+        # Fetch village network to obtain real monitored node and edge counts
+        monitored_nodes = 0
+        monitored_edges = 0
+        try:
+            async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
+                net_res = await client.get(f"{LARAVEL_API_URL}/villages/{village_id}/network")
+                if net_res.status_code == 200:
+                    net_json = net_res.json()
+                    monitored_nodes = len(net_json.get("nodes", []))
+                    monitored_edges = len(net_json.get("edges", []))
+        except Exception:
+            pass
 
         # Categorize
         categories = {}
@@ -385,20 +479,38 @@ class GaunPulseAIAgent:
                 critical_count += 1
                 critical_titles.append(iss.get("title", ""))
 
-        most_freq = max(categories.items(), key=lambda x: x[1])[0] if categories else "Bridge & Road"
+        most_freq = max(categories.items(), key=lambda x: x[1])[0] if categories else "Infrastructure"
+
+        crit_summary = (
+            f"{critical_count} critical disruption: {critical_titles[0]}"
+            if critical_count > 0
+            else f"0 critical disruptions reported in {village_name}"
+        )
+
+        sim_risk = (
+            f"Active risk monitoring for {monitored_edges} lifeline edges across {village_name}."
+            if monitored_edges > 0
+            else f"Network graph for {village_name} has no edges mapped yet. Please map in Village Data Manager."
+        )
+
+        action_rec = (
+            f"Review prioritized disruption reports for {village_name} and schedule engineering verification."
+            if len(issues_list) > 0
+            else f"All mapped infrastructure lifelines in {village_name} are recorded in nominal working status."
+        )
 
         return AIInsightsResponse(
             village_id=village_id,
-            village_name="Bhotenamlang (Demo Village)",
+            village_name=village_name,
             frequent_category=f"{most_freq.replace('_', ' ').title()} ({len(issues_list)} reports logged)",
-            critical_issues_summary=f"{critical_count} critical disruption: {critical_titles[0] if critical_titles else 'Bridge B suspension cable damage'}",
-            simulation_risk_alert="Single Point of Failure: Suspension Bridge B closure severs all access for Settlement B (20 households) to primary health clinic.",
-            recommended_action="Dispatch municipal bridge inspector to verify anchor cable tension and clear Chautari road slide before monsoon peak.",
+            critical_issues_summary=crit_summary,
+            simulation_risk_alert=sim_risk,
+            recommended_action=action_rec,
             database_backed=True,
             metrics={
                 "total_issues": len(issues_list),
                 "critical_disruptions": critical_count,
-                "monitored_nodes": 8,
-                "monitored_edges": 8,
+                "monitored_nodes": monitored_nodes,
+                "monitored_edges": monitored_edges,
             },
         )

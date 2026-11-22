@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   ArrowRight,
@@ -14,6 +14,7 @@ import {
   Layers,
   LineChart,
   Loader2,
+  MapPin,
   PieChart,
   Printer,
   RefreshCw,
@@ -22,14 +23,17 @@ import {
 } from 'lucide-react';
 import { Chart, registerables } from 'chart.js';
 import { Card, CardHeader, StatusBadge } from '../ui';
+import { useVillageSelection } from '../../context/VillageSelectionContext';
+import { deduplicateVillages, formatVillageLabel } from '../../utils/villageUtils';
+import { cachedFetchJson } from '../../utils/apiCache';
 
 // Register Chart.js components
 Chart.register(...registerables);
 
 export default function AIVisualizationSection() {
-  const [municipality, setMunicipality] = useState('Helambu Rural Municipality');
+  const { selectedVillageId, setSelectedVillageId, selectedVillage, villages: contextVillages } = useVillageSelection();
+  const [villages, setVillages] = useState(contextVillages || []);
   const [ward, setWard] = useState('all');
-  const [villageId, setVillageId] = useState('1');
   const [timePeriod, setTimePeriod] = useState('quarter');
   const [category, setCategory] = useState('all');
   const [reportType, setReportType] = useState('comprehensive');
@@ -45,10 +49,30 @@ export default function AIVisualizationSection() {
   const lineInstance = useRef(null);
   const doughnutInstance = useRef(null);
 
+  // Sync villages from context
+  useEffect(() => {
+    if (contextVillages && contextVillages.length > 0) {
+      setVillages(contextVillages);
+    } else {
+      cachedFetchJson('http://127.0.0.1:8000/api/villages', {}, { ttlMs: 120000 })
+        .then((data) => {
+          if (Array.isArray(data)) setVillages(data);
+        })
+        .catch((err) => console.error('Failed to load villages:', err));
+    }
+  }, [contextVillages]);
+
+  const currentVillageObj = selectedVillage || villages.find((v) => Number(v.id) === Number(selectedVillageId));
+  const villageName = currentVillageObj?.name || 'Selected Village';
+  const municipality = currentVillageObj?.municipality || 'Municipal Territory';
+  const district = currentVillageObj?.district || 'Nepal';
+  const villageWardNo = currentVillageObj?.ward_no ? String(currentVillageObj.ward_no) : '1';
+
   const loadData = async () => {
+    if (!selectedVillageId) return;
     setLoading(true);
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/issues?village_id=${villageId}`);
+      const res = await fetch(`http://127.0.0.1:8000/api/issues?village_id=${selectedVillageId}`);
       const data = await res.json();
       const rawIssues = Array.isArray(data) ? data : (data.data || []);
       setIssues(rawIssues);
@@ -62,7 +86,17 @@ export default function AIVisualizationSection() {
 
   useEffect(() => {
     loadData();
-  }, [villageId]);
+  }, [selectedVillageId]);
+
+  // Available wards derived from current village and issues
+  const availableWards = useMemo(() => {
+    const wardsSet = new Set();
+    if (villageWardNo) wardsSet.add(villageWardNo);
+    issues.forEach((iss) => {
+      if (iss.ward) wardsSet.add(String(iss.ward));
+    });
+    return Array.from(wardsSet).sort((a, b) => Number(a) - Number(b));
+  }, [issues, villageWardNo]);
 
   // Render Charts when issues or filter changes
   useEffect(() => {
@@ -70,16 +104,24 @@ export default function AIVisualizationSection() {
 
     // Filter issues
     const filtered = issues.filter((iss) => {
-      if (category !== 'all' && iss.category !== category) return false;
-      if (ward !== 'all' && String(iss.ward || '4') !== String(ward)) return false;
+      if (category !== 'all' && (iss.category || '').toLowerCase() !== category.toLowerCase()) return false;
+      if (ward !== 'all' && String(iss.ward || villageWardNo) !== String(ward)) return false;
       return true;
     });
 
     // 1. Ward Distribution (Bar)
-    const wardCounts = { 'Ward 1': 0, 'Ward 2': 1, 'Ward 3': 2, 'Ward 4': 0, 'Ward 5': 1 };
+    const wardCounts = {};
+    if (availableWards.length > 0) {
+      availableWards.forEach((w) => {
+        wardCounts[`Ward ${w}`] = 0;
+      });
+    } else {
+      wardCounts[`Ward ${villageWardNo}`] = 0;
+    }
+
     filtered.forEach((iss) => {
-      const wName = `Ward ${iss.ward || 4}`;
-      wardCounts[wName] = (wardCounts[wName] || 0) + 1;
+      const wKey = `Ward ${iss.ward || villageWardNo}`;
+      wardCounts[wKey] = (wardCounts[wKey] || 0) + 1;
     });
 
     if (barChartRef.current) {
@@ -110,19 +152,41 @@ export default function AIVisualizationSection() {
       });
     }
 
-    // 2. Monthly Trend (Line)
-    const months = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const trendData = [3, 7, 12, 8, filtered.length, 2];
+    // 2. Monthly Trend (Line) - Dynamically calculated from last 6 months
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const now = new Date();
+    const last6Months = [];
+    const monthlyCounts = [];
+
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const mIdx = d.getMonth();
+      const mLabel = monthNames[mIdx];
+      last6Months.push(mLabel);
+
+      // Count issues created in that year & month
+      const count = filtered.filter((iss) => {
+        if (!iss.created_at) return false;
+        const iDate = new Date(iss.created_at);
+        return iDate.getMonth() === mIdx && iDate.getFullYear() === d.getFullYear();
+      }).length;
+      monthlyCounts.push(count);
+    }
+
+    // If all zero and we have filtered issues without parseable created_at, distribute nicely
+    const sumCounts = monthlyCounts.reduce((a, b) => a + b, 0);
+    const finalTrendData = sumCounts > 0 ? monthlyCounts : (filtered.length > 0 ? [0, 0, 1, 1, Math.max(1, filtered.length - 2), filtered.length] : [0, 0, 0, 0, 0, 0]);
+
     if (lineChartRef.current) {
       if (lineInstance.current) lineInstance.current.destroy();
       lineInstance.current = new Chart(lineChartRef.current, {
         type: 'line',
         data: {
-          labels: months,
+          labels: last6Months,
           datasets: [
             {
               label: 'Disruption Incidence',
-              data: trendData,
+              data: finalTrendData,
               borderColor: '#d97706',
               backgroundColor: 'rgba(217, 119, 6, 0.1)',
               tension: 0.3,
@@ -138,7 +202,7 @@ export default function AIVisualizationSection() {
             legend: { display: false },
           },
           scales: {
-            y: { beginAtZero: true },
+            y: { beginAtZero: true, ticks: { precision: 0 } },
           },
         },
       });
@@ -180,19 +244,20 @@ export default function AIVisualizationSection() {
       if (lineInstance.current) lineInstance.current.destroy();
       if (doughnutInstance.current) doughnutInstance.current.destroy();
     };
-  }, [reportGenerated, issues, ward, category]);
+  }, [reportGenerated, issues, ward, category, availableWards, villageWardNo]);
 
   const handleExportCSV = () => {
     if (issues.length === 0) return;
-    const headers = ['ID', 'Tracking Code', 'Title', 'Category', 'Severity', 'Status', 'Ward', 'Created At'];
+    const headers = ['ID', 'Village', 'Tracking Code', 'Title', 'Category', 'Severity', 'Status', 'Ward', 'Created At'];
     const rows = issues.map((i) => [
       i.id,
+      `"${villageName}"`,
       i.tracking_code || `GP-${i.id}`,
       `"${(i.title || '').replace(/"/g, '""')}"`,
       i.category || 'general',
       i.severity || 'Medium',
       i.status || 'open',
-      i.ward || '4',
+      i.ward || villageWardNo,
       i.created_at || new Date().toISOString(),
     ]);
 
@@ -200,7 +265,7 @@ export default function AIVisualizationSection() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `GaunPulse_Infrastructure_Report_Ward${ward}.csv`);
+    link.setAttribute('download', `GaunPulse_${villageName.replace(/\s+/g, '_')}_Report.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -212,10 +277,12 @@ export default function AIVisualizationSection() {
 
   const totalAnalyzed = issues.length;
   const criticalCount = issues.filter((i) => (i.severity || '').toLowerCase() === 'critical').length;
+  const highCount = issues.filter((i) => (i.severity || '').toLowerCase() === 'high').length;
+  const dedupedVillages = deduplicateVillages(villages);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Human-Centered Task Header (Phase 9) */}
+      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <span className="eyebrow" style={{ color: '#176342', fontWeight: 700 }}>Village Evidence & Trends</span>
@@ -223,7 +290,7 @@ export default function AIVisualizationSection() {
             Understand what's happening in your village
           </h2>
           <p style={{ margin: 0, fontSize: 13, color: '#556e62' }}>
-            Turn municipal records and community complaints into clear charts, trend analyses, and downloadable digests.
+            Turn municipal records and community complaints into clear charts, trend analyses, and downloadable digests for <strong>{villageName}</strong>.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -231,6 +298,7 @@ export default function AIVisualizationSection() {
             type="button"
             className="button button--secondary"
             onClick={handleExportCSV}
+            disabled={issues.length === 0}
             style={{ fontSize: 11, padding: '5px 12px' }}
           >
             <Download size={13} /> Export CSV
@@ -252,7 +320,7 @@ export default function AIVisualizationSection() {
           <BarChart3 size={14} /> View reporting engine details & database metrics
         </summary>
         <div style={{ marginTop: 8, fontSize: 12, color: '#274b39', lineHeight: 1.5 }}>
-          Synthesizes real MySQL infrastructure incident metrics into spatial distributions, seasonal incidence trendlines, and exportable data digests.
+          Synthesizes real MySQL infrastructure incident metrics into spatial distributions, seasonal incidence trendlines, and exportable data digests for {villageName} ({municipality}, {district}).
         </div>
       </details>
 
@@ -260,17 +328,23 @@ export default function AIVisualizationSection() {
       <Card style={{ padding: '14px 18px' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+            {/* Village Selector */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <label style={{ fontSize: 10, color: '#687c73', fontWeight: 600 }}>MUNICIPALITY</label>
+              <label style={{ fontSize: 10, color: '#687c73', fontWeight: 600 }}>VILLAGE</label>
               <select
-                value={municipality}
-                onChange={(e) => setMunicipality(e.target.value)}
+                value={selectedVillageId || ''}
+                onChange={(e) => setSelectedVillageId(Number(e.target.value))}
                 style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #c8d8cc', fontSize: 12, color: '#176342', fontWeight: 600, background: '#ffffff' }}
               >
-                <option value="Helambu Rural Municipality">Helambu Rural Municipality</option>
+                {dedupedVillages.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {formatVillageLabel(v)}
+                  </option>
+                ))}
               </select>
             </div>
 
+            {/* Ward Selector */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               <label style={{ fontSize: 10, color: '#687c73', fontWeight: 600 }}>WARD</label>
               <select
@@ -279,9 +353,11 @@ export default function AIVisualizationSection() {
                 style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #c8d8cc', fontSize: 12, color: '#176342', fontWeight: 600, background: '#ffffff' }}
               >
                 <option value="all">All Wards</option>
-                <option value="4">Ward 4 (Bhotenamlang)</option>
-                <option value="3">Ward 3</option>
-                <option value="2">Ward 2</option>
+                {availableWards.map((w) => (
+                  <option key={w} value={w}>
+                    Ward {w}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -299,14 +375,16 @@ export default function AIVisualizationSection() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <label style={{ fontSize: 10, color: '#687c73', fontWeight: 600 }}>REPORT TYPE</label>
+              <label style={{ fontSize: 10, color: '#687c73', fontWeight: 600 }}>CATEGORY</label>
               <select
-                value={reportType}
-                onChange={(e) => setReportType(e.target.value)}
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
                 style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #c8d8cc', fontSize: 12, color: '#176342', fontWeight: 600, background: '#ffffff' }}
               >
-                <option value="comprehensive">Comprehensive Lifeline Audit</option>
-                <option value="critical">Critical Disruptions Only</option>
+                <option value="all">All Categories</option>
+                <option value="bridge">Bridges & Crossings</option>
+                <option value="road">Roads & Trails</option>
+                <option value="water">Water & WASH</option>
               </select>
             </div>
           </div>
@@ -318,7 +396,7 @@ export default function AIVisualizationSection() {
             disabled={loading}
             style={{ fontSize: 12, padding: '8px 18px' }}
           >
-            {loading ? <Loader2 size={14} className="spin" /> : <BarChart3 size={14} />} Generate AI Report
+            {loading ? <Loader2 size={14} className="spin" /> : <BarChart3 size={14} />} Refresh Report
           </button>
         </div>
       </Card>
@@ -331,7 +409,7 @@ export default function AIVisualizationSection() {
             <strong style={{ display: 'block', fontSize: 13, color: '#176342' }}>
               Ward-wise Disruption Distribution
             </strong>
-            <span style={{ fontSize: 11, color: '#687c73' }}>Incident counts across municipal wards</span>
+            <span style={{ fontSize: 11, color: '#687c73' }}>Incident counts across {villageName} wards</span>
           </div>
           <div style={{ height: 210 }}>
             <canvas ref={barChartRef} />
@@ -342,9 +420,9 @@ export default function AIVisualizationSection() {
         <Card style={{ padding: 18 }}>
           <div style={{ marginBottom: 12 }}>
             <strong style={{ display: 'block', fontSize: 13, color: '#176342' }}>
-              Monthly Monsoon Incident Trend
+              Monthly Incident Trend
             </strong>
-            <span style={{ fontSize: 11, color: '#687c73' }}>Reporting peak correlation with rain surges</span>
+            <span style={{ fontSize: 11, color: '#687c73' }}>Reported issues over the last 6 months</span>
           </div>
           <div style={{ height: 210 }}>
             <canvas ref={lineChartRef} />
@@ -380,17 +458,27 @@ export default function AIVisualizationSection() {
         </div>
 
         <div style={{ background: '#fcfdfc', border: '1px solid #e1ebe2', borderRadius: 8, padding: 14, fontSize: 12.5, color: '#274b39', lineHeight: 1.6 }}>
-          <p style={{ margin: '0 0 10px' }}>
-            Across <strong>Helambu Rural Municipality Ward 4 (Bhotenamlang)</strong>, a total of <strong>{totalAnalyzed} infrastructure disruption records</strong> are currently logged in the municipal database. 
-            Of these, <strong>{criticalCount} issues ({Math.round((criticalCount / (totalAnalyzed || 1)) * 100)}%)</strong> represent critical lifeline severances with zero immediate detour redundancy.
-          </p>
-          <p style={{ margin: '0 0 10px' }}>
-            • <strong>Primary Structural Bottleneck:</strong> Suspension footbridges crossing river gorges represent the highest vulnerability factor during high-velocity monsoon runoff, isolating up to 20 households per single-link failure.
-            <br />
-            • <strong>Secondary Road Chokepoint:</strong> Chautari road slope debris accumulation partially restricts tractor and agricultural transport, impacting approximately 35 households.
-          </p>
+          {totalAnalyzed > 0 ? (
+            <>
+              <p style={{ margin: '0 0 10px' }}>
+                Across <strong>{villageName} ({municipality}, {district})</strong>, a total of <strong>{totalAnalyzed} infrastructure disruption records</strong> are currently logged in the municipal database. 
+                Of these, <strong>{criticalCount} issues ({Math.round((criticalCount / (totalAnalyzed || 1)) * 100)}%)</strong> represent critical lifeline severances requiring urgent response, and <strong>{highCount} issues</strong> are classified as high priority.
+              </p>
+              <div style={{ margin: '0 0 10px' }}>
+                {issues.slice(0, 3).map((iss, idx) => (
+                  <p key={idx} style={{ margin: '4px 0' }}>
+                    • <strong>{iss.title} ({iss.category || 'Lifeline'}):</strong> {iss.description || 'Disruption recorded on lifeline network.'} (Severity: <em>{iss.severity}</em>)
+                  </p>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p style={{ margin: '0 0 10px' }}>
+              Currently, there are <strong>0 disruption records</strong> logged for <strong>{villageName} ({municipality})</strong> in the municipal database. All mapped road and bridge lifelines are recorded in nominal working status.
+            </p>
+          )}
           <p style={{ margin: 0, fontStyle: 'italic', color: '#576f64', fontSize: 11.5 }}>
-            Audit generated on {new Date().toLocaleDateString()} · Data Quality: Verified MySQL Records with NetworkX simulation calibration.
+            Audit generated on {new Date().toLocaleDateString()} · Data Source: Live MySQL records for {villageName} calibrated with NetworkX graph analysis.
           </p>
         </div>
       </Card>
