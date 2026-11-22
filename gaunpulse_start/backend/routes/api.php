@@ -143,7 +143,7 @@ Route::get('/dashboard/stats', function () {
     ]);
 });
 
-Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1')->name('login');
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:5,1');
 
 // Authenticated User Profile & Workspace
