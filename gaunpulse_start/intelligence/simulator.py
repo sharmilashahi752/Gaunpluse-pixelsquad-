@@ -12,6 +12,47 @@ from schemas import (
     RepairScenarioOutcome,
 )
 
+_GRAPH_CACHE: dict[str, tuple[nx.MultiGraph | nx.MultiDiGraph, dict[str, Any]]] = {}
+_MAX_GRAPH_CACHE_ENTRIES = 50
+
+
+def clear_graph_cache():
+    """Clear in-memory graph cache."""
+    _GRAPH_CACHE.clear()
+
+
+def get_or_build_graph(
+    nodes: list[Union[dict, Any]],
+    edges: list[Union[dict, Any]],
+    facilities: list[Union[dict, Any]] = None,
+    settlements: list[Union[dict, Any]] = None,
+    routing_metric: str = None,
+    graph_version: str = None,
+) -> tuple[nx.MultiGraph | nx.MultiDiGraph, dict[str, Any]]:
+    """Retrieve pre-built graph by fingerprint if available, or build and cache."""
+    if graph_version:
+        if routing_metric:
+            cached = _GRAPH_CACHE.get(f"{graph_version}:{routing_metric}")
+            if cached is not None:
+                return cached[0].copy(), cached[1]
+        else:
+            prefix = f"{graph_version}:"
+            for k, (cg, cm) in _GRAPH_CACHE.items():
+                if k.startswith(prefix):
+                    return cg.copy(), cm
+
+    graph, meta = build_network_graph(nodes, edges, facilities, settlements, routing_metric)
+
+    if graph_version:
+        resolved_metric = meta.get("routing_metric", routing_metric or "default")
+        cache_key = f"{graph_version}:{resolved_metric}"
+        if len(_GRAPH_CACHE) >= _MAX_GRAPH_CACHE_ENTRIES:
+            oldest_key = next(iter(_GRAPH_CACHE))
+            _GRAPH_CACHE.pop(oldest_key, None)
+        _GRAPH_CACHE[cache_key] = (graph.copy(), meta)
+
+    return graph, meta
+
 
 def _resolve_edge_infos(edge_ids, edge_by_id, label="infrastructure edge"):
     canonical_ids = set()
@@ -72,14 +113,28 @@ def run_simulation(
     routing_metric: str = None,
     data_quality: str = "unverified",
     graph_version: str = None,
+    base_graph: Any = None,
+    base_meta: dict = None,
 ) -> SimulationResult:
     """
     Simulates the infrastructure impact of blocking one or more edges.
     Calculates baseline shortest paths, isolates failed connections on a graph copy,
     and analyzes accessibility changes, isolated settlements, and affected households.
     """
-    # 1. Build original graph & metadata
-    graph, meta = build_network_graph(nodes, edges, facilities, settlements, routing_metric)
+    # 1. Build or retrieve original graph & metadata
+    if base_graph is not None and base_meta is not None:
+        graph = base_graph.copy()
+        meta = base_meta
+    else:
+        graph, meta = get_or_build_graph(
+            nodes=nodes,
+            edges=edges,
+            facilities=facilities,
+            settlements=settlements,
+            routing_metric=routing_metric,
+            graph_version=graph_version,
+        )
+
     edge_by_id = meta["edge_by_id"]
     settlement_nodes = meta["settlement_nodes"]
     facility_nodes = meta["facility_nodes"]
@@ -93,23 +148,31 @@ def run_simulation(
     baseline_graph = graph.copy()
     _remove_edges(baseline_graph, baseline_edges_info)
 
-    # 2. Compute Baseline Paths
+    # 2. Compute Baseline Paths using single-source Dijkstra per settlement
     # Maps (settlement_id, facility_id) -> (distance, path)
     baseline_routes = {}
     already_disconnected_pairs = set()
 
     for s_node in settlement_nodes:
         s_id = s_node["id"]
+        if s_id in baseline_graph:
+            try:
+                base_lengths, base_paths = nx.single_source_dijkstra(baseline_graph, s_id, weight="weight")
+            except Exception:
+                base_lengths, base_paths = {}, {}
+        else:
+            base_lengths, base_paths = {}, {}
+
         for f_node in facility_nodes:
             f_id = f_node["id"]
             if s_id == f_id:
                 continue
 
-            try:
-                dist = nx.shortest_path_length(baseline_graph, s_id, f_id, weight="weight")
-                path = nx.shortest_path(baseline_graph, s_id, f_id, weight="weight")
+            if f_id in base_lengths and f_id in base_paths:
+                dist = base_lengths[f_id]
+                path = base_paths[f_id]
                 baseline_routes[(s_id, f_id)] = (round(dist, 1), path)
-            except nx.NetworkXNoPath:
+            else:
                 baseline_routes[(s_id, f_id)] = (None, None)
                 already_disconnected_pairs.add((s_id, f_id))
 
@@ -139,6 +202,16 @@ def run_simulation(
             "detour_facilities": [],
         }
 
+        if s_id in disrupted_graph:
+            try:
+                disrupted_lengths, disrupted_paths = nx.single_source_dijkstra(
+                    disrupted_graph, s_id, weight="weight"
+                )
+            except Exception:
+                disrupted_lengths, disrupted_paths = {}, {}
+        else:
+            disrupted_lengths, disrupted_paths = {}, {}
+
         for f_node in facility_nodes:
             f_id = f_node["id"]
             if s_id == f_id:
@@ -150,12 +223,11 @@ def run_simulation(
 
             base_dist, base_path = baseline_routes.get((s_id, f_id), (None, None))
 
-            # Recalculate on disrupted graph
-            try:
-                post_dist = nx.shortest_path_length(disrupted_graph, s_id, f_id, weight="weight")
-                post_path = nx.shortest_path(disrupted_graph, s_id, f_id, weight="weight")
-                post_dist = round(post_dist, 1)
-            except nx.NetworkXNoPath:
+            # Recalculate on disrupted graph from single-source dijkstra
+            if f_id in disrupted_lengths and f_id in disrupted_paths:
+                post_dist = round(disrupted_lengths[f_id], 1)
+                post_path = disrupted_paths[f_id]
+            else:
                 post_dist, post_path = None, None
 
             # Determine route status
@@ -330,7 +402,17 @@ def compare_repairs(
     """
     Implements 'What If We Fix This First?':
     Compares two competing repair interventions against the current disrupted baseline.
+    Reuses pre-built base graph across baseline and scenario simulations.
     """
+    base_graph, base_meta = get_or_build_graph(
+        nodes=nodes,
+        edges=edges,
+        facilities=facilities,
+        settlements=settlements,
+        routing_metric=routing_metric,
+        graph_version=graph_version,
+    )
+
     # Baseline disrupted state
     sim_baseline = run_simulation(
         nodes=nodes,
@@ -341,6 +423,8 @@ def compare_repairs(
         routing_metric=routing_metric,
         data_quality=data_quality,
         graph_version=graph_version,
+        base_graph=base_graph,
+        base_meta=base_meta,
     )
 
     # Calculate remaining blocked for Scenario A
@@ -358,6 +442,8 @@ def compare_repairs(
         routing_metric=routing_metric,
         data_quality=data_quality,
         graph_version=graph_version,
+        base_graph=base_graph,
+        base_meta=base_meta,
     )
 
     # Calculate remaining blocked for Scenario B
@@ -375,6 +461,8 @@ def compare_repairs(
         routing_metric=routing_metric,
         data_quality=data_quality,
         graph_version=graph_version,
+        base_graph=base_graph,
+        base_meta=base_meta,
     )
 
     # Calculate improvements

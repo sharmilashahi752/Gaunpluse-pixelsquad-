@@ -16,7 +16,14 @@ class IssueController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Issue::with(['village', 'edge', 'updates'])->latest();
+        $perPage = min(max($request->integer('per_page', 20), 5), 100);
+
+        $query = Issue::with([
+            'village:id,name,municipality_id,ward_no,municipality',
+            'edge:id,name,infrastructure_type',
+            'complaint:id,complaint_number,ward_number,settlement_name,status,speech_transcript',
+            'complaint.media:id,complaint_id,media_type',
+        ])->latest();
 
         // Multi-municipality & ward scoping
         $user = $request->user('sanctum') ?? $request->user();
@@ -49,12 +56,25 @@ class IssueController extends Controller
             });
         }
 
+        if ($request->boolean('pending_only') || $request->input('queue') === 'pending') {
+            $query->whereIn('status', ['submitted', 'pending_verification']);
+        }
+
+        if ($request->filled('search')) {
+            $term = '%' . $request->input('search') . '%';
+            $query->where(function ($q) use ($term) {
+                $q->where('title', 'like', $term)
+                  ->orWhere('tracking_code', 'like', $term)
+                  ->orWhere('settlement_name', 'like', $term);
+            });
+        }
+
         foreach (['category', 'severity', 'status', 'village_id'] as $filter) {
             if ($request->filled($filter)) {
                 $query->where($filter, $request->input($filter));
             }
         }
-        return IssueResource::collection($query->paginate(30));
+        return IssueResource::collection($query->paginate($perPage));
     }
 
     public function show(Request $request, Issue $issue)
@@ -80,7 +100,15 @@ class IssueController extends Controller
             }
         }
 
-        return new IssueResource($issue->load(['village', 'edge', 'updates']));
+        return new IssueResource($issue->load([
+            'village',
+            'edge',
+            'updates.user',
+            'complaint.media',
+            'priorityScore',
+            'reporter',
+            'verifier',
+        ]));
     }
 
     public function store(StoreIssueRequest $request)

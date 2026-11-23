@@ -46,7 +46,7 @@ export default function CommunityVoicesPage() {
     if (voices.length === 0) setLoading(true);
     try {
       const [dataVoices, dataVillages] = await Promise.all([
-        cachedFetchJson('http://127.0.0.1:8000/api/feedback', {}, {
+        cachedFetchJson('/api/feedback', {}, {
           force,
           ttlMs: 45000,
           onBackgroundUpdate: (fresh) => {
@@ -55,7 +55,7 @@ export default function CommunityVoicesPage() {
         }),
         contextVillages && contextVillages.length > 0
           ? Promise.resolve(contextVillages)
-          : cachedFetchJson('http://127.0.0.1:8000/api/villages', {}, { ttlMs: 120000 }),
+          : cachedFetchJson('/api/villages', {}, { ttlMs: 120000 }),
       ]);
 
       const voicesList = Array.isArray(dataVoices) ? dataVoices : [];
@@ -81,7 +81,7 @@ export default function CommunityVoicesPage() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/feedback', {
+      const res = await fetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(formData),
@@ -109,7 +109,7 @@ export default function CommunityVoicesPage() {
 
   const handleAcknowledge = async (id) => {
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/feedback/${id}/acknowledge`, {
+      const res = await fetch(`/api/feedback/${id}/acknowledge`, {
         method: 'PATCH',
         headers: { Accept: 'application/json' },
       });

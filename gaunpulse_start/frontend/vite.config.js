@@ -19,4 +19,16 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-leaflet': ['leaflet', 'leaflet.markercluster', 'react-leaflet'],
+          'vendor-charts': ['chart.js'],
+          'vendor-icons': ['lucide-react'],
+        },
+      },
+    },
+  },
 });

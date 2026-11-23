@@ -7,7 +7,7 @@ export default function CommunityVoices({ onViewAll, full = false }) {
   const [voices, setVoices] = useState([]);
 
   const loadFeedback = () => {
-    fetch('http://127.0.0.1:8000/api/feedback')
+    fetch('/api/feedback')
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
@@ -23,7 +23,7 @@ export default function CommunityVoices({ onViewAll, full = false }) {
 
   const handleAcknowledge = async (id) => {
     try {
-      await fetch(`http://127.0.0.1:8000/api/feedback/${id}/acknowledge`, {
+      await fetch(`/api/feedback/${id}/acknowledge`, {
         method: 'PATCH',
         headers: { Accept: 'application/json' },
       });

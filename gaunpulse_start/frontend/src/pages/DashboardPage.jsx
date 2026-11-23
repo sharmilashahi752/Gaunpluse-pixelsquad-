@@ -16,7 +16,7 @@ export default function DashboardPage({ onNavigate }) {
 
   useEffect(() => {
     cachedFetchJson(
-      'http://127.0.0.1:8000/api/dashboard/stats',
+      '/api/dashboard/stats',
       {},
       {
         ttlMs: 45000,

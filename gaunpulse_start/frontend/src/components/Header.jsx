@@ -43,7 +43,7 @@ export default function Header({ title, onMenuClick, onNavigate }) {
   };
 
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/api/issues')
+    fetch('/api/issues')
       .then((res) => res.json())
       .then((data) => {
         const list = data.data || data || [];

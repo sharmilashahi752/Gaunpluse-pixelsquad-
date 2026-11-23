@@ -23,8 +23,28 @@ class VillageController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Village::query()
-            ->withCount(['settlements', 'issues', 'nodes', 'edges', 'facilities']);
+        $isLightweight = $request->boolean('lightweight') || $request->boolean('dropdown');
+
+        $query = Village::query();
+
+        if ($isLightweight) {
+            $query->select([
+                'id',
+                'name',
+                'local_name',
+                'ward_no',
+                'municipality',
+                'municipality_id',
+                'district',
+                'province',
+                'center_lat',
+                'center_lng',
+                'is_demo',
+                'status',
+            ]);
+        } else {
+            $query->withCount(['settlements', 'issues', 'nodes', 'edges', 'facilities']);
+        }
 
         // Multi-municipality & ward scoping
         $user = $request->user('sanctum') ?? $request->user();

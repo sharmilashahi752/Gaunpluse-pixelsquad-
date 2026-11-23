@@ -296,3 +296,27 @@ def test_api_compare_repairs_endpoint(base_village_network):
     assert "scenario_a" in data
     assert "scenario_b" in data
     assert "comparison_summary" in data
+
+
+def test_graph_caching_with_graph_version(base_village_network):
+    from simulator import _GRAPH_CACHE, clear_graph_cache
+    clear_graph_cache()
+    version = "test-version-v1"
+
+    res1 = run_simulation(
+        nodes=base_village_network["nodes"],
+        edges=base_village_network["edges"],
+        blocked_edge_ids=["bridge_b"],
+        graph_version=version,
+    )
+    cache_key = f"{version}:travel_time_minutes"
+    assert cache_key in _GRAPH_CACHE
+
+    res2 = run_simulation(
+        nodes=base_village_network["nodes"],
+        edges=base_village_network["edges"],
+        blocked_edge_ids=["bridge_b"],
+        graph_version=version,
+    )
+    assert res1.affected_households == res2.affected_households == 20
+    assert len(res1.access_comparisons) == len(res2.access_comparisons)

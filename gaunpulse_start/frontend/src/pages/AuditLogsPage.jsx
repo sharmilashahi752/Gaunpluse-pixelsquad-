@@ -24,7 +24,7 @@ export default function AuditLogsPage() {
     if (!token) return;
     setLoading(true);
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/admin/audit-logs', {
+      const res = await fetch('/api/admin/audit-logs', {
         headers: {
           Accept: 'application/json',
           Authorization: `Bearer ${token}`,

@@ -5,7 +5,7 @@ const TOKEN_KEY = 'gaunpulse_auth_token';
 const USER_KEY = 'gaunpulse_auth_user';
 const MUNICIPALITY_KEY = 'gaunpulse_active_municipality_id';
 
-const API_BASE = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : 'http://127.0.0.1:8000';
+const API_BASE = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : '';
 
 function extractCallbackToken() {
   if (typeof window === 'undefined') return null;

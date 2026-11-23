@@ -44,7 +44,7 @@ import { useVillageSelection } from '../context/VillageSelectionContext';
 // Register Chart.js components
 Chart.register(...registerables);
 
-const API_BASE = 'http://127.0.0.1:8000/api';
+const API_BASE = '/api';
 
 export default function ReportsInsightsPage({ onNavigate }) {
   const { villages: globalVillages } = useVillageSelection();

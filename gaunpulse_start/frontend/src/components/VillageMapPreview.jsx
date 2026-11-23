@@ -18,16 +18,16 @@ export default function VillageMapPreview({ onOpenMap, expanded = false }) {
   const [villageName, setVillageName] = useState('Bhotenamlang');
 
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/api/villages')
+    fetch('/api/villages')
       .then((res) => res.json())
       .then((data) => {
         const list = Array.isArray(data) ? data : (data.data || []);
         if (list.length > 0) {
           const v = list[0];
           setVillageName(`${v.name} (${v.municipality || 'Municipal Workspace'})`);
-          return fetch(`http://127.0.0.1:8000/api/villages/${v.id}/network`);
+          return fetch(`/api/villages/${v.id}/network`);
         }
-        return fetch('http://127.0.0.1:8000/api/villages/1/network');
+        return fetch('/api/villages/1/network');
       })
       .then((res) => res?.json())
       .then((net) => {

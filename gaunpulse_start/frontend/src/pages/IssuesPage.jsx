@@ -34,7 +34,7 @@ import { useVillageSelection } from '../context/VillageSelectionContext';
 import { useAuth } from '../context/AuthContext';
 import { cachedFetchJson, invalidateApiCache } from '../utils/apiCache';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 const CATEGORIES = [
   { value: 'damaged_bridge', label: 'Damaged Bridge' },
@@ -91,6 +91,13 @@ export default function IssuesPage({ onNavigate }) {
   const [filterSeverity, setFilterSeverity] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalIssues, setTotalIssues] = useState(0);
+  const [perPage] = useState(20);
+  const [loadError, setLoadError] = useState(null);
+
   // Sync villages from context
   useEffect(() => {
     if (contextVillages && contextVillages.length > 0) {
@@ -132,16 +139,46 @@ export default function IssuesPage({ onNavigate }) {
   const [photoPreview, setPhotoPreview] = useState(null);
   const fileInputRef = useRef(null);
 
-  // Load issues and villages
-  const loadData = async (force = false) => {
+  // Load issues and villages with server-side pagination & filter scoping
+  const loadData = async (forceOrOpts = false, maybeForce = false) => {
+    let targetPage = currentPage;
+    let force = false;
+
+    if (typeof forceOrOpts === 'boolean') {
+      force = forceOrOpts;
+    } else if (typeof forceOrOpts === 'number') {
+      targetPage = forceOrOpts;
+      force = Boolean(maybeForce);
+    } else if (forceOrOpts && typeof forceOrOpts === 'object') {
+      targetPage = forceOrOpts.page || currentPage;
+      force = Boolean(forceOrOpts.force);
+    }
+
     if (issues.length === 0) setLoading(true);
+    setLoadError(null);
     try {
+      const params = new URLSearchParams({
+        page: String(targetPage),
+        per_page: String(perPage),
+      });
+      if (filterCategory) params.append('category', filterCategory);
+      if (filterSeverity) params.append('severity', filterSeverity);
+      if (filterStatus) params.append('status', filterStatus);
+      if (activeTab === 'pending_verification') params.append('pending_only', '1');
+
       const [dataIssues, dataVillages] = await Promise.all([
-        cachedFetchJson(`${API_BASE_URL}/api/issues`, {}, {
+        cachedFetchJson(`${API_BASE_URL}/api/issues?${params.toString()}`, {}, {
           force,
           ttlMs: 45000,
           onBackgroundUpdate: (fresh) => {
-            if (fresh) setIssues(fresh.data || fresh || []);
+            if (fresh) {
+              const freshList = fresh.data || (Array.isArray(fresh) ? fresh : []);
+              setIssues(freshList);
+              if (fresh.meta) {
+                setTotalPages(fresh.meta.last_page || 1);
+                setTotalIssues(fresh.meta.total || freshList.length);
+              }
+            }
           },
         }),
         contextVillages && contextVillages.length > 0
@@ -149,10 +186,18 @@ export default function IssuesPage({ onNavigate }) {
           : cachedFetchJson(`${API_BASE_URL}/api/villages`, {}, { ttlMs: 120000 }),
       ]);
 
-      const issueList = dataIssues.data || dataIssues || [];
+      const issueList = dataIssues.data || (Array.isArray(dataIssues) ? dataIssues : []);
       const villageList = Array.isArray(dataVillages) ? dataVillages : [];
 
       setIssues(issueList);
+      if (dataIssues.meta) {
+        setTotalPages(dataIssues.meta.last_page || 1);
+        setTotalIssues(dataIssues.meta.total || issueList.length);
+        setCurrentPage(dataIssues.meta.current_page || targetPage);
+      } else {
+        setTotalPages(1);
+        setTotalIssues(issueList.length);
+      }
       setVillages(villageList);
 
       // Default to globally selected village if available, or first village
@@ -171,18 +216,25 @@ export default function IssuesPage({ onNavigate }) {
       }
     } catch (err) {
       console.error('Failed to load issues or villages:', err);
+      setLoadError('Failed to load issues from server. Please check your network connection.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadData({ page: 1, force: false });
+  }, [activeTab, filterCategory, filterSeverity, filterStatus]);
 
-  // When village changes in modal, load its edges & reset invalid edge
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || newPage > totalPages || newPage === currentPage) return;
+    setCurrentPage(newPage);
+    loadData({ page: newPage, force: false });
+  };
+
+  // Only load village edges when modal is open and village is selected (eliminates eager fetch on mount)
   useEffect(() => {
-    if (!formData.village_id) {
+    if (!showCreateModal || !formData.village_id) {
       setVillageEdges([]);
       return;
     }
@@ -210,7 +262,7 @@ export default function IssuesPage({ onNavigate }) {
       .finally(() => {
         setLoadingEdges(false);
       });
-  }, [formData.village_id]);
+  }, [showCreateModal, formData.village_id]);
 
   // Photo selection with preview and size validation
   const handlePhotoChange = (e) => {
@@ -403,7 +455,7 @@ export default function IssuesPage({ onNavigate }) {
     }
   };
 
-  // Open complaint review modal and reset action states
+  // Open complaint review modal, reset action states, and lazy-load complete audit trail & media
   const handleOpenIssueModal = (item) => {
     setSelectedIssue(item);
     setActionNotes('');
@@ -414,6 +466,19 @@ export default function IssuesPage({ onNavigate }) {
     setIsSavingVillage(false);
     setVillageSaveMessage(null);
     setIsAuditTrailOpen(true);
+
+    if (item.id) {
+      cachedFetchJson(`${API_BASE_URL}/api/issues/${item.id}`, {}, { ttlMs: 30000 })
+        .then((detailRes) => {
+          const detail = detailRes.data || detailRes;
+          if (detail && detail.id === item.id) {
+            setSelectedIssue((prev) => (prev && prev.id === item.id ? { ...prev, ...detail } : prev));
+          }
+        })
+        .catch((err) => {
+          console.warn('Could not load detailed issue info:', err);
+        });
+    }
   };
 
   // Derive municipality / ward cross-jurisdiction restriction for modal issue
@@ -816,9 +881,35 @@ export default function IssuesPage({ onNavigate }) {
       {/* Issues Table */}
       <Card>
         <CardHeader
-          title={activeTab === 'pending_verification' ? `Citizen Reports Awaiting Verification (${filteredIssues.length})` : `Registered Infrastructure Issues (${filteredIssues.length})`}
+          title={activeTab === 'pending_verification' ? `Citizen Reports Awaiting Verification (${totalIssues || filteredIssues.length})` : `Registered Infrastructure Issues (${totalIssues || filteredIssues.length})`}
           description={activeTab === 'pending_verification' ? 'Review unverified citizen complaints, inspect audio recordings and photographic evidence, and approve or reject.' : 'Click any issue row to view complete details, history timeline, and update municipal verification status.'}
         />
+
+        {loadError && (
+          <div style={{
+            padding: '12px 16px',
+            background: 'var(--danger-bg)',
+            border: '1px solid rgba(198,79,69,0.3)',
+            borderRadius: 'var(--radius-md)',
+            color: 'var(--danger)',
+            fontSize: '12.5px',
+            margin: '16px',
+            display: 'flex',
+            gap: '8px',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}>
+            <span>{loadError}</span>
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={() => loadData({ page: currentPage, force: true })}
+              style={{ padding: '4px 10px', fontSize: '12px' }}
+            >
+              Retry
+            </button>
+          </div>
+        )}
 
         {loading ? (
           <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
@@ -949,6 +1040,64 @@ export default function IssuesPage({ onNavigate }) {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {totalPages > 1 && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '12px 16px',
+            borderTop: '1px solid var(--border)',
+            fontSize: '12.5px',
+            color: 'var(--text-secondary)',
+            flexWrap: 'wrap',
+            gap: '10px',
+          }}>
+            <div>
+              Showing page <strong>{currentPage}</strong> of <strong>{totalPages}</strong> ({totalIssues} total records)
+            </div>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button
+                type="button"
+                className="button button--secondary"
+                disabled={currentPage <= 1 || loading}
+                onClick={() => handlePageChange(currentPage - 1)}
+                style={{ padding: '4px 12px', fontSize: '12px' }}
+              >
+                Previous
+              </button>
+              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                  .map((p, idx, arr) => {
+                    const prev = arr[idx - 1];
+                    return (
+                      <span key={p} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {prev && p - prev > 1 && <span style={{ padding: '0 2px' }}>...</span>}
+                        <button
+                          type="button"
+                          className={`button ${currentPage === p ? 'button--primary' : 'button--secondary'}`}
+                          onClick={() => handlePageChange(p)}
+                          style={{ padding: '4px 9px', fontSize: '12px', minWidth: '28px', height: '28px' }}
+                        >
+                          {p}
+                        </button>
+                      </span>
+                    );
+                  })}
+              </div>
+              <button
+                type="button"
+                className="button button--secondary"
+                disabled={currentPage >= totalPages || loading}
+                onClick={() => handlePageChange(currentPage + 1)}
+                style={{ padding: '4px 12px', fontSize: '12px' }}
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </Card>

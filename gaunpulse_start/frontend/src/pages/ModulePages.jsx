@@ -145,9 +145,9 @@ export function ReportsInsightsPage() {
     setExporting(true);
     try {
       const [resIssues, resPlans, resVillages] = await Promise.all([
-        fetch('http://127.0.0.1:8000/api/issues'),
-        fetch('http://127.0.0.1:8000/api/action-plans'),
-        fetch('http://127.0.0.1:8000/api/villages'),
+        fetch('/api/issues'),
+        fetch('/api/action-plans'),
+        fetch('/api/villages'),
       ]);
       const data = {
         exported_at: new Date().toISOString(),

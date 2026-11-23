@@ -1,21 +1,23 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import AppLayout from './layouts/AppLayout';
-import ActionPlansPage from './pages/ActionPlansPage';
-import AIAgentPage from './pages/AIAgentPage';
-import CommunityVoicesPage from './pages/CommunityVoicesPage';
 import DashboardPage from './pages/DashboardPage';
-import IssuesPage from './pages/IssuesPage';
-import SimulationsPage from './pages/SimulationsPage';
-import VillageMapPage from './pages/VillageMapPage';
-import VillageDataPage from './pages/VillageDataPage';
-import ReportsInsightsPage from './pages/ReportsInsightsPage';
-import UserManagementPage from './pages/UserManagementPage';
-import ProfileSettingsPage from './pages/ProfileSettingsPage';
-import AuditLogsPage from './pages/AuditLogsPage';
-import CitizenPortal from './citizen/CitizenPortal';
 import { navigationItems } from './data/demoData';
 import { VillageSelectionProvider } from './context/VillageSelectionContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { LoadingSkeleton } from './components/ui';
+
+const ActionPlansPage = lazy(() => import('./pages/ActionPlansPage'));
+const AIAgentPage = lazy(() => import('./pages/AIAgentPage'));
+const CommunityVoicesPage = lazy(() => import('./pages/CommunityVoicesPage'));
+const IssuesPage = lazy(() => import('./pages/IssuesPage'));
+const SimulationsPage = lazy(() => import('./pages/SimulationsPage'));
+const VillageMapPage = lazy(() => import('./pages/VillageMapPage'));
+const VillageDataPage = lazy(() => import('./pages/VillageDataPage'));
+const ReportsInsightsPage = lazy(() => import('./pages/ReportsInsightsPage'));
+const UserManagementPage = lazy(() => import('./pages/UserManagementPage'));
+const ProfileSettingsPage = lazy(() => import('./pages/ProfileSettingsPage'));
+const AuditLogsPage = lazy(() => import('./pages/AuditLogsPage'));
+const CitizenPortal = lazy(() => import('./citizen/CitizenPortal'));
 
 const pages = {
   dashboard: DashboardPage,
@@ -78,7 +80,11 @@ function AppContent() {
   }, [activePage, user, isCitizen, isAdmin, loading]);
 
   if (activePage === 'citizen') {
-    return <CitizenPortal />;
+    return (
+      <Suspense fallback={<div style={{ padding: '32px' }}><LoadingSkeleton rows={6} height="52px" /></div>}>
+        <CitizenPortal />
+      </Suspense>
+    );
   }
 
   const ActivePage = pages[activePage] || DashboardPage;
@@ -86,7 +92,9 @@ function AppContent() {
   return (
     <VillageSelectionProvider>
       <AppLayout activePage={activePage} onNavigate={navigate}>
-        <ActivePage onNavigate={navigate} />
+        <Suspense fallback={<div style={{ padding: '24px' }}><LoadingSkeleton rows={6} height="52px" /></div>}>
+          <ActivePage onNavigate={navigate} />
+        </Suspense>
       </AppLayout>
     </VillageSelectionProvider>
   );

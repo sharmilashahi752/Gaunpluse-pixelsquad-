@@ -18,7 +18,7 @@ export default function PriorityActionQueue({ onViewAll }) {
   const [plans, setPlans] = useState([]);
 
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/api/action-plans')
+    fetch('/api/action-plans')
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {

@@ -46,7 +46,7 @@ export default function UserManagementPage() {
     if (!token) return;
     setLoading(true);
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/admin/users', {
+      const res = await fetch('/api/admin/users', {
         headers: {
           Accept: 'application/json',
           Authorization: `Bearer ${token}`,
@@ -77,7 +77,7 @@ export default function UserManagementPage() {
     setActionLoading(true);
 
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/admin/users/${wardModalUser.id}/assign-ward`, {
+      const res = await fetch(`/api/admin/users/${wardModalUser.id}/assign-ward`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -109,7 +109,7 @@ export default function UserManagementPage() {
     setActionLoading(true);
 
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/admin/users/${roleModalUser.id}/role`, {
+      const res = await fetch(`/api/admin/users/${roleModalUser.id}/role`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -137,7 +137,7 @@ export default function UserManagementPage() {
   // Handle Toggle Active
   const handleToggleActive = async (targetUser) => {
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/admin/users/${targetUser.id}/toggle-active`, {
+      const res = await fetch(`/api/admin/users/${targetUser.id}/toggle-active`, {
         method: 'PATCH',
         headers: {
           Accept: 'application/json',

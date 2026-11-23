@@ -20,7 +20,7 @@ import AddVillageWizardModal from '../components/village-manager/AddVillageWizar
 import MapDataImportModal from '../components/village-manager/MapDataImportModal';
 import { cachedFetchJson } from '../utils/apiCache';
 
-const API_BASE = 'http://127.0.0.1:8000/api';
+const API_BASE = '/api';
 
 export default function VillageDataPage() {
   const { selectedVillageId, setSelectedVillageId, villages: contextVillages, refreshVillages } = useVillageSelection();

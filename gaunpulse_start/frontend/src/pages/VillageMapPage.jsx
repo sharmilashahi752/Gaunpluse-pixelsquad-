@@ -144,7 +144,7 @@ export default function VillageMapPage() {
     setTimeout(() => setNotification(null), 6000);
   };
 
-  // 1. Initial Load: Villages, Provinces, and Administrative Hierarchy Audit
+  // 1. Initial Load: Villages and Provinces (lazy-load audit on demand)
   useEffect(() => {
     loadVillages();
     cachedFetchJson('/api/locations/provinces', {}, { ttlMs: 600000 })
@@ -152,15 +152,6 @@ export default function VillageMapPage() {
         if (Array.isArray(data)) setProvinces(data);
       })
       .catch((err) => console.error('Failed to load provinces:', err));
-
-    // Audit administrative hierarchy integrity
-    cachedFetchJson('/api/villages/audit-hierarchy', {}, { ttlMs: 120000 })
-      .then((data) => {
-        if (data?.inconsistent_count > 0) {
-          setHierarchyAudit(data);
-        }
-      })
-      .catch((err) => console.error('Hierarchy audit failed:', err));
   }, []);
 
   const loadVillages = async (force = false) => {
@@ -177,7 +168,7 @@ export default function VillageMapPage() {
     }
 
     try {
-      const data = await cachedFetchJson('/api/villages', {}, {
+      const data = await cachedFetchJson('/api/villages?dropdown=true', {}, {
         force,
         ttlMs: 60000,
         onBackgroundUpdate: (fresh) => {
@@ -198,7 +189,7 @@ export default function VillageMapPage() {
   // 2. Cascade Districts when Province changes
   useEffect(() => {
     if (!villageForm.province) return;
-    cachedFetchJson(`http://127.0.0.1:8000/api/locations/districts?province=${encodeURIComponent(villageForm.province)}`, {}, { ttlMs: 600000 })
+    cachedFetchJson(`/api/locations/districts?province=${encodeURIComponent(villageForm.province)}`, {}, { ttlMs: 600000 })
       .then((data) => {
         if (Array.isArray(data)) {
           setDistricts(data);
@@ -213,7 +204,7 @@ export default function VillageMapPage() {
   // 3. Cascade Municipalities when District changes (Phase 1 Fix: auto-reset to avoid cross-district mismatch)
   useEffect(() => {
     if (!villageForm.district) return;
-    cachedFetchJson(`http://127.0.0.1:8000/api/locations/municipalities?district=${encodeURIComponent(villageForm.district)}`, {}, { ttlMs: 600000 })
+    cachedFetchJson(`/api/locations/municipalities?district=${encodeURIComponent(villageForm.district)}`, {}, { ttlMs: 600000 })
       .then((data) => {
         if (Array.isArray(data)) {
           setMunicipalities(data);
@@ -231,33 +222,46 @@ export default function VillageMapPage() {
       .catch((err) => console.error('Failed to load municipalities:', err));
   }, [villageForm.district]);
 
-  // 4. Load Active Village Network with SWR
+  // 4. Load Active Village Network with SWR & AbortController to prevent race conditions
   useEffect(() => {
     if (!selectedVillageId) return;
+    const controller = new AbortController();
+
     if (!villageData || villageData.village?.id !== Number(selectedVillageId)) {
       setLoading(true);
     }
 
     cachedFetchJson(
-      `http://127.0.0.1:8000/api/villages/${selectedVillageId}/network`,
-      {},
+      `/api/villages/${selectedVillageId}/network`,
+      { signal: controller.signal },
       {
         ttlMs: 60000,
         onBackgroundUpdate: (fresh) => {
-          if (fresh && fresh.village?.id === Number(selectedVillageId)) {
+          if (!controller.signal.aborted && fresh && fresh.village?.id === Number(selectedVillageId)) {
             setVillageData(fresh);
           }
         },
       }
     )
       .then((data) => {
-        setVillageData(data);
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setVillageData(data);
+        }
       })
       .catch((err) => {
-        console.error('Failed to load village network:', err);
-        setLoading(false);
+        if (err.name !== 'AbortError') {
+          console.error('Failed to load village network:', err);
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       });
+
+    return () => {
+      controller.abort();
+    };
   }, [selectedVillageId]);
 
   // 5. Debounced Nepal Search
@@ -270,7 +274,7 @@ export default function VillageMapPage() {
 
     const timer = setTimeout(() => {
       setIsSearching(true);
-      fetch(`http://127.0.0.1:8000/api/locations/search?q=${encodeURIComponent(searchQuery.trim())}`)
+      fetch(`/api/locations/search?q=${encodeURIComponent(searchQuery.trim())}`)
         .then((res) => res.json())
         .then((data) => {
           setSearchResults(Array.isArray(data) ? data : []);
@@ -401,7 +405,7 @@ export default function VillageMapPage() {
         auto_import: true,
       };
 
-      const res = await fetch('http://127.0.0.1:8000/api/villages', {
+      const res = await fetch('/api/villages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(payload),
@@ -441,7 +445,7 @@ export default function VillageMapPage() {
       setSelectedLocationMarker(null);
 
       // Instantly load the new village's network into map
-      const netRes = await fetch(`http://127.0.0.1:8000/api/villages/${newVillage.id}/network`);
+      const netRes = await fetch(`/api/villages/${newVillage.id}/network`);
       if (netRes.ok) {
         const netData = await netRes.json();
         setVillageData(netData);
@@ -466,7 +470,7 @@ export default function VillageMapPage() {
     setDiscoveryError(null);
 
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/villages/${vId}/discover-osm?radius=${radius}${force ? '&force=true' : ''}`);
+      const res = await fetch(`/api/villages/${vId}/discover-osm?radius=${radius}${force ? '&force=true' : ''}`);
       if (!res.ok) {
         throw new Error(`Server returned error code ${res.status}`);
       }
@@ -507,7 +511,7 @@ export default function VillageMapPage() {
     setConfirmingLocation(true);
     try {
       const coords = discoveryData.suggested_coordinates;
-      const res = await fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/coordinates`, {
+      const res = await fetch(`/api/villages/${selectedVillageId}/coordinates`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
@@ -535,7 +539,7 @@ export default function VillageMapPage() {
     try {
       const lat = parseFloat(manualLat);
       const lng = parseFloat(manualLng);
-      const res = await fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/coordinates`, {
+      const res = await fetch(`/api/villages/${selectedVillageId}/coordinates`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
@@ -573,7 +577,7 @@ export default function VillageMapPage() {
     setImportingLoading(true);
     setDiscoveryStatus('saving');
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/confirm-osm-import`, {
+      const res = await fetch(`/api/villages/${selectedVillageId}/confirm-osm-import`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
@@ -593,7 +597,7 @@ export default function VillageMapPage() {
       showNotification(`Import complete! ${result.imported_nodes || result.nodes_created || 0} nodes and ${result.imported_edges || result.edges_created || 0} lifeline edges saved to MySQL.`);
 
       // Refresh village network immediately from MySQL (Task 7)
-      const refreshRes = await fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/network`);
+      const refreshRes = await fetch(`/api/villages/${selectedVillageId}/network`);
       setVillageData(await refreshRes.json());
       loadVillages();
     } catch (err) {
@@ -657,7 +661,7 @@ export default function VillageMapPage() {
         description: pointForm.description,
       };
 
-      const res = await fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/nodes`, {
+      const res = await fetch(`/api/villages/${selectedVillageId}/nodes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(payload),
@@ -672,7 +676,7 @@ export default function VillageMapPage() {
       showNotification(`Infrastructure node "${pointForm.name}" added to village.`);
       setPointForm({ name: '', node_type: 'settlement', latitude: '', longitude: '', households: '', population: '', description: '' });
 
-      const refreshRes = await fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/network`);
+      const refreshRes = await fetch(`/api/villages/${selectedVillageId}/network`);
       setVillageData(await refreshRes.json());
     } catch (err) {
       alert('Error saving asset: ' + err.message);
@@ -704,7 +708,7 @@ export default function VillageMapPage() {
         notes: linearForm.notes,
       };
 
-      const res = await fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/edges`, {
+      const res = await fetch(`/api/villages/${selectedVillageId}/edges`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(payload),
@@ -729,7 +733,7 @@ export default function VillageMapPage() {
         notes: '',
       });
 
-      const refreshRes = await fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/network`);
+      const refreshRes = await fetch(`/api/villages/${selectedVillageId}/network`);
       setVillageData(await refreshRes.json());
     } catch (err) {
       alert('Error saving road/bridge: ' + err.message);
@@ -740,7 +744,7 @@ export default function VillageMapPage() {
   const handleDeleteNode = async (nodeId) => {
     if (!confirm('Are you sure you want to remove this infrastructure node?')) return;
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/nodes/${nodeId}`, {
+      const res = await fetch(`/api/villages/${selectedVillageId}/nodes/${nodeId}`, {
         method: 'DELETE',
       });
       if (!res.ok) {
@@ -750,7 +754,7 @@ export default function VillageMapPage() {
       }
       setSelectedNode(null);
       showNotification('Node deleted successfully.');
-      const refreshRes = await fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/network`);
+      const refreshRes = await fetch(`/api/villages/${selectedVillageId}/network`);
       setVillageData(await refreshRes.json());
     } catch (err) {
       alert('Error: ' + err.message);
@@ -761,7 +765,7 @@ export default function VillageMapPage() {
   const handleDeleteEdge = async (edgeId) => {
     if (!confirm('Are you sure you want to remove this lifeline edge?')) return;
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/edges/${edgeId}`, {
+      const res = await fetch(`/api/villages/${selectedVillageId}/edges/${edgeId}`, {
         method: 'DELETE',
       });
       if (!res.ok) {
@@ -771,7 +775,7 @@ export default function VillageMapPage() {
       }
       setSelectedEdge(null);
       showNotification('Lifeline edge deleted successfully.');
-      const refreshRes = await fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/network`);
+      const refreshRes = await fetch(`/api/villages/${selectedVillageId}/network`);
       setVillageData(await refreshRes.json());
     } catch (err) {
       alert('Error: ' + err.message);
@@ -784,7 +788,7 @@ export default function VillageMapPage() {
     setDiagLoading(true);
     setIsDiagnosticModalOpen(true);
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/integrity`);
+      const res = await fetch(`/api/villages/${selectedVillageId}/integrity`);
       const data = await res.json();
       setDiagnostics(data);
     } catch (err) {
@@ -866,7 +870,7 @@ export default function VillageMapPage() {
             onClick={() => {
               const inc = hierarchyAudit.records.find((r) => !r.is_consistent);
               if (inc && inc.proposed_corrections) {
-                fetch(`http://127.0.0.1:8000/api/villages/${inc.village_id}/correct-hierarchy`, {
+                fetch(`/api/villages/${inc.village_id}/correct-hierarchy`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify(inc.proposed_corrections),
@@ -937,6 +941,8 @@ export default function VillageMapPage() {
                 fontSize: '12.5px',
                 fontWeight: '600',
                 color: 'var(--text-primary)',
+                maxWidth: '240px',
+                textOverflow: 'ellipsis',
               }}
               aria-label="Select saved village"
             >

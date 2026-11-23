@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Tooltip, Circle, useMap, useMapEvents } from 'react-leaflet';
 import L from '../utils/leafletCluster';
 import 'leaflet/dist/leaflet.css';
@@ -46,8 +46,15 @@ function MapClickHandler({ onMapClick }) {
   return null;
 }
 
-// Custom DivIcons styled for GaunPulse forest & cream design language
+// Custom DivIcons styled for GaunPulse forest & cream design language with memoization cache
+const customIconCache = new Map();
+
 function createCustomIcon(type, status = 'operational', count = null) {
+  const cacheKey = `${type}:${status}:${count || 0}`;
+  if (customIconCache.has(cacheKey)) {
+    return customIconCache.get(cacheKey);
+  }
+
   let bg = '#166534';
   let border = '#ffffff';
   let svgPath = '';
@@ -87,13 +94,15 @@ function createCustomIcon(type, status = 'operational', count = null) {
   } else {
     // Junction / waypoint: restrained 8px subtle dot
     size = 8;
-    return L.divIcon({
+    const waypointIcon = L.divIcon({
       className: 'custom-leaflet-marker-waypoint',
       html: `<div style="width:8px; height:8px; background:#64748b; border:1.5px solid #ffffff; border-radius:50%; box-shadow:0 1px 3px rgba(0,0,0,0.2); cursor:pointer;"></div>`,
       iconSize: [8, 8],
       iconAnchor: [4, 4],
       popupAnchor: [0, -6],
     });
+    customIconCache.set(cacheKey, waypointIcon);
+    return waypointIcon;
   }
 
   if (status === 'blocked' || status === 'unreachable') {
@@ -110,7 +119,7 @@ function createCustomIcon(type, status = 'operational', count = null) {
     ? 'animation: pulse-ring 1.8s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;'
     : '';
 
-  return L.divIcon({
+  const icon = L.divIcon({
     className: 'custom-leaflet-marker',
     html: `
       <div style="position:relative; width:${size}px; height:${size}px; background:${bg}; border:1.5px solid ${border}; border-radius:50%; display:grid; place-items:center; box-shadow:0 2px 6px rgba(0,0,0,0.18); transform:translate(-50%, -50%); cursor:pointer; ${pulseClass}">
@@ -122,6 +131,8 @@ function createCustomIcon(type, status = 'operational', count = null) {
     iconAnchor: [size / 2, size / 2],
     popupAnchor: [0, -size / 2 - 2],
   });
+  customIconCache.set(cacheKey, icon);
+  return icon;
 }
 
 // MarkerClusterLayer: Clusters dense infrastructure points with custom GaunPulse green badge
@@ -324,14 +335,24 @@ export default function InteractiveVillageMap({
   const issues = villageData?.issues || [];
   const village = villageData?.village || {};
 
-  const waypointCount = nodes.filter(
-    (n) =>
-      !['settlement', 'school', 'health_post', 'health', 'clinic', 'water_point', 'water', 'facility', 'office', 'civic'].includes(
-        (n.node_type || n.type || '').toLowerCase()
-      ) &&
-      !n.households &&
-      !n.settlement_group_id
-  ).length;
+  const deduplicatedVillages = useMemo(() => deduplicateVillages(allVillages), [allVillages]);
+
+  const nodeMap = useMemo(() => {
+    const map = new Map();
+    nodes.forEach((n) => map.set(String(n.id), n));
+    return map;
+  }, [nodes]);
+
+  const waypointCount = useMemo(() => {
+    return nodes.filter(
+      (n) =>
+        !['settlement', 'school', 'health_post', 'health', 'clinic', 'water_point', 'water', 'facility', 'office', 'civic'].includes(
+          (n.node_type || n.type || '').toLowerCase()
+        ) &&
+        !n.households &&
+        !n.settlement_group_id
+    ).length;
+  }, [nodes]);
 
   // Center & zoom logic
   let centerLat = 28.3949; // Nepal central geographic coordinates
@@ -348,8 +369,7 @@ export default function InteractiveVillageMap({
     currentZoom = selectedLocationMarker.zoom || 14;
   }
 
-  const nodeMap = new Map();
-  nodes.forEach((n) => nodeMap.set(String(n.id), n));
+
 
   const toggleLayer = (layer) => {
     setActiveLayers((prev) => ({ ...prev, [layer]: !prev[layer] }));
@@ -609,8 +629,8 @@ export default function InteractiveVillageMap({
         })}
 
         {/* 1. Nationwide Saved Villages Layer */}
-        {activeLayers.savedVillages &&
-          deduplicateVillages(allVillages).map((v) => {
+        {activeLayers.savedVillages && isNationwideView &&
+          deduplicatedVillages.map((v) => {
             const vLat = parseFloat(v.center_lat || v.latitude);
             const vLng = parseFloat(v.center_lng || v.longitude);
             if (!vLat || !vLng || isNaN(vLat) || isNaN(vLng)) return null;

@@ -7,12 +7,12 @@ export default function ConnectivityTrendChart() {
   const [overview, setOverview] = useState(null);
 
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/api/reports/trends')
+    fetch('/api/reports/trends')
       .then((r) => r.json())
       .then((data) => setTrends(data))
       .catch((e) => console.warn('Could not load trends:', e));
 
-    fetch('http://127.0.0.1:8000/api/reports/overview')
+    fetch('/api/reports/overview')
       .then((r) => r.json())
       .then((data) => setOverview(data))
       .catch((e) => console.warn('Could not load overview:', e));

@@ -7,7 +7,7 @@ export default function AIAgentPreview({ onOpenAgent }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/api/ai/insights?village_id=1')
+    fetch('/api/ai/insights?village_id=1')
       .then((res) => res.json())
       .then((data) => {
         setInsights(data);

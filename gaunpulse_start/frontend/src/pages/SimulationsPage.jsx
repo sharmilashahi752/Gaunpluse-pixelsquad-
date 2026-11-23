@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   AlertCircle,
@@ -106,6 +106,10 @@ export default function SimulationsPage({ onNavigate }) {
   // History & Validation
   const [history, setHistory] = useState([]);
   const [validating, setValidating] = useState(false);
+
+  // Performance Optimization: Cache simulation and comparison calculations to avoid duplicate runs
+  const simulationResultsCache = useRef(new Map());
+  const comparisonResultsCache = useRef(new Map());
 
   const isDemoVillage = selectedVillageId === 'demo-sundar-gaun';
 
@@ -283,6 +287,17 @@ export default function SimulationsPage({ onNavigate }) {
     const blocked = selectedBlockedEdgeIds.length > 0 ? selectedBlockedEdgeIds : (selectedEdgeId ? [selectedEdgeId] : []);
     if (!selectedVillageId || blocked.length === 0) return;
 
+    const blockedKey = blocked.slice().sort().join(',');
+    const cacheKey = `${selectedVillageId}:${blockedKey}:${scenarioType}`;
+
+    // Return instant cached simulation result if scenario has already been calculated
+    if (simulationResultsCache.current.has(cacheKey)) {
+      const cached = simulationResultsCache.current.get(cacheKey);
+      setSimulationEnvelope(cached);
+      setMapMode('after');
+      return;
+    }
+
     setSimulating(true);
     setSimulationError('');
 
@@ -295,6 +310,7 @@ export default function SimulationsPage({ onNavigate }) {
           scenarioType,
           scenarioName: currentPreset?.name || `Custom Disruption (${blocked.length} link${blocked.length > 1 ? 's' : ''})`,
         });
+        simulationResultsCache.current.set(cacheKey, envelope);
         setSimulationEnvelope(envelope);
         setHistory((current) => [envelope, ...current.filter((item) => item.id !== envelope.id)]);
         setMapMode('after');
@@ -321,6 +337,7 @@ export default function SimulationsPage({ onNavigate }) {
           throw new Error('The simulation result belongs to a different village.');
         }
 
+        simulationResultsCache.current.set(cacheKey, data);
         setSimulationEnvelope(data);
         setHistory((current) => [data, ...current.filter((item) => item.id !== data.id)]);
         setMapMode('after');
@@ -366,6 +383,12 @@ export default function SimulationsPage({ onNavigate }) {
   const runComparison = async () => {
     if (!repairOptionA || !repairOptionB || repairOptionA === repairOptionB) return;
 
+    const compareKey = `${selectedVillageId}:${repairOptionA}:${repairOptionB}`;
+    if (comparisonResultsCache.current.has(compareKey)) {
+      setComparisonResult(comparisonResultsCache.current.get(compareKey));
+      return;
+    }
+
     setComparing(true);
     setComparisonError('');
 
@@ -376,6 +399,7 @@ export default function SimulationsPage({ onNavigate }) {
           optionAEdgeId: repairOptionA,
           optionBEdgeId: repairOptionB,
         });
+        comparisonResultsCache.current.set(compareKey, demoComparison);
         setComparisonResult(demoComparison);
       } else {
         const edgeA = damagedEdges.find((edge) => String(edge.id) === repairOptionA);
@@ -399,6 +423,7 @@ export default function SimulationsPage({ onNavigate }) {
 
         const data = await response.json();
         if (!response.ok) throw new Error(data.message || 'Repair comparison failed.');
+        comparisonResultsCache.current.set(compareKey, data);
         setComparisonResult(data);
       }
     } catch (error) {

@@ -16,7 +16,15 @@ class AdminIssueController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Issue::with(['village', 'edge', 'reporter', 'priorityScore', 'complaint.media', 'updates.user'])->latest();
+        $perPage = min(max($request->integer('per_page', 20), 5), 100);
+
+        $query = Issue::with([
+            'village:id,name,municipality_id,ward_no,municipality',
+            'edge:id,name,infrastructure_type',
+            'reporter:id,name,email',
+            'complaint:id,complaint_number,ward_number,settlement_name,status,speech_transcript',
+            'complaint.media:id,complaint_id,media_type',
+        ])->latest();
         $user = $request->user();
 
         // Multi-municipality & ward scoping
@@ -54,12 +62,21 @@ class AdminIssueController extends Controller
             $query->whereIn('status', ['submitted', 'pending_verification']);
         }
 
+        if ($request->filled('search')) {
+            $term = '%' . $request->input('search') . '%';
+            $query->where(function ($q) use ($term) {
+                $q->where('title', 'like', $term)
+                  ->orWhere('tracking_code', 'like', $term)
+                  ->orWhere('settlement_name', 'like', $term);
+            });
+        }
+
         foreach (['category', 'severity', 'status', 'village_id'] as $filter) {
             if ($request->filled($filter)) {
                 $query->where($filter, $request->input($filter));
             }
         }
-        return IssueResource::collection($query->paginate(50));
+        return IssueResource::collection($query->paginate($perPage));
     }
 
     public function show(Request $request, Issue $issue)
@@ -85,7 +102,7 @@ class AdminIssueController extends Controller
             }
         }
 
-        return new IssueResource($issue->load(['village', 'edge', 'reporter', 'updates.user', 'priorityScore', 'complaint.media']));
+        return new IssueResource($issue->load(['village', 'edge', 'reporter', 'updates.user', 'priorityScore', 'complaint.media', 'verifier']));
     }
 
     public function updateStatus(UpdateIssueStatusRequest $request, Issue $issue)

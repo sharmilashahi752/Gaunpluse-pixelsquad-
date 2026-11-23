@@ -94,7 +94,7 @@ export default function ActionPlansPage() {
     if (plans.length === 0) setLoading(true);
     try {
       const [dataPlans, dataVillages, dataIssues] = await Promise.all([
-        cachedFetchJson('http://127.0.0.1:8000/api/action-plans', {}, {
+        cachedFetchJson('/api/action-plans', {}, {
           force,
           ttlMs: 45000,
           onBackgroundUpdate: (fresh) => {
@@ -103,8 +103,8 @@ export default function ActionPlansPage() {
         }),
         contextVillages && contextVillages.length > 0
           ? Promise.resolve(contextVillages)
-          : cachedFetchJson('http://127.0.0.1:8000/api/villages', {}, { ttlMs: 120000 }),
-        cachedFetchJson('http://127.0.0.1:8000/api/issues', {}, {
+          : cachedFetchJson('/api/villages', {}, { ttlMs: 120000 }),
+        cachedFetchJson('/api/issues', {}, {
           force,
           ttlMs: 45000,
           onBackgroundUpdate: (fresh) => {
@@ -143,8 +143,8 @@ export default function ActionPlansPage() {
 
     const isEdit = Boolean(editingPlan);
     const url = isEdit
-      ? `http://127.0.0.1:8000/api/action-plans/${editingPlan.id}`
-      : 'http://127.0.0.1:8000/api/action-plans';
+      ? `/api/action-plans/${editingPlan.id}`
+      : '/api/action-plans';
     const method = isEdit ? 'PUT' : 'POST';
 
     try {
@@ -182,7 +182,7 @@ export default function ActionPlansPage() {
   const handleSaveProgress = async () => {
     if (!updatingProgressPlan) return;
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/action-plans/${updatingProgressPlan.id}/progress`, {
+      const res = await fetch(`/api/action-plans/${updatingProgressPlan.id}/progress`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({ progress_percentage: Number(progressVal) }),
@@ -203,7 +203,7 @@ export default function ActionPlansPage() {
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to remove this municipal action plan?')) return;
     try {
-      await fetch(`http://127.0.0.1:8000/api/action-plans/${id}`, { method: 'DELETE' });
+      await fetch(`/api/action-plans/${id}`, { method: 'DELETE' });
       invalidateApiCache('api/action-plans');
       invalidateApiCache('api/dashboard');
       invalidateApiCache('api/reports');
