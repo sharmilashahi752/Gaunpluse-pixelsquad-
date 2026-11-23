@@ -42,7 +42,7 @@ export default function AIPrioritizationSection({ onNavigate, onSelectTab }) {
     if (contextVillages && contextVillages.length > 0) {
       setVillages(contextVillages);
     } else {
-      cachedFetchJson('http://127.0.0.1:8000/api/villages', {}, { ttlMs: 120000 })
+      cachedFetchJson('/api/villages', {}, { ttlMs: 120000 })
         .then((data) => {
           if (Array.isArray(data)) setVillages(data);
         })
@@ -59,10 +59,10 @@ export default function AIPrioritizationSection({ onNavigate, onSelectTab }) {
     setAnalyzing(true);
     try {
       const [issuesRes, networkRes] = await Promise.all([
-        cachedFetchJson(`http://127.0.0.1:8000/api/issues?village_id=${selectedVillageId}`, {}, {
+        cachedFetchJson(`/api/issues?village_id=${selectedVillageId}`, {}, {
           ttlMs: 30000,
         }),
-        cachedFetchJson(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/network`, {}, {
+        cachedFetchJson(`/api/villages/${selectedVillageId}/network`, {}, {
           ttlMs: 60000,
         }).catch(() => null),
       ]);

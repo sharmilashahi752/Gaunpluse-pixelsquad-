@@ -41,7 +41,7 @@ export default function AIOverviewSection({ onSelectTab, onNavigate }) {
     if (contextVillages && contextVillages.length > 0) {
       setVillages(contextVillages);
     } else {
-      cachedFetchJson('http://127.0.0.1:8000/api/villages', {}, { ttlMs: 120000 })
+      cachedFetchJson('/api/villages', {}, { ttlMs: 120000 })
         .then((data) => {
           if (Array.isArray(data)) setVillages(data);
         })
@@ -58,9 +58,9 @@ export default function AIOverviewSection({ onSelectTab, onNavigate }) {
     setError(null);
     try {
       const [statsRes, insightsRes, issuesRes] = await Promise.all([
-        fetch('http://127.0.0.1:8000/api/dashboard/stats').then((r) => r.json()),
-        fetch(`http://127.0.0.1:8000/api/ai/insights?village_id=${selectedVillageId}`).then((r) => r.json()),
-        fetch(`http://127.0.0.1:8000/api/issues?village_id=${selectedVillageId}`).then((r) => r.json()),
+        fetch('/api/dashboard/stats').then((r) => r.json()),
+        fetch(`/api/ai/insights?village_id=${selectedVillageId}`).then((r) => r.json()),
+        fetch(`/api/issues?village_id=${selectedVillageId}`).then((r) => r.json()),
       ]);
 
       setStats(statsRes);

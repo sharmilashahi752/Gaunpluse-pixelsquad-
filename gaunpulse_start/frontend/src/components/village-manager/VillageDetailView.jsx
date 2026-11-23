@@ -51,7 +51,7 @@ import {
 } from 'lucide-react';
 import DataQualityPanel from './DataQualityPanel';
 
-const API_BASE = 'http://127.0.0.1:8000/api';
+const API_BASE = '/api';
 
 // Controller to fly map to village coordinates
 function MapCenterController({ center }) {

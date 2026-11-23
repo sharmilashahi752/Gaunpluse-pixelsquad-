@@ -49,7 +49,7 @@ export default function AIRepairPlanningSection({ onNavigate }) {
     if (contextVillages && contextVillages.length > 0) {
       setVillages(contextVillages);
     } else {
-      cachedFetchJson('http://127.0.0.1:8000/api/villages', {}, { ttlMs: 120000 })
+      cachedFetchJson('/api/villages', {}, { ttlMs: 120000 })
         .then((data) => {
           if (Array.isArray(data)) setVillages(data);
         })
@@ -71,7 +71,7 @@ export default function AIRepairPlanningSection({ onNavigate }) {
     setSavedSuccess(false);
     setSelectedIssueId('');
 
-    fetch(`http://127.0.0.1:8000/api/issues?village_id=${selectedVillageId}`)
+    fetch(`/api/issues?village_id=${selectedVillageId}`)
       .then((r) => r.json())
       .then((data) => {
         const raw = Array.isArray(data) ? data : (data.data || []);
@@ -183,7 +183,7 @@ export default function AIRepairPlanningSection({ onNavigate }) {
       const dueDate = new Date(today.getTime() + Number(targetDays) * 24 * 60 * 60 * 1000);
       const dueDateStr = dueDate.toISOString().split('T')[0];
 
-      const res = await fetch('http://127.0.0.1:8000/api/action-plans', {
+      const res = await fetch('/api/action-plans', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

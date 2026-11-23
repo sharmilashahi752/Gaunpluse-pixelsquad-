@@ -36,7 +36,7 @@ export default function AICitizenAssistanceSection({ onNavigate }) {
     if (contextVillages && contextVillages.length > 0) {
       setVillages(contextVillages);
     } else {
-      cachedFetchJson('http://127.0.0.1:8000/api/villages', {}, { ttlMs: 120000 })
+      cachedFetchJson('/api/villages', {}, { ttlMs: 120000 })
         .then((data) => {
           if (Array.isArray(data)) setVillages(data);
         })
@@ -50,7 +50,7 @@ export default function AICitizenAssistanceSection({ onNavigate }) {
   // Fetch current village issues for sample tracking codes and lookup
   useEffect(() => {
     if (!selectedVillageId) return;
-    fetch(`http://127.0.0.1:8000/api/issues?village_id=${selectedVillageId}`)
+    fetch(`/api/issues?village_id=${selectedVillageId}`)
       .then((r) => r.json())
       .then((data) => {
         const items = Array.isArray(data) ? data : (data.data || []);
@@ -88,7 +88,7 @@ export default function AICitizenAssistanceSection({ onNavigate }) {
 
     try {
       // 1. Search in current village
-      const res = await fetch(`http://127.0.0.1:8000/api/issues?village_id=${selectedVillageId}`);
+      const res = await fetch(`/api/issues?village_id=${selectedVillageId}`);
       const data = await res.json();
       const items = Array.isArray(data) ? data : (data.data || []);
       let matched = items.find(
@@ -99,7 +99,7 @@ export default function AICitizenAssistanceSection({ onNavigate }) {
 
       // 2. If not found in current village, search all issues to provide cross-village clarity
       if (!matched) {
-        const allRes = await fetch('http://127.0.0.1:8000/api/issues');
+        const allRes = await fetch('/api/issues');
         const allData = await allRes.json();
         const allItems = Array.isArray(allData) ? allData : (allData.data || []);
         matched = allItems.find(
@@ -149,7 +149,7 @@ export default function AICitizenAssistanceSection({ onNavigate }) {
     setLoading(true);
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/ai/chat', {
+      const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

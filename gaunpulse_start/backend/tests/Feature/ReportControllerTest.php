@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class ReportControllerTest extends TestCase
 {
+    use RefreshDatabase;
     public function test_reports_overview_returns_valid_kpis(): void
     {
         $response = $this->getJson('/api/reports/overview');

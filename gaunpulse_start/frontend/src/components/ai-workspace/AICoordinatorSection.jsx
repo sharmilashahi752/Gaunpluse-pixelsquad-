@@ -34,7 +34,7 @@ export default function AICoordinatorSection({ onNavigate, onSelectTab }) {
     if (contextVillages && contextVillages.length > 0) {
       setVillages(contextVillages);
     } else {
-      cachedFetchJson('http://127.0.0.1:8000/api/villages', {}, { ttlMs: 120000 })
+      cachedFetchJson('/api/villages', {}, { ttlMs: 120000 })
         .then((data) => {
           if (Array.isArray(data)) setVillages(data);
         })
@@ -120,7 +120,7 @@ export default function AICoordinatorSection({ onNavigate, onSelectTab }) {
 
     try {
       const langParam = language === 'auto' ? null : language;
-      const res = await fetch('http://127.0.0.1:8000/api/ai/chat', {
+      const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -177,7 +177,7 @@ export default function AICoordinatorSection({ onNavigate, onSelectTab }) {
       const dueDate = new Date(today.getTime() + (plan.target_days || 7) * 24 * 60 * 60 * 1000);
       const dueDateStr = dueDate.toISOString().split('T')[0];
 
-      const res = await fetch('http://127.0.0.1:8000/api/action-plans', {
+      const res = await fetch('/api/action-plans', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

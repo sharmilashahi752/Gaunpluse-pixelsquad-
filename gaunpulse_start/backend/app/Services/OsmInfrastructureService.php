@@ -1117,7 +1117,7 @@ OVERPASS;
                     if (Schema::hasColumn('edges', 'osm_type')) $edgeAttrs['osm_type'] = $ef['osm_type'] ?? 'way';
                     if (Schema::hasColumn('edges', 'highway_type')) $edgeAttrs['highway_type'] = $ef['highway_type'] ?? null;
                     if (Schema::hasColumn('edges', 'travel_minutes')) $edgeAttrs['travel_minutes'] = $ef['travel_minutes'] ?? null;
-                    if (Schema::hasColumn('edges', 'geometry')) $edgeAttrs['geometry'] = json_encode($ef['geometry'] ?? []);
+                    if (Schema::hasColumn('edges', 'geometry')) $edgeAttrs['geometry'] = $ef['geometry'] ?? [];
                     if (Schema::hasColumn('edges', 'import_batch_id')) $edgeAttrs['import_batch_id'] = $batchId;
 
                     if ($existingEdge) {
@@ -1154,6 +1154,13 @@ OVERPASS;
             ]);
 
             DB::commit();
+
+            // Auto-heal graph topology: snap settlements, facilities, and bridges to the road network
+            try {
+                \App\Services\NetworkTopologyService::ensureVillageTopology($village);
+            } catch (\Throwable $topoErr) {
+                \Illuminate\Support\Facades\Log::warning("NetworkTopologyService error for village {$village->id}: " . $topoErr->getMessage());
+            }
 
             // Fetch live saved statistics from MySQL (Task 7)
             $stats = [

@@ -54,7 +54,7 @@ export default function AIVisualizationSection() {
     if (contextVillages && contextVillages.length > 0) {
       setVillages(contextVillages);
     } else {
-      cachedFetchJson('http://127.0.0.1:8000/api/villages', {}, { ttlMs: 120000 })
+      cachedFetchJson('/api/villages', {}, { ttlMs: 120000 })
         .then((data) => {
           if (Array.isArray(data)) setVillages(data);
         })
@@ -72,7 +72,7 @@ export default function AIVisualizationSection() {
     if (!selectedVillageId) return;
     setLoading(true);
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/issues?village_id=${selectedVillageId}`);
+      const res = await fetch(`/api/issues?village_id=${selectedVillageId}`);
       const data = await res.json();
       const rawIssues = Array.isArray(data) ? data : (data.data || []);
       setIssues(rawIssues);

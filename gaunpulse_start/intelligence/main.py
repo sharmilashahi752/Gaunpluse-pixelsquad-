@@ -156,7 +156,16 @@ async def ai_insights_endpoint(village_id: int = 1):
 async def ai_insights_post_endpoint(payload: dict[str, Any]):
     try:
         village_id = payload.get("village_id", 1)
+        village_name = payload.get("village_name")
+        monitored_nodes = payload.get("monitored_nodes")
+        monitored_edges = payload.get("monitored_edges")
         issues_list = payload.get("issues_data")
-        return await ai_agent.get_insights(village_id=village_id, issues_list=issues_list)
+        return await ai_agent.get_insights(
+            village_id=village_id,
+            village_name=village_name,
+            monitored_nodes=monitored_nodes,
+            monitored_edges=monitored_edges,
+            issues_list=issues_list,
+        )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"AI Insights error: {str(exc)}") from exc

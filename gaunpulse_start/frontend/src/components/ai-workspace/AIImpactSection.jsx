@@ -41,7 +41,7 @@ export default function AIImpactSection({ onSelectTab, onNavigate }) {
     if (contextVillages && contextVillages.length > 0) {
       setVillages(contextVillages);
     } else {
-      cachedFetchJson('http://127.0.0.1:8000/api/villages', {}, { ttlMs: 120000 })
+      cachedFetchJson('/api/villages', {}, { ttlMs: 120000 })
         .then((data) => {
           if (Array.isArray(data)) setVillages(data);
         })
@@ -73,7 +73,7 @@ export default function AIImpactSection({ onSelectTab, onNavigate }) {
     setReadiness(null);
     setNetworkLoading(true);
 
-    fetch(`http://127.0.0.1:8000/api/villages/${selectedVillageId}/network`, {
+    fetch(`/api/villages/${selectedVillageId}/network`, {
       signal: controller.signal,
     })
       .then((r) => {
@@ -146,7 +146,7 @@ export default function AIImpactSection({ onSelectTab, onNavigate }) {
     setSimResult(null);
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/simulations', {
+      const res = await fetch('/api/simulations', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

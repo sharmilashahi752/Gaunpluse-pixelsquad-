@@ -238,7 +238,14 @@ class VillageController extends Controller
             }
         }
 
-        $villageData = $village->loadCount(['settlements', 'issues', 'nodes', 'edges', 'facilities'])->toArray();
+        // Always ensure topological graph integrity, settlements, and lifelines
+        try {
+            \App\Services\NetworkTopologyService::ensureVillageTopology($village);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Topology initialization for {$village->name} had exception: " . $e->getMessage());
+        }
+
+        $villageData = $village->fresh()->loadCount(['settlements', 'issues', 'nodes', 'edges', 'facilities'])->toArray();
         if ($importSummary) {
             $villageData['auto_imported'] = true;
             $villageData['imported_nodes'] = $importSummary['imported_nodes'] ?? 0;
@@ -1463,6 +1470,9 @@ class VillageController extends Controller
      */
     public function buildNetwork(Request $request, Village $village)
     {
+        // Ensure topological connectivity, snapping settlements and facilities to road network
+        $topologyReport = \App\Services\NetworkTopologyService::ensureVillageTopology($village);
+
         $nodes = $village->nodes()->get();
         $edges = $village->edges()->with(['source', 'target'])->get();
 

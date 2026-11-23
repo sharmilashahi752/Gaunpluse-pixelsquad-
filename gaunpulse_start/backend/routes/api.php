@@ -162,7 +162,7 @@ Route::middleware(['auth:sanctum', 'active', 'admin'])->prefix('admin')->group(f
     Route::get('/issues', [AdminIssueController::class, 'index']);
     Route::get('/issues/{issue}', [AdminIssueController::class, 'show']);
     Route::patch('/issues/{issue}/status', [AdminIssueController::class, 'updateStatus']);
-    Route::post('/simulations', [SimulationController::class, 'store']);
+    Route::post('/simulations', [AdminSimulationController::class, 'store']);
     Route::post('/simulations/compare', [SimulationController::class, 'compare']);
     Route::get('/priorities', PriorityController::class);
 

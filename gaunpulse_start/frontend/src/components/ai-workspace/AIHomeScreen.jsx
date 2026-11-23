@@ -42,7 +42,7 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
     if (contextVillages && contextVillages.length > 0) {
       setVillages(contextVillages);
     } else {
-      cachedFetchJson('http://127.0.0.1:8000/api/villages', {}, { ttlMs: 120000 })
+      cachedFetchJson('/api/villages', {}, { ttlMs: 120000 })
         .then((data) => {
           if (Array.isArray(data)) setVillages(data);
         })
@@ -108,7 +108,7 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
 
   // Load live village statistics for recent activity widget
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/api/dashboard/stats')
+    fetch('/api/dashboard/stats')
       .then((res) => res.json())
       .then((data) => setStats(data))
       .catch((err) => console.warn('Could not load stats for AI home:', err));
@@ -135,7 +135,7 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
     setLoading(true);
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/ai/chat', {
+      const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -191,7 +191,7 @@ export default function AIHomeScreen({ onSelectTask, onNavigate }) {
       const dueDate = new Date(today.getTime() + (plan.target_days || 7) * 24 * 60 * 60 * 1000);
       const dueDateStr = dueDate.toISOString().split('T')[0];
 
-      const res = await fetch('http://127.0.0.1:8000/api/action-plans', {
+      const res = await fetch('/api/action-plans', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

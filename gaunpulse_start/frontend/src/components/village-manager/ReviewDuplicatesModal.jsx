@@ -15,7 +15,7 @@ import {
   X,
 } from 'lucide-react';
 
-const API_BASE = 'http://127.0.0.1:8000/api';
+const API_BASE = '/api';
 
 export default function ReviewDuplicatesModal({ isOpen, onClose, onConsolidationComplete }) {
   const [audit, setAudit] = useState(null);

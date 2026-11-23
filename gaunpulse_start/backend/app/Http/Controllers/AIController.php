@@ -150,13 +150,20 @@ class AIController extends Controller
             ];
         });
 
+        $village = Village::withCount(['nodes', 'edges', 'facilities', 'settlements'])->find($villageId);
+
+        $payload = [
+            'village_id' => $villageId,
+            'village_name' => $village ? $village->name : "Village {$villageId}",
+            'monitored_nodes' => $village ? $village->nodes_count : 0,
+            'monitored_edges' => $village ? $village->edges_count : 0,
+            'issues_data' => $issues->toArray(),
+        ];
+
         $simulatorUrl = rtrim(config('services.simulator.url', 'http://127.0.0.1:8001'), '/');
 
         try {
-            $response = Http::timeout(10)->acceptJson()->post("{$simulatorUrl}/ai/insights", [
-                'village_id' => $villageId,
-                'issues_data' => $issues->toArray(),
-            ]);
+            $response = Http::timeout(10)->acceptJson()->post("{$simulatorUrl}/ai/insights", $payload);
         } catch (\Throwable $e) {
             return response()->json([
                 'message' => 'AI insights service is unavailable.',

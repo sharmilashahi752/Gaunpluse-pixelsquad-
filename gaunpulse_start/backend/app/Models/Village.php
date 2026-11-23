@@ -28,6 +28,7 @@ class Village extends Model
     public function edges() { return $this->hasMany(Edge::class); }
     public function facilities() { return $this->hasMany(Facility::class); }
     public function settlements() { return $this->hasMany(SettlementGroup::class); }
+    public function settlementGroups() { return $this->hasMany(SettlementGroup::class); }
     public function issues() { return $this->hasMany(Issue::class); }
     public function auditLogs() { return $this->hasMany(AuditLog::class); }
     public function municipalityRel() { return $this->belongsTo(Municipality::class, 'municipality_id'); }

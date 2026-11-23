@@ -71,8 +71,18 @@ class GaunPulseAIAgent:
                 ],
             )
 
-        # Retrieve village administrative metadata dynamically
-        village_details = await tools.get_village_details(village_id=village_id)
+        # Retrieve village administrative metadata from preloaded request or dynamically
+        network_data = request.network_data
+        issues_data = request.issues_data
+
+        if network_data and isinstance(network_data, dict) and "village" in network_data:
+            village_details = network_data["village"] or {}
+        else:
+            try:
+                village_details = await tools.get_village_details(village_id=village_id)
+            except Exception:
+                village_details = {}
+
         village_name = village_details.get("name") or f"Village {village_id}"
         village_muni = village_details.get("municipality") or "Municipality"
         village_ward = f"Ward {village_details.get('ward_no', '1')}"
@@ -110,9 +120,6 @@ class GaunPulseAIAgent:
             "issues", "problems", "alerts", "reports", "disruptions",
             "समस्या", "विवरण", "के के छन्"
         ])
-
-        network_data = request.network_data
-        issues_data = request.issues_data
 
         # 1. Citizen Assistance Tool Call
         if is_citizen_intent:
@@ -445,28 +452,38 @@ class GaunPulseAIAgent:
     async def get_insights(
         self,
         village_id: int = 1,
+        village_name: Optional[str] = None,
+        monitored_nodes: Optional[int] = None,
+        monitored_edges: Optional[int] = None,
         issues_list: Optional[List[Dict[str, Any]]] = None,
     ) -> AIInsightsResponse:
         """Generate database-backed proactive insights for any village in Nepal."""
-        village_details = await tools.get_village_details(village_id=village_id)
-        village_name = village_details.get("name") or f"Village {village_id}"
+        if village_name is None:
+            try:
+                village_details = await tools.get_village_details(village_id=village_id)
+                village_name = village_details.get("name") or f"Village {village_id}"
+            except Exception:
+                village_name = f"Village {village_id}"
 
         if issues_list is None:
-            issues_data = await tools.get_village_issues(village_id=village_id)
-            issues_list = issues_data.get("issues", [])
+            try:
+                issues_data = await tools.get_village_issues(village_id=village_id)
+                issues_list = issues_data.get("issues", [])
+            except Exception:
+                issues_list = []
 
-        # Fetch village network to obtain real monitored node and edge counts
-        monitored_nodes = 0
-        monitored_edges = 0
-        try:
-            async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
-                net_res = await client.get(f"{LARAVEL_API_URL}/villages/{village_id}/network")
-                if net_res.status_code == 200:
-                    net_json = net_res.json()
-                    monitored_nodes = len(net_json.get("nodes", []))
-                    monitored_edges = len(net_json.get("edges", []))
-        except Exception:
-            pass
+        if monitored_nodes is None or monitored_edges is None:
+            monitored_nodes = 0
+            monitored_edges = 0
+            try:
+                async with httpx.AsyncClient(timeout=2.0) as client:
+                    net_res = await client.get(f"{LARAVEL_API_URL}/villages/{village_id}/network")
+                    if net_res.status_code == 200:
+                        net_json = net_res.json()
+                        monitored_nodes = len(net_json.get("nodes", []))
+                        monitored_edges = len(net_json.get("edges", []))
+            except Exception:
+                pass
 
         # Categorize
         categories = {}

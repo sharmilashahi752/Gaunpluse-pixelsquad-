@@ -35,6 +35,12 @@ class SimulationNetworkService
     {
         $village->loadMissing(['nodes', 'edges.source', 'edges.target', 'facilities.node', 'settlements']);
 
+        // Auto-heal topological connectivity and settlement groups if needed
+        if ($village->nodes->isNotEmpty() && ($village->settlements->isEmpty() || $village->facilities->isEmpty())) {
+            NetworkTopologyService::ensureVillageTopology($village);
+            $village->load(['nodes', 'edges.source', 'edges.target', 'facilities.node', 'settlements']);
+        }
+
         $nodes = $village->nodes;
         $edges = $village->edges;
         $facilities = $village->facilities;
@@ -187,13 +193,14 @@ class SimulationNetworkService
 
     public function graphVersion(Village $village): string
     {
-        $village->loadMissing(['nodes:id,village_id,updated_at', 'edges:id,village_id,updated_at']);
+        $village->loadMissing(['nodes:id,village_id,updated_at', 'edges:id,village_id,updated_at', 'settlements:id,village_id,updated_at']);
         $fingerprint = [
             'village_id' => $village->id,
             'import_batch_id' => $village->import_batch_id,
             'updated_at' => $village->updated_at?->toJSON(),
             'nodes' => $village->nodes->map(fn ($node): array => [$node->id, $node->updated_at?->toJSON()])->all(),
             'edges' => $village->edges->map(fn ($edge): array => [$edge->id, $edge->updated_at?->toJSON()])->all(),
+            'settlements' => $village->settlements->map(fn ($s): array => [$s->id, $s->updated_at?->toJSON()])->all(),
         ];
 
         return 'gp-'.substr(hash('sha256', json_encode($fingerprint, JSON_THROW_ON_ERROR)), 0, 16);
