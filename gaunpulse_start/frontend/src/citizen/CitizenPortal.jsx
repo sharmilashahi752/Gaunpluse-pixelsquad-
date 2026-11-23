@@ -55,9 +55,6 @@ class CitizenErrorBoundary extends Component {
 
   handleReload = () => {
     this.setState({ hasError: false, error: null });
-    if (this.props.onReset) {
-      this.props.onReset();
-    }
   };
 
   render() {
@@ -86,7 +83,7 @@ class CitizenErrorBoundary extends Component {
                 ? 'अनपेक्षित त्रुटि देखा परेको छ। कृपया पृष्ठ पुनः लोड गर्नुहोस् वा मुख्य पृष्ठमा फर्कनुहोस्।'
                 : (this.state.error?.message || 'An unexpected rendering error occurred. You can safely return to the dashboard overview.')}
             </p>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
               <button
                 type="button"
                 className="citizen-primary"
@@ -106,8 +103,30 @@ class CitizenErrorBoundary extends Component {
                 }}
               >
                 <RefreshCw size={14} />
-                {isNe ? 'पुनः प्रयास गर्नुहोस्' : 'Reload Overview'}
+                {isNe ? 'पुनः प्रयास गर्नुहोस्' : 'Try Again'}
               </button>
+              {this.props.onReset && (
+                <button
+                  type="button"
+                  className="citizen-secondary"
+                  onClick={this.props.onReset}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '9px 18px',
+                    background: '#f1f5f3',
+                    color: '#123D30',
+                    borderRadius: '7px',
+                    border: '1px solid #c8d8ce',
+                    fontSize: '13.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {isNe ? 'ड्यासबोर्डमा फर्कनुहोस्' : 'Return to Dashboard'}
+                </button>
+              )}
             </div>
           </div>
         </div>

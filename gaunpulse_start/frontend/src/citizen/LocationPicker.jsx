@@ -29,48 +29,65 @@ export default function LocationPicker({ latitude, longitude, onChange, lang = '
   useEffect(() => {
     if (!mapElement.current || mapInstance.current) return;
 
-    // Nepal centroid default (28.3949, 84.1240)
-    const initial = latitude && longitude
-      ? [Number(latitude), Number(longitude)]
-      : [28.3949, 84.1240];
-
-    const map = L.map(mapElement.current, {
-      zoomControl: true,
-      scrollWheelZoom: true,
-    }).setView(initial, latitude && longitude ? 15 : 7);
-
-    mapInstance.current = map;
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors',
-    }).addTo(map);
-
-    function createMarker(lat, lng) {
-      const pos = [lat, lng];
-      if (markerInstance.current) {
-        markerInstance.current.setLatLng(pos);
-      } else {
-        markerInstance.current = L.marker(pos, { icon: customPinIcon, draggable: true }).addTo(map);
-        markerInstance.current.on('dragend', () => {
-          const newPos = markerInstance.current.getLatLng();
-          onChange(newPos.lat.toFixed(6), newPos.lng.toFixed(6));
-        });
-      }
-      onChange(lat.toFixed(6), lng.toFixed(6));
+    if (mapElement.current._leaflet_id) {
+      delete mapElement.current._leaflet_id;
     }
 
-    map.on('click', (event) => {
-      createMarker(event.latlng.lat, event.latlng.lng);
-    });
+    try {
+      // Nepal centroid default (28.3949, 84.1240)
+      const latNum = Number(latitude);
+      const lngNum = Number(longitude);
+      const isValid = !isNaN(latNum) && !isNaN(lngNum) && (latNum !== 0 || lngNum !== 0);
+      const initial = isValid ? [latNum, lngNum] : [28.3949, 84.1240];
 
-    if (latitude && longitude && Number(latitude) !== 0) {
-      createMarker(Number(latitude), Number(longitude));
+      const map = L.map(mapElement.current, {
+        zoomControl: true,
+        scrollWheelZoom: true,
+      }).setView(initial, isValid ? 15 : 7);
+
+      mapInstance.current = map;
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors',
+      }).addTo(map);
+
+      function createMarker(lat, lng, notify = true) {
+        const pos = [lat, lng];
+        if (markerInstance.current) {
+          markerInstance.current.setLatLng(pos);
+        } else {
+          markerInstance.current = L.marker(pos, { icon: customPinIcon, draggable: true }).addTo(map);
+          markerInstance.current.on('dragend', () => {
+            const newPos = markerInstance.current.getLatLng();
+            onChange?.(newPos.lat.toFixed(6), newPos.lng.toFixed(6));
+          });
+        }
+        if (notify) {
+          onChange?.(lat.toFixed(6), lng.toFixed(6));
+        }
+      }
+
+      map.on('click', (event) => {
+        createMarker(event.latlng.lat, event.latlng.lng, true);
+      });
+
+      if (isValid) {
+        createMarker(latNum, lngNum, false);
+      }
+    } catch (err) {
+      console.warn('LocationPicker Map Init Error:', err);
     }
 
     return () => {
-      map.remove();
-      mapInstance.current = null;
+      if (mapInstance.current) {
+        try {
+          mapInstance.current.remove();
+        } catch (e) {
+          console.warn('LocationPicker Map Cleanup Error:', e);
+        }
+        mapInstance.current = null;
+      }
       markerInstance.current = null;
     };
   }, []);

@@ -105,24 +105,41 @@ export default function SubmitComplaint({ onNavigate, onViewComplaint, lang = 'n
         if (!isMounted) return;
         const munis = data.municipalities || [];
         setMunicipalities(munis);
-        setProvinces(data.provinces || []);
-        setDistricts(data.districts || []);
-        setCategories(
-          data.categories || [
-            'Road Damage',
-            'Bridge Damage',
-            'Drinking Water Supply',
-            'Water Pipeline',
-            'Drainage',
-            'Street Light',
-            'School Access / Building',
-            'Health Facility Access',
-            'Landslide',
-            'Flood Damage',
-            'Public Building',
-            'Other',
-          ]
-        );
+        
+        // Normalize provinces to safe array of { code, name, local_name }
+        const rawProvinces = data.provinces || [];
+        const normalizedProvinces = rawProvinces.map((p) => {
+          if (typeof p === 'string') return { code: p, name: p, local_name: p };
+          return {
+            code: p.code || p.name || '',
+            name: p.name || p.local_name || '',
+            local_name: p.local_name || p.name || '',
+          };
+        });
+        setProvinces(normalizedProvinces);
+
+        // Normalize districts to array of strings
+        const rawDistricts = data.districts || [];
+        const normalizedDistricts = rawDistricts.map((d) => (typeof d === 'string' ? d : (d?.name || '')));
+        setDistricts(normalizedDistricts);
+
+        // Normalize categories
+        const rawCategories = data.categories || [];
+        const normalizedCategories = (rawCategories.length > 0 ? rawCategories : [
+          'Road Damage',
+          'Bridge Damage',
+          'Drinking Water Supply',
+          'Water Pipeline',
+          'Drainage',
+          'Street Light',
+          'School Access / Building',
+          'Health Facility Access',
+          'Landslide',
+          'Flood Damage',
+          'Public Building',
+          'Other',
+        ]).map((c) => (typeof c === 'string' ? c : (c?.name || c?.title || '')));
+        setCategories(normalizedCategories);
 
         if (munis.length > 0) {
           const firstMuni = munis[0];
@@ -201,15 +218,21 @@ export default function SubmitComplaint({ onNavigate, onViewComplaint, lang = 'n
 
   // Filtered districts by province
   const availableDistricts = useMemo(() => {
-    if (!selectedProvince) return districts;
-    const filteredMunis = municipalities.filter((m) => m.province === selectedProvince);
-    return Array.from(new Set(filteredMunis.map((m) => m.district)));
+    if (!selectedProvince) return districts || [];
+    const filteredMunis = (municipalities || []).filter((m) => {
+      const mProv = m.province || '';
+      return mProv === selectedProvince || mProv.toLowerCase() === String(selectedProvince).toLowerCase();
+    });
+    return Array.from(new Set(filteredMunis.map((m) => m.district).filter(Boolean)));
   }, [municipalities, selectedProvince, districts]);
 
   // Filtered municipalities by district
   const availableMunicipalities = useMemo(() => {
-    if (!selectedDistrict) return municipalities;
-    return municipalities.filter((m) => m.district === selectedDistrict);
+    if (!selectedDistrict) return municipalities || [];
+    return (municipalities || []).filter((m) => {
+      const mDist = m.district || '';
+      return mDist === selectedDistrict || mDist.toLowerCase() === String(selectedDistrict).toLowerCase();
+    });
   }, [municipalities, selectedDistrict]);
 
   // Instant Municipality Search Handler
@@ -768,17 +791,27 @@ export default function SubmitComplaint({ onNavigate, onViewComplaint, lang = 'n
                 onChange={(e) => {
                   const p = e.target.value;
                   setSelectedProvince(p);
-                  const matchingMunis = municipalities.filter((m) => m.province === p);
+                  const matchingMunis = municipalities.filter((m) => {
+                    const mProv = m.province || '';
+                    return mProv === p || mProv.toLowerCase() === p.toLowerCase();
+                  });
                   if (matchingMunis.length > 0) {
                     handleMunicipalityChange(matchingMunis[0].id);
                   }
                 }}
               >
-                {provinces.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
+                {provinces.map((p, idx) => {
+                  const pName = typeof p === 'string' ? p : (p?.name || p?.local_name || '');
+                  const pKey = typeof p === 'string' ? p : (p?.code || p?.name || idx);
+                  const pLabel = typeof p === 'string'
+                    ? p
+                    : (lang === 'ne' && p?.local_name ? `${p.local_name} (${p.name})` : (p?.name || p?.local_name || ''));
+                  return (
+                    <option key={pKey} value={pName}>
+                      {pLabel}
+                    </option>
+                  );
+                })}
               </select>
             </label>
 
@@ -790,17 +823,23 @@ export default function SubmitComplaint({ onNavigate, onViewComplaint, lang = 'n
                 onChange={(e) => {
                   const d = e.target.value;
                   setSelectedDistrict(d);
-                  const matchingMunis = municipalities.filter((m) => m.district === d);
+                  const matchingMunis = municipalities.filter((m) => {
+                    const mDist = m.district || '';
+                    return mDist === d || mDist.toLowerCase() === d.toLowerCase();
+                  });
                   if (matchingMunis.length > 0) {
                     handleMunicipalityChange(matchingMunis[0].id);
                   }
                 }}
               >
-                {availableDistricts.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
+                {availableDistricts.map((d, idx) => {
+                  const dName = typeof d === 'string' ? d : (d?.name || '');
+                  return (
+                    <option key={dName || idx} value={dName}>
+                      {dName}
+                    </option>
+                  );
+                })}
               </select>
             </label>
 
