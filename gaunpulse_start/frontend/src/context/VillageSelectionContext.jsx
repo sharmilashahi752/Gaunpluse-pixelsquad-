@@ -59,7 +59,10 @@ export function VillageSelectionProvider({ children }) {
 
   // Re-fetch on mount and whenever authentication session, role, or active municipality workspace changes
   useEffect(() => {
-    fetchVillages(true);
+    // Authentication/workspace changes are already handled by token-scoped cache keys
+    // and AuthContext invalidation. Reuse fresh data instead of forcing every reload.
+    setLoadingVillages(true);
+    fetchVillages(false);
   }, [token, activeMunicipalityId, isSystemAdmin, fetchVillages]);
 
   const selectedVillage = useMemo(() => {
