@@ -176,26 +176,23 @@ export default function SimulationsPage({ onNavigate }) {
     setLoadingVillage(true);
     setVillageData(null);
 
-    Promise.all([
-      cachedFetchJson(`${API_BASE}/villages/${requestedVillageId}/network`, {}, {
-        ttlMs: 60000,
-        onBackgroundUpdate: (fresh) => {
-          if (fresh?.village?.id === requestedVillageId) setVillageData(fresh);
-        },
-      }),
-      cachedFetchJson(`${API_BASE}/simulations?village_id=${requestedVillageId}`, {}, {
-        ttlMs: 45000,
-        onBackgroundUpdate: (fresh) => {
-          if (Array.isArray(fresh)) setHistory(fresh);
-        },
-      }),
-    ])
-      .then(([networkData, historyData]) => {
+    // Load network and history independently: a slow history response must never
+    // prevent the network and simulation controls from becoming usable.
+    let cancelled = false;
+    cachedFetchJson(`${API_BASE}/villages/${requestedVillageId}/network`, {}, {
+      ttlMs: 60000,
+      onBackgroundUpdate: (fresh) => {
+        if (!cancelled && Number(fresh?.village?.id) === requestedVillageId) {
+          setVillageData(fresh);
+        }
+      },
+    })
+      .then((networkData) => {
+        if (cancelled) return;
         if (Number(networkData?.village?.id) !== requestedVillageId) {
           throw new Error('The server returned a different village network. Please retry.');
         }
         setVillageData(networkData);
-        setHistory(Array.isArray(historyData) ? historyData : []);
 
         const firstOperational = networkData.edges?.find(
           (edge) => !BLOCKED_STATUSES.has(String(edge.status || '').toLowerCase()),
@@ -204,7 +201,6 @@ export default function SimulationsPage({ onNavigate }) {
           setSelectedEdgeId(String(firstOperational.id));
           setSelectedBlockedEdgeIds([String(firstOperational.id)]);
         }
-
         const damaged = (networkData.edges || []).filter((edge) =>
           BLOCKED_STATUSES.has(String(edge.status || '').toLowerCase()),
         );
@@ -212,11 +208,26 @@ export default function SimulationsPage({ onNavigate }) {
         if (damaged[1]) setRepairOptionB(String(damaged[1].id));
       })
       .catch((error) => {
-        setLoadError(error.message || 'Village network could not be loaded.');
+        if (!cancelled) setLoadError(error.message || 'Village network could not be loaded.');
       })
       .finally(() => {
-        setLoadingVillage(false);
+        if (!cancelled) setLoadingVillage(false);
       });
+
+    cachedFetchJson(`${API_BASE}/simulations?village_id=${requestedVillageId}`, {}, {
+      ttlMs: 45000,
+      onBackgroundUpdate: (fresh) => {
+        if (!cancelled && Array.isArray(fresh)) setHistory(fresh);
+      },
+    })
+      .then((historyData) => {
+        if (!cancelled) setHistory(Array.isArray(historyData) ? historyData : []);
+      })
+      .catch((error) => {
+        if (!cancelled) console.warn('Simulation history could not be loaded:', error);
+      });
+
+    return () => { cancelled = true; };
   }, [selectedVillageId]);
 
   // Derived Properties
